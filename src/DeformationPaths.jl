@@ -4,10 +4,10 @@ import HomotopyContinuation: evaluate
 import LinearAlgebra: norm, pinv, nullspace
 import GLMakie: @lift, Figure, record, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f
 
-export ConstraintSystem, Framework, DeformationPath, animate2D_framework, animate3D_framework
-
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix
+using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, plot_framework
+
+export ConstraintSystem, Framework, DeformationPath, animate2D_framework, animate3D_framework, plot_framework
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -103,7 +103,7 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
     xlims!(ax, xlims[1]-padding,xlims[2]+padding)
     ylims!(ax, ylims[1]-padding,ylims[2]+padding)
     zlims!(ax, zlims[1]-padding,zlims[2]+padding)

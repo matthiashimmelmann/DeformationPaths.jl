@@ -1,8 +1,9 @@
 module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate
+import GLMakie: Figure, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f
 
-export GeometricConstraintSystem, Framework
+export GeometricConstraintSystem, Framework, plot_framework
 
 mutable struct ConstraintSystem
     variables::Vector{Variable}
@@ -81,6 +82,31 @@ end
 
 function to_Matrix(F::Framework, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
+end
+
+function plot_framework(F::Framework, filename::String; padding=0.15, markersize=50, linewidth=12)
+    fig = Figure(size=(1000,1000))
+    matrix_coords = F.G.realization
+    if F.G.dimension==2
+        ax = Axis(fig[1,1], aspect = 1)
+    elseif F.G.dimension==3
+        ax = Axis3(fig[1,1], aspect = 1)
+        zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
+        zlims!(ax, zlims[1]-padding, zlims[2]+padding)
+    else
+        throw(error("The dimension must either be 2 or 3!"))
+    end
+    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
+    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
+    xlims!(ax, xlims[1]-padding, xlims[2]+padding)
+    ylims!(ax, ylims[1]-padding, ylims[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = linewidth, color=:steelblue), F.bars)
+    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = markersize, color=:black), 1:length(F.vertices))
+    save("$(filename).png", fig)
 end
 
 end
