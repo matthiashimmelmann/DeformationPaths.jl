@@ -1,0 +1,8 @@
+name = "DeformationPaths"
+uuid = "50c58891-b0b3-4ec2-813a-7650aafc80af"
+authors = ["matthiashimmelmann <matthias.himmelmann@outlook.de>"]
+version = "0.1.0"
+
+[deps]
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+HomotopyContinuation = "f213a82b-91d6-5c5d-acf7-10f1c761b327"
