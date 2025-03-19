@@ -43,6 +43,7 @@ mutable struct Framework
         end
         variables = [x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !((i,j) in pinned_indices)]
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
+        bar_equations = filter(eq->eq!=0, bar_equations)
         G = ConstraintSystem(variables, bar_equations, realization, pinned_indices)
         new(G, vertices, bars)
     end
@@ -88,9 +89,9 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
-        ax = Axis(fig[1,1], aspect = 1)
+        ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = 1)
+        ax = Axis3(fig[1,1])
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
         throw(error("The dimension must either be 2 or 3!"))

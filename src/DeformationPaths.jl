@@ -3,6 +3,7 @@ module DeformationPaths
 import HomotopyContinuation: evaluate
 import LinearAlgebra: norm, pinv, nullspace
 import GLMakie: @lift, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f
+import ProgressMeter: @showprogress
 
 include("GeometricConstraintSystem.jl")
 using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, plot_framework
@@ -18,14 +19,15 @@ mutable struct DeformationPath
     function DeformationPath(G::ConstraintSystem, flex_choice::Union{Int, Vector{Float64}}, num_steps::Int; step_size::Float64=1e-2)
         start_point = to_Array(G, G.realization)
         if typeof(flex_choice)==Int || typeof(flex_choice)==Float64
-            flex_space = nullspace(evaluate(G.jacobian, G.variables=>start_point); atol=1e-10)
+            J = evaluate(G.jacobian, G.variables=>start_point)
+            flex_space = nullspace(J; atol=1e-12)
             prev_flex = flex_space[:,Int(flex_choice)]
         else
             prev_flex = flex_choice
         end
         motion_samples = [Float64.(start_point)]
 
-        for i in 1:num_steps
+        @showprogress for i in 1:num_steps
             q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end])
             q = newton_correct(G, q)
             push!(motion_samples, q)
@@ -38,7 +40,7 @@ mutable struct DeformationPath
         global damping = 0.15
         while(norm(evaluate(G.equations, G.variables=>q)) > tol)
             J = evaluate.(G.jacobian, G.variables=>q)
-            stress_dimension = size(nullspace(J'; atol=1e-10))[2]
+            stress_dimension = size(nullspace(J'; atol=1e-12))[2]
             if stress_dimension > 0
                 rand_mat = randn(Float64, length(G.equations) - stress_dimension, length(G.equations))
                 equations = rand_mat*G.equations
@@ -81,7 +83,7 @@ end
 
 function animate2D_framework(D::DeformationPath, F::Framework, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=50, line_width::Int=12, edge_color=:steelblue, vertex_color=:black)
     fig = Figure(size=(1000,1000))
-    ax = Axis(fig[1,1], aspect = 1)
+    ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
@@ -108,18 +110,15 @@ end
 
 function animate3D_framework(D::DeformationPath, F::Framework, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=50, line_width::Int=12, edge_color=:steelblue, vertex_color=:black)
     fig = Figure(size=(1000,1000))
-    ax = Axis3(fig[1,1], aspect = 1)
+    ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
     zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
     limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
-    translation = limits[1]-xlims[1] + xlims[2]-limits[2]
-    xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
-    translation = limits[1]-ylims[1] + ylims[2]-limits[2]
-    ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
-    translation = limits[1]-zlims[1] + zlims[2]-limits[2]
-    zlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
 
@@ -160,4 +159,8 @@ function project_deformation_random(D::DeformationPath, projected_dimension::Int
     return fig
 end
 
+F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 sqrt(2)]'))
+display(F.G.pinned_indices)
+D = DeformationPath(F.G, 1, 1500; step_size=0.02)
+animate3D_framework(D,F,"coned_cube_motion.jl")
 end 
