@@ -1,21 +1,24 @@
 module DeformationPaths
 
-import HomotopyContinuation: evaluate
-import LinearAlgebra: norm, pinv, nullspace, rank, qr
-import GLMakie: @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f
+import HomotopyContinuation: evaluate, differentiate
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros
+import GLMakie: @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, VolumeHypergraph, plot
+using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope
 
 export  ConstraintSystem, 
         Framework, 
         DeformationPath, 
         animate,
         plot,
-        project_deformation_random
+        project_deformation_random,
+        Polytope,
+        to_Matrix,
+        to_Array
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -30,8 +33,8 @@ mutable struct DeformationPath
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples = [Float64.(start_point)]
-        if !(type in ["framework", "hypergraph"])
-            throw(error("The type must either be 'framework' or 'hypergraph', but is $(type)."))
+        if !(type in ["framework", "hypergraph", "polytope"])
+            throw(error("The type must either be 'framework', 'hypergraph' or 'polytope', but is $(type)."))
         end
         @showprogress for i in 1:num_steps
             q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], type)
@@ -49,6 +52,10 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; step_size=step_size)
     end
 
+    function DeformationPath(F::Polytope, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+        DeformationPath(F.G, flex_mult, num_steps, "polytope"; step_size=step_size)
+    end
+
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
         realization = to_Matrix(G,point)
@@ -56,8 +63,11 @@ mutable struct DeformationPath
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
+        elseif type=="polytope"
+            K_n = ConstraintSystem(G.vertices,G.variables, vcat(G.equations,[sum((G.xs[:,bar[1]]-G.xs[:,bar[2]]).^2) - sum((G.realization[:,bar[1]]-G.realization[:,bar[2]]).^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
         end
-        trivial_inf_flexes = nullspace(evaluate(K_n.G.jacobian, G.variables=>point))
+        trivial_inf_flexes = nullspace(evaluate(K_n.G.jacobian, K_n.G.variables=>point))
+        display(trivial_inf_flexes)
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
@@ -118,19 +128,7 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
         flex_mult = [1 for _ in 1:size(flex_space)[2]]
     end
     D = DeformationPath(F, filename, flex_mult, num_steps; step_size=step_size)
-    if typeof(F)==Framework
-        if F.G.dimension==2
-            animate2D_framework(F, filename; kwargs...)
-        elseif F.G.dimension==3
-            animate3D_framework(F, filename; kwargs...)
-        else
-            throw(error("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)"))
-        end
-    elseif typeof(F)==VolumeHypergraph
-        return animate2D_hypergraph(F, filename; kwargs...)
-    else
-        throw(error("The type of 'F' needs to be either Framework or VolumeHypergraph, but is $(typeof(F))"))
-    end
+    animate(D, F, filename; kwargs...)
 end
 
 function animate(D::DeformationPath, F, filename::String; kwargs...)
@@ -144,8 +142,10 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
         end
     elseif typeof(F)==VolumeHypergraph
         return animate2D_hypergraph(D, F, filename; kwargs...)
+    elseif typeof(F)==Polytope
+        return animate3D_polytope(D, F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework or VolumeHypergraph, but is $(typeof(F))"))
+        throw(error("The type of 'F' needs to be either Framework, Polytope or VolumeHypergraph, but is $(typeof(F))"))
     end
 end
 
@@ -230,27 +230,47 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
+function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int}}=nothing, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     if facet_colors==nothing
         facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.facets), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
-    fixed_edge[1] in D.G.vertices && fixed_edge[2] in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
+    skip_scaling = false
+    if fixed_triangle==nothing
+        fixed_triangle=(1,2,3)
+        skip_scaling=true
+    else
+        all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.facets]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.facets]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.facets]) || throw(error("fixed_triangle is not a vertex of the underlying graph."))
+    end
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,fixed_edge[1]]
+        p0 = matrix_coords[i][:,fixed_triangle[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
     end
     fixed_direction = [1.,0]
     for i in 1:length(matrix_coords)
-        theta = atan(matrix_coords[i][:,fixed_edge[2]][2], matrix_coords[i][:,fixed_edge[2]][1])
+        theta = atan(matrix_coords[i][:,fixed_triangle[2]][2], matrix_coords[i][:,fixed_triangle[2]][1])
         rotation_matrix = [cos(theta) sin(theta); -sin(theta) cos(theta)]
         # Rotate the realization to the `fixed_direction`.
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
+        end
+        # Scale to (1,0)
+        if skip_scaling
+            continue
+        end
+        x_val = matrix_coords[i][1,fixed_triangle[2]]
+        scaling_matrix = [1/x_val 0; 0 x_val]
+        for j in 1:size(matrix_coords[i])[2]
+            matrix_coords[i][:,j] = scaling_matrix*matrix_coords[i][:,j]
+        end
+        y_val = matrix_coords[i][:,fixed_triangle[3]]
+        shear_matrix = [1 (tip_value-y_val[1])/y_val[2]; 0 1]
+        for j in 1:size(matrix_coords[i])[2]
+            matrix_coords[i][:,j] = shear_matrix*matrix_coords[i][:,j]
         end
     end
 
@@ -278,6 +298,41 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
         time[] = t
     end
+end
+
+function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
+    fig = Figure(size=(1000,1000))
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+
+    ax = Axis3(fig[1,1])
+    for i in 1:length(matrix_coords)
+        p0 = matrix_coords[i][:,pinned_vertex]
+        for j in 1:size(matrix_coords[i])[2]
+            matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
+        end
+    end
+
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    zlims!(ax, limits[1]-padding, limits[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+    time=Observable(1)
+
+    allVertices=@lift begin
+        pointys = matrix_coords[$time]
+        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+    end
+
+    foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(F.edges[i][1])], ($allVertices)[Int64(F.edges[i][2])]]); linewidth=line_width, color=line_color), 1:length(F.edges))
+    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
+    foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    save("../data/$(filename).png", fig)
+    return fig
 end
 
 
