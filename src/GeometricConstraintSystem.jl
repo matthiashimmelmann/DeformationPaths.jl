@@ -106,7 +106,7 @@ mutable struct Polytope
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
-        facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j])%length(facets[i])+1]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
+        facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j%length(facets[i])+1])]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
         normal_equations = [n[:,i]'*n[:,j]-1 for i in 1:length(facets) for j in i+1:length(facets)]
         bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, normal_equations, bar_equations))

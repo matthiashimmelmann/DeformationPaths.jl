@@ -59,16 +59,20 @@ mutable struct DeformationPath
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
         display(inf_flexes)
-        realization = to_Matrix(G,point)
+        realization = to_Matrix(G, point)
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
         elseif type=="polytope"
-            K_n = ConstraintSystem(G.vertices,G.variables, vcat(G.equations,[sum((G.xs[:,bar[1]]-G.xs[:,bar[2]]).^2) - sum((G.realization[:,bar[1]]-G.realization[:,bar[2]]).^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization[:,1:length(G.vertices)])
         end
-        trivial_inf_flexes = nullspace(evaluate(K_n.jacobian, K_n.variables=>point))
+        trivial_inf_flexes = nullspace(evaluate(K_n.jacobian, K_n.variables=>point[1:length(G.vertices)*G.dimension]))
         s = size(trivial_inf_flexes)[2]+1
+        if type=="polytope"
+            trivial_inf_flexes = vcat(trivial_inf_flexes, zeros(size(inf_flexes)[1]-size(trivial_inf_flexes)[1], size(inf_flexes)[2]))
+        end
+        display(trivial_inf_flexes)
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
             tmp_matrix = hcat(trivial_inf_flexes, inf_flex)
