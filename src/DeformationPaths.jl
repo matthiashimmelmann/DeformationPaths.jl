@@ -58,6 +58,7 @@ mutable struct DeformationPath
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
+        display(inf_flexes)
         realization = to_Matrix(G,point)
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
@@ -66,8 +67,7 @@ mutable struct DeformationPath
         elseif type=="polytope"
             K_n = ConstraintSystem(G.vertices,G.variables, vcat(G.equations,[sum((G.xs[:,bar[1]]-G.xs[:,bar[2]]).^2) - sum((G.realization[:,bar[1]]-G.realization[:,bar[2]]).^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
         end
-        trivial_inf_flexes = nullspace(evaluate(K_n.G.jacobian, K_n.G.variables=>point))
-        display(trivial_inf_flexes)
+        trivial_inf_flexes = nullspace(evaluate(K_n.jacobian, K_n.variables=>point))
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
@@ -76,6 +76,7 @@ mutable struct DeformationPath
                 extend_basis_matrix = hcat(extend_basis_matrix, inf_flex)
             end
         end
+        display(extend_basis_matrix)
         Q, R = qr(extend_basis_matrix)
         Q = Q[:, s:rank(R, atol=1e-12)]
         return Q
