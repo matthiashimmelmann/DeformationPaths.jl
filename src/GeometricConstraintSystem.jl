@@ -166,6 +166,11 @@ function to_Array(F::Union{Framework,VolumeHypergraph,Polytope}, p::Union{Matrix
     return to_Array(F.G, p)
 end
 
+function to_Array(F::DiskPacking, p::Union{Matrix{Int},Matrix{Float64}})
+    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in F.pinned_vertices)]...)
+end
+
+
 function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
     counts = 1
     point = Matrix{Float64}(Base.copy(G.realization))
@@ -178,6 +183,24 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
     end
     return point
 end
+
+function to_Matrix(F::DiskPacking, q::Union{Vector{Float64}, Vector{Int}})
+    counts = 1
+    point = Matrix{Float64}(Base.copy(G.realization))
+
+    for i in 1:size(point)[2]
+        for j in 1:size(point)[1]
+            if j in F.pinned_vertices
+                point[j,i] = F.G.realization[j,i]
+                continue
+            end
+            point[j,i] = q[counts]
+            counts += 1
+        end
+    end
+    return point
+end
+
 
 function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope}, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
@@ -229,7 +252,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=9, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Int=6, dualgraph_color=:grey75, n_circle_segments::Int=40)
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Int=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     ax = Axis(fig[1,1])
@@ -258,8 +281,8 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
     translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
     ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
 
-    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.5), marker=:utriangle), F.pinned_vertices)
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.pinned_vertices)
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end

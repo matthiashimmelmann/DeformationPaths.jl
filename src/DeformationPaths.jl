@@ -66,6 +66,8 @@ mutable struct DeformationPath
 
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
+        display(G.variables)
+        display(point)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
         realization = to_Matrix(G, point)
         if type=="framework"
@@ -349,7 +351,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
 end
 
 
-function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_labels=true, disk_strokewidth::Int=8.5, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Int=6, dualgraph_color=:grey75, n_circle_segments::Int=50)
+function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_labels=true, disk_strokewidth::Int=8.5, line_width::Float64=7, disk_color=:steelblue, markersize=75, markercolor=:red3, dualgraph_color=:grey85, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
