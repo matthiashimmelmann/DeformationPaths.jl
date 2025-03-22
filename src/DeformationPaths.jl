@@ -12,7 +12,8 @@ using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matr
 
 export  ConstraintSystem, 
         Framework, 
-        DeformationPath, 
+        DeformationPath,
+        VolumeHypergraph,
         animate,
         plot,
         project_deformation_random,
@@ -35,8 +36,8 @@ mutable struct DeformationPath
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
-        if !(type in ["framework", "hypergraph", "polytope"])
-            throw(error("The type must either be 'framework', 'hypergraph' or 'polytope', but is $(type)."))
+        if !(type in ["framework", "hypergraph", "polytope", "diskpacking"])
+            throw(error("The type must either be 'framework', 'diskpacking', 'hypergraph' or 'polytope', but is $(type)."))
         end
         @showprogress for i in 1:num_steps
             q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], type)
@@ -61,7 +62,24 @@ mutable struct DeformationPath
     end
 
     function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
-        DeformationPath(F.G, flex_mult, num_steps, "diskpacking"; step_size=step_size)
+        start_point = to_Array(F, F.G.realization)
+        flex_space = compute_nontrivial_inf_flexes(F.G, start_point, "diskpacking")
+        size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
+        prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
+        prev_flex = prev_flex ./ norm(prev_flex)
+        motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(F.G, Float64.(start_point))]
+        @showprogress for i in 1:num_steps
+            q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], "diskpacking")
+            q = newton_correct(F.G, q)
+            cur_realization = to_Matrix(F,Float64.(q))
+            if any(t->norm(cur_realization[:,t[1]]-cur_realization[:,t[2]]) < F.radii[t[1]]+F.radii[t[2]]-F.tolerance, powerset(F.G.vertices,2,2))
+                @warn "A pair of disks got too close!"
+                break
+            end
+            push!(motion_samples, q)
+            push!(motion_matrices, cur_realization)
+        end
+        new(F.G, step_size, motion_samples, motion_matrices, flex_mult)
     end
 
 
@@ -132,7 +150,18 @@ end
 
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
     if flex_mult==nothing
-        flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), typeof(F)==Framework ? "framework" : "hypergraph")
+        if typeof(F)==Framework
+            type="framework"
+        elseif typeof(F)==VolumeHypergraph
+            type="hypergraph"
+        elseif typeof(F)==DiskPacking
+            type="diskpacking"
+        elseif typeof(F)==Polytope
+            type="polytope"
+        else
+            throw(error("Type of F is not yet supported. It is $(typeof(F))."))
+        end
+        flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), type)
         flex_mult = [1 for _ in 1:size(flex_space)[2]]
     end
     D = DeformationPath(F, filename, flex_mult, num_steps; step_size=step_size)
@@ -159,7 +188,7 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
     end
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
+function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -200,12 +229,15 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=25, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
 
     timestamps = range(1, length(D.motion_samples), step=step)
-    record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black)
+function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -235,12 +267,15 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
-    record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end
 
-function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
+function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -305,12 +340,15 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=26, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
 
     timestamps = range(1, length(D.motion_samples), step=step)
-    record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
+function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
@@ -343,17 +381,19 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
-    record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end
 
 
-function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey85, n_circle_segments::Int=50)
+function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-
     if F.G.dimension!=2
         throw(error("The dimension must be 2, but is $(F.G.dimension)!"))
     end
@@ -372,17 +412,21 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
         pointys = matrix_coords[$time]
         [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
-    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]); linewidth = line_width, color=dualgraph_color), F.contacts)
+    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=dualgraph_color), F.contacts)
     for index in 1:length(F.G.vertices)
-        disk_vertices = @lift([Vector($allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments])
+        disk_vertices = @lift([Point2f(Vector($allVertices[index])+F.radii[index]*[cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments])
         diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
-        poly!(ax, @lift([($disk_vertices)[i] for i in 1:n_circle_segments]); color=(disk_color, 0.1))
+        poly!(ax, @lift([($disk_vertices)[i] for i in 1:n_circle_segments]); color=(disk_color, 0.08))
         lines!(ax, @lift([($disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=disk_color)
     end
 
-    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.5), marker=:utriangle), F.G.pinned_vertices)
-    vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
-    record(fig, "../data/$(filename).gif", timestamps; framerate = framerate) do t
+    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.G.pinned_vertices)
+    vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    timestamps = range(1, length(D.motion_samples), step=step)
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end

@@ -1,7 +1,7 @@
 module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
-import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!
+import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere
 import LinearAlgebra: det, cross, norm
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
@@ -19,7 +19,7 @@ mutable struct ConstraintSystem
     system::System
     pinned_vertices::Vector{Int}
 
-    function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=[])
+    function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
         size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw(error("The realization does not have the correct format."))
@@ -57,15 +57,16 @@ mutable struct DiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
     radii::Union{Vector{Int},Vector{Float64}}
+    tolerance::Float64
 
-    function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
+    function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-12)
         length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
         all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        all(t->isapprox(norm(realization[:,t[1]]-realization[:,t[2]]) >=radii[t[1]]+radii[t[2]]-1e-12), powerset(length(vertices),2,2)) || throw(error("Some of the disks are too close"))
-        contacts = [Tuple([i,j]) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=1e-12)]
-        dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
+        all(t->norm(realization[:,t[1]]-realization[:,t[2]]) >= radii[t[1]]+radii[t[2]]-tolerance, powerset(length(vertices),2,2)) || throw(error("Some of the disks are too close"))
+        contacts = [Tuple([i,j]) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=tolerance)]
+        dimension==2 || raise(error("The dimension for DiskPackings must be 2."))
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
@@ -76,13 +77,53 @@ mutable struct DiskPacking
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in contacts]
         bar_equations = filter(eq->eq!=0, bar_equations)
         G = ConstraintSystem(vertices, variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
-        new(G, contacts, radii)
+        new(G, contacts, radii, tolerance)
     end
 
-    function DiskPacking(radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
+    function DiskPacking(radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         vertices = [i for i in 1:length(radii)]
         DiskPacking(vertices, radii, realization; pinned_vertices=pinned_vertices)
     end
+end
+
+mutable struct SphericalDiskPacking
+    G::ConstraintSystem
+    contacts::Vector{Tuple{Int,Int}}
+    inversive_distances::Union{Vector{Int},Vector{Float64}}
+
+    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-12)
+        length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")))
+        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
+        dimension = size(realization)[1]
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
+        contacts = [Tuple(contact) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=tolerance)]
+        dimension==3 || raise(error("The dimension for DiskPackings must be 2."))
+        all(edge->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]]), inversive_distances[i], atol=1e-12), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
+
+        @var x[1:dimension, 1:length(vertices)]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
+        for v in pinned_vertices
+            xs[:,v] = realization[:,v]
+        end
+        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+        inversive_distance_equation = [minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][1]]) * minkowski_scalar_product(xs[:,contacts[i][2]], xs[:,contacts[i][2]]) for i in 1:length(contacts)]
+        inversive_distance_equation = filter(eq->eq!=0, inversive_distance_equation)
+        G = ConstraintSystem(vertices, variables, inversive_distance_equation, realization, xs; pinned_vertices=pinned_vertices)
+        new(G, contacts, inversive_distances)
+    end
+
+    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+        vertices = sort(collect(Set(vcat([bar[1] for bar in contacts], [bar[2] for bar in contacts]))))
+        SphericalDiskPacking(vertices, contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
+    end
+
+    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+        inversive_distances = [minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[2]]) for contact in contacts]
+        SphericalDiskPacking(contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
+    end
+
+    minkowski_scalar_product(e1,e2) = e1'*e2-1
 end
 
 
@@ -172,12 +213,12 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
     counts = 1
     point = Matrix{Float64}(Base.copy(G.realization))
 
-    for i in 1:size(point)[2]
+    for (i, v) in enumerate(G.vertices)
+        if v in G.pinned_vertices
+            point[:,i] = G.realization[:,i]
+            continue
+        end
         for j in 1:size(point)[1]
-            if j in G.pinned_vertices
-                point[j,i] = G.realization[j,i]
-                continue
-            end
             point[j,i] = q[counts]
             counts += 1
         end
@@ -236,7 +277,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width=7, dualgraph_color=:grey80, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     ax = Axis(fig[1,1])
@@ -253,7 +294,7 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
         disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
         limit_vertices = vcat(limit_vertices, disk_vertices)
         diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
-        poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(disk_color, 0.1))
+        poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(disk_color, 0.08))
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
     xlims = [minimum([limit_vertices[i][1] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][1] for i in 1:length(limit_vertices)])]
@@ -266,11 +307,36 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
     ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
 
     foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.G.pinned_vertices)
-    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
 
+
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.15, sphere_color=:lightgrey, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
+    fig = Figure(size=(1000,1000))
+    matrix_coords = F.G.realization    
+
+    ax = Axis3(fig[1,1])
+    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
+    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
+    zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
+    limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    zlims!(ax, limits[1]-padding, limits[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+    mesh!(ax, Sphere(Point3f0(0), 1f0), color = (sphere_color,0.25))
+
+    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    #foreach(i->linesegments!(ax, [(allVertices)[Int64(F.edges[i][1])], (allVertices)[Int64(F.edges[i][2])]]; linewidth=line_width, color=line_color), 1:length(F.edges))
+    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
+    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    save("../data/$(filename).png", fig)
+    return fig
+end
+    
 
 function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
