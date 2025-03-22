@@ -57,7 +57,6 @@ mutable struct DiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
     radii::Union{Vector{Int},Vector{Float64}}
-    pinned_vertices::Vector{Int}
 
     function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
         length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
@@ -160,7 +159,7 @@ end
 
 
 function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
-    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in F.pinned_vertices)]...)
+    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
 function to_Array(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
@@ -266,7 +265,7 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
     translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
     ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
 
-    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.pinned_vertices)
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
