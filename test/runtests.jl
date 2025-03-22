@@ -2,14 +2,21 @@ import DeformationPaths:    Framework,
                             DeformationPath,
                             Polytope,
                             animate, 
-                            VolumeHypergraph, 
+                            VolumeHypergraph,
+                            DiskPacking,
                             plot
 using Test
+
+
+@testset "cube" begin
+    F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 3 sqrt(3); 4 0; 6 0]'); pinned_vertices=[1,5])
+    plot(F,"diskpacking")
+end
 
 @testset "cube" begin
     F = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'))
     plot(F,"cube")
-    D = DeformationPath(F, [1,1,1], 100; step_size=0.01)
+    D = DeformationPath(F, [1,1,1], 100; step_size=0.025)
     animate(D,F,"cube_motion")
 end
 
@@ -45,12 +52,12 @@ end
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F,"two_triangles")
     D = DeformationPath(F, [1], 100; step_size=0.01)
-    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0)
+    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false)
 end
 
 @testset "octehedral_decomposition" begin
-    F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,2,3],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
+    F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
     plot(F,"octahedral_decomposition")
-    D = DeformationPath(F, [1, 1, 1], 150; step_size=0.01)
-    animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), tip_value=1.)
+    D = DeformationPath(F, [1, 1], 200; step_size=0.005)
+    animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5)
 end

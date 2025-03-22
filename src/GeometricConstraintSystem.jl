@@ -1,11 +1,12 @@
 module GeometricConstraintSystem
 
-import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate
+import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
 import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!
 import LinearAlgebra: det, cross, norm
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
+import Combinatorics: powerset
 
-export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array
+export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, DiskPacking
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -15,13 +16,14 @@ mutable struct ConstraintSystem
     jacobian::Matrix{Expression}
     dimension::Int
     xs::Matrix{Variable}
+    system::System
 
     function ConstraintSystem(vertices,variables, equations, realization, xs)
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
         size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw(error("The realization does not have the correct format."))
         size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw(error("The matrix 'xs' does not have the correct format."))
-        new(vertices, variables, equations, realization, jacobian, dimension, xs)
+        new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables))
     end
 end
 
@@ -49,6 +51,43 @@ mutable struct Framework
         Framework(vertices, bars, realization)
     end
 end
+
+mutable struct DiskPacking
+    G::ConstraintSystem
+    contacts::Vector{Tuple{Int,Int}}
+    radii::Dict{Int,Float64}
+    pinned_vertices::Vector{Int}
+
+    function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
+        length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
+        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
+        dimension = size(realization)[1]
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
+        all(t->isapprox(norm(realization[:,t[1]]-realization[:,t[2]]) >=radii[t[1]]+radii[t[2]]-1e-12), powerset(length(vertices),2,2)) || throw(error("Some of the disks are too close"))
+        contacts = [Tuple([i,j]) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=1e-12)]
+        dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
+        @var x[1:dimension, 1:length(vertices)]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        for v in pinned_vertices
+            xs[:,v] = realization[:,v]
+        end
+        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+        display(variables)
+        display(contacts)
+        display(xs)
+        display(realization)
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in contacts]
+        bar_equations = filter(eq->eq!=0, bar_equations)
+        G = ConstraintSystem(vertices, variables, bar_equations, realization, xs)
+        new(G, contacts, radii, pinned_vertices)
+    end
+
+    function DiskPacking(radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
+        vertices = [i for i in 1:length(radii)]
+        DiskPacking(vertices, radii, realization; pinned_vertices=pinned_vertices)
+    end
+end
+
 
 mutable struct VolumeHypergraph
     G::ConstraintSystem
@@ -107,7 +146,7 @@ mutable struct Polytope
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
         facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j%length(facets[i])+1])]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
-        normal_equations = [n[:,i]'*n[:,j]-1 for i in 1:length(facets) for j in i+1:length(facets)]
+        normal_equations = [n[:,i]'*n[:,i]-1 for i in 1:length(facets)]
         bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, normal_equations, bar_equations))
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, hcat(x,n))
@@ -155,8 +194,10 @@ function plot(F, filename::String; kwargs...)
         return plot_hypergraph(F, filename; kwargs...)
     elseif typeof(F)==Polytope
         return plot_polytope(F, filename; kwargs...)
+    elseif typeof(F)==DiskPacking
+        return plot_diskpacking(F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework, Polytope or VolumeHypergraph, but is $(typeof(F))"))
+        throw(error("The type of 'F' needs to be either Framework, Polytope, DiskPacking or VolumeHypergraph, but is $(typeof(F))"))
     end
 end
 
@@ -188,6 +229,36 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     save("../data/$(filename).png", fig)
     return fig
 end
+
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=12, disk_color=:steelblue, markersize=50, markercolor=:red2, line_width::Int=6, dualgraph_color=:green3, n_circle_segments::Int=30)
+    fig = Figure(size=(1000,1000))
+    matrix_coords = F.G.realization
+    ax = Axis(fig[1,1])
+    if F.G.dimension==2
+        throw(error("The dimension must be 2!"))
+    end
+    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
+    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
+    limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
+
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    allVertices = [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    for index in 1:length(F.G.vertices)
+        disk_vertices = [F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
+        diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
+        foreach(edge->linesegments!(ax, [(disk_vertices)[Int64(edge[1])], (disk_vertices)[Int64(edge[2])]]; linewidth = disk_strokewidth, color=disk_color), diskedges)
+    end
+    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=markercolor, marker=:triangle), F.pinned_vertices)
+    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    save("../data/$(filename).png", fig)
+    return fig
+end
+
 
 function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, vertex_size::Int=60, line_width::Int=8, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
