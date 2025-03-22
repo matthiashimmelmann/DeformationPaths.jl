@@ -252,7 +252,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Int=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Float64=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Float64=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     ax = Axis(fig[1,1])
