@@ -15,7 +15,7 @@ mutable struct ConstraintSystem
     realization::Union{Matrix{Int},Matrix{Float64}}
     jacobian::Matrix{Expression}
     dimension::Int
-    xs::Matrix{Variable}
+    xs::Union{Matrix{Variable},Matrix{Expression}}
     system::System
 
     function ConstraintSystem(vertices,variables, equations, realization, xs)
@@ -55,7 +55,7 @@ end
 mutable struct DiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
-    radii::Dict{Int,Float64}
+    radii::Union{Vector{Int},Vector{Float64}}
     pinned_vertices::Vector{Int}
 
     function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
@@ -68,14 +68,11 @@ mutable struct DiskPacking
         dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
         for v in pinned_vertices
             xs[:,v] = realization[:,v]
         end
         variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
-        display(variables)
-        display(contacts)
-        display(xs)
-        display(realization)
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in contacts]
         bar_equations = filter(eq->eq!=0, bar_equations)
         G = ConstraintSystem(vertices, variables, bar_equations, realization, xs)
@@ -216,8 +213,10 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
     limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
 
-    xlims!(ax, limits[1]-padding, limits[2]+padding)
-    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
+    xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+    translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
+    ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
     F.G.dimension==3 && zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
@@ -230,31 +229,37 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=12, disk_color=:steelblue, markersize=50, markercolor=:red2, line_width::Int=6, dualgraph_color=:green3, n_circle_segments::Int=30)
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Int=9, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Int=6, dualgraph_color=:grey75, n_circle_segments::Int=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     ax = Axis(fig[1,1])
-    if F.G.dimension==2
-        throw(error("The dimension must be 2!"))
+    if F.G.dimension!=2
+        throw(error("The dimension must be 2, but is $(F.G.dimension)!"))
     end
-    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
-    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
-    limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
-
-    xlims!(ax, limits[1]-padding, limits[2]+padding)
-    ylims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
 
     allVertices = [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    for index in 1:length(F.G.vertices)
-        disk_vertices = [F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
-        diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
-        foreach(edge->linesegments!(ax, [(disk_vertices)[Int64(edge[1])], (disk_vertices)[Int64(edge[2])]]; linewidth = disk_strokewidth, color=disk_color), diskedges)
-    end
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=markercolor, marker=:triangle), F.pinned_vertices)
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    limit_vertices = allVertices
+    for index in 1:length(F.G.vertices)
+        disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
+        limit_vertices = vcat(limit_vertices, disk_vertices)
+        diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
+        poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(disk_color, 0.1))
+        lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
+    end
+    xlims = [minimum([limit_vertices[i][1] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][1] for i in 1:length(limit_vertices)])]
+    ylims = [minimum([limit_vertices[i][2] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][2] for i in 1:length(limit_vertices)])]
+    limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
+
+    translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
+    xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+    translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
+    ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.5), marker=:utriangle), F.pinned_vertices)
+    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=35, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
@@ -278,8 +283,10 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
     limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
-    xlims!(ax, limits[1]-padding, limits[2]+padding)
-    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
+    xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+    translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
+    ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
     F.G.dimension==3 && zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
