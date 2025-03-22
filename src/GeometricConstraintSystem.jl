@@ -17,13 +17,14 @@ mutable struct ConstraintSystem
     dimension::Int
     xs::Union{Matrix{Variable},Matrix{Expression}}
     system::System
+    pinned_vertices::Vector{Int}
 
-    function ConstraintSystem(vertices,variables, equations, realization, xs)
+    function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=[])
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
         size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw(error("The realization does not have the correct format."))
         size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw(error("The matrix 'xs' does not have the correct format."))
-        new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables))
+        new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_vertices)
     end
 end
 
@@ -75,8 +76,8 @@ mutable struct DiskPacking
         variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in contacts]
         bar_equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices, variables, bar_equations, realization, xs)
-        new(G, contacts, radii, pinned_vertices)
+        G = ConstraintSystem(vertices, variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
+        new(G, contacts, radii)
     end
 
     function DiskPacking(radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=[])
@@ -159,16 +160,13 @@ end
 
 
 function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
-    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2]))]...)
+    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in F.pinned_vertices)]...)
 end
 
-function to_Array(F::Union{Framework,VolumeHypergraph,Polytope}, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
     return to_Array(F.G, p)
 end
 
-function to_Array(F::DiskPacking, p::Union{Matrix{Int},Matrix{Float64}})
-    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in F.pinned_vertices)]...)
-end
 
 
 function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
@@ -177,21 +175,8 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
 
     for i in 1:size(point)[2]
         for j in 1:size(point)[1]
-            point[j,i] = q[counts]
-            counts += 1
-        end
-    end
-    return point
-end
-
-function to_Matrix(F::DiskPacking, q::Union{Vector{Float64}, Vector{Int}})
-    counts = 1
-    point = Matrix{Float64}(Base.copy(G.realization))
-
-    for i in 1:size(point)[2]
-        for j in 1:size(point)[1]
-            if j in F.pinned_vertices
-                point[j,i] = F.G.realization[j,i]
+            if j in G.pinned_vertices
+                point[j,i] = G.realization[j,i]
                 continue
             end
             point[j,i] = q[counts]
@@ -202,7 +187,7 @@ function to_Matrix(F::DiskPacking, q::Union{Vector{Float64}, Vector{Int}})
 end
 
 
-function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope}, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
 end
 
