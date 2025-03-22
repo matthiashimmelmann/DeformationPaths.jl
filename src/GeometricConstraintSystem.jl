@@ -221,7 +221,7 @@ function plot(F, filename::String; kwargs...)
     end
 end
 
-function plot_framework(F::Framework, filename::String; padding::Float64=0.15, vertex_size::Int=60, line_width::Int=12, edge_color=:steelblue, vertex_color=:black)
+function plot_framework(F::Framework, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, vertex_color=:black)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
@@ -252,7 +252,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth::Float64=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width::Float64=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
+function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width=7, dualgraph_color=:grey85, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     ax = Axis(fig[1,1])
@@ -288,7 +288,7 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
 end
 
 
-function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, vertex_size::Int=60, line_width::Int=8, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
+function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
     if facet_colors==nothing
@@ -323,7 +323,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     return fig
 end
 
-function plot_polytope(F::Polytope, filename::String; padding::Float64=0.15, vertex_size::Int=60, line_width::Int=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
+function plot_polytope(F::Polytope, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 

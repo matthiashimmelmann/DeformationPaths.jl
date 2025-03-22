@@ -66,8 +66,6 @@ mutable struct DeformationPath
 
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
-        display(G.variables)
-        display(point)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
         realization = to_Matrix(G, point)
         if type=="framework"
@@ -161,7 +159,7 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
     end
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
+function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -207,7 +205,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=10, edge_color=:steelblue, vertex_color=:black)
+function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black)
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -242,7 +240,7 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; target_stretch::Float64=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
+function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -312,7 +310,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_size::Int=42, line_width::Int=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
+function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
@@ -351,7 +349,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
 end
 
 
-function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Float64=0.15, vertex_labels=true, disk_strokewidth::Float64=8.5, line_width::Float64=7, disk_color=:steelblue, markersize=75, markercolor=:red3, dualgraph_color=:grey85, n_circle_segments::Int=50)
+function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey85, n_circle_segments::Int=50)
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -390,7 +388,7 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
 end
 
 
-function project_deformation_random(D::DeformationPath, projected_dimension::Int; line_width::Int=8, line_color=:green3, markersize::Int=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::DeformationPath, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=:green3, markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw(error("The projected_dimension is neither 2 nor 3."))
     end
