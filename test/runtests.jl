@@ -4,9 +4,17 @@ import DeformationPaths:    Framework,
                             animate, 
                             VolumeHypergraph,
                             DiskPacking,
-                            plot
+                            plot,
+                            SphericalDiskPacking
 using Test
 
+
+@testset "sphericaldiskpacking" begin
+    F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
+    plot(F,"sphericaldiskpacking")
+    D = DeformationPath(F, [1], 250; step_size=0.01)
+    animate(D,F,"sphericaldiskpacking_motion")
+end
 
 @testset "diskpacking" begin
     F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 3 sqrt(3); 4 0; 6 0]'); pinned_vertices=[1,5])
@@ -17,20 +25,11 @@ using Test
 end
 
 @testset "squarediskpacking" begin
-    F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 0 2; 2 2]'); pinned_vertices=[1])
-    plot(F,"diskpacking")
-    D = DeformationPath(F, [1,1], 250; step_size=0.01)
+    F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 0 2; 2 2]'); pinned_vertices=[1])
+    plot(F,"squarediskpacking")
+    D = DeformationPath(F, [1], 250; step_size=0.01)
     animate(D,F,"squarediskpacking_motion")
 end
-
-@testset "sphericaldiskpacking" begin
-    F = DiskPacking([(1,2),(1,3),(1,4),(1,5),(2,4),(3,5)], Matrix([1/sqrt(2) 0 0; 0 1/sqrt(2) 0; 0 0 1/sqrt(2); 0 -1/sqrt(2) 0; 0 0 -1/sqrt(2)]'); pinned_vertices=[1])
-    plot(F,"sphericaldiskpacking")
-    D = DeformationPath(F, [1,1], 250; step_size=0.025)
-    animate(D,F,"sphericaldiskpacking_motion")
-end
-
-
 
 @testset "cube" begin
     F = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'))
@@ -77,6 +76,6 @@ end
 @testset "octehedral_decomposition" begin
     F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
     plot(F,"octahedral_decomposition")
-    D = DeformationPath(F, [1, 1], 200; step_size=0.005)
+    D = DeformationPath(F, [0, 1], 200; step_size=0.001)
     animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5)
 end

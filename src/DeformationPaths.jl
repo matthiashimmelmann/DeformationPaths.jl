@@ -1,14 +1,14 @@
 module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros
-import GLMakie: @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross
+import GLMakie: Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, DiskPacking
+using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, DiskPacking, SphericalDiskPacking
 
 export  ConstraintSystem, 
         Framework, 
@@ -20,7 +20,8 @@ export  ConstraintSystem,
         Polytope,
         to_Matrix,
         to_Array,
-        DiskPacking
+        DiskPacking,
+        SphericalDiskPacking
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -28,25 +29,39 @@ mutable struct DeformationPath
     motion_samples::Vector{Vector{Float64}}
     motion_matrices::Vector{Matrix{Float64}}
     flex_mult::Vector{Float64}
+    _contacts::Vector
 
     function DeformationPath(G::ConstraintSystem, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int, type::String; step_size::Float64=1e-2)
         start_point = to_Array(G, G.realization)
-        flex_space = compute_nontrivial_inf_flexes(G, start_point, type)
-        size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
+        if !(type in ["framework", "hypergraph", "polytope",  "sphericaldiskpacking"])
+            throw(error("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type)."))
+        end
+        if type=="framework"
+            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
+        elseif type=="hypergraph"
+            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
+        elseif type=="polytope" || type == "diskpacking"
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+        elseif  type=="sphericaldiskpacking"
+            minkowski_scalar_product(e1,e2) = e1'*e2-1
+            inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
+            K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
+        end
+
+        flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
+        size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
-        if !(type in ["framework", "hypergraph", "polytope", "diskpacking"])
-            throw(error("The type must either be 'framework', 'diskpacking', 'hypergraph' or 'polytope', but is $(type)."))
-        end
+
         @showprogress for i in 1:num_steps
-            q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], type)
+            q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
             q = newton_correct(G, q)
         
             push!(motion_samples, q)
             push!(motion_matrices, to_Matrix(G, Float64.(q)))
         end
-        new(G, step_size, motion_samples, motion_matrices, flex_mult)
+        new(G, step_size, motion_samples, motion_matrices, flex_mult, [])
     end
 
     function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
@@ -61,10 +76,15 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; step_size=step_size)
     end
 
-    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], step_size::Float64=1e-2, prev_flex=nothing)
+    function DeformationPath(F::SphericalDiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+        DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; step_size=step_size)
+    end
+
+    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing)
         start_point = to_Array(F, F.G.realization)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
         if prev_flex == nothing
-            flex_space = compute_nontrivial_inf_flexes(F.G, start_point, "diskpacking")
+            flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
             prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
             prev_flex = prev_flex ./ norm(prev_flex)
@@ -72,9 +92,12 @@ mutable struct DeformationPath
         if length(motion_samples)==0
             motion_samples = [Float64.(start_point)]
         end
+        if length(_contacts)==0
+            _contacts = [F.contacts]
+        end
         @showprogress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], "diskpacking")
+                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
                 global q = newton_correct(F.G, q)
             catch e
                 display(e)
@@ -84,26 +107,20 @@ mutable struct DeformationPath
             if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
                 @warn "A pair of disks got too close!"
                 _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
-                DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, step_size=step_size, prev_flex=prev_flex)
+                DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex)
                 break
             end
             push!(motion_samples, q)
+            push!(_contacts, F.contacts)
         end
         motion_matrices = [to_Matrix(F, Float64.(sample)) for sample in motion_samples]
-        new(F.G, step_size, motion_samples, motion_matrices, flex_mult)
+        new(F.G, step_size, motion_samples, motion_matrices, flex_mult, _contacts)
     end
 
-
-    function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, type::String)
+    function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
         realization = to_Matrix(G, point)
-        if type=="framework"
-            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
-        elseif type=="hypergraph"
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
-        elseif type=="polytope" || type == "diskpacking"
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
-        end
+        K_n.realization = realization
         trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]))
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
@@ -149,9 +166,9 @@ mutable struct DeformationPath
         return q
     end
 
-    function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, type)
+    function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
         J = evaluate(G.jacobian, G.variables=>point)
-        flex_space = compute_nontrivial_inf_flexes(G, point, type)
+        flex_space = compute_nontrivial_inf_flexes(G, point, K_n)
         flex_coefficients = pinv(flex_space) * prev_flex
         predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
@@ -159,20 +176,25 @@ mutable struct DeformationPath
     end
 end
 
+
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
     if flex_mult==nothing
         if typeof(F)==Framework
-            type="framework"
+            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
         elseif typeof(F)==VolumeHypergraph
-            type="hypergraph"
+            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
         elseif typeof(F)==DiskPacking
-            type="diskpacking"
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
         elseif typeof(F)==Polytope
-            type="polytope"
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+        elseif typeof(F)==SphericalDiskPacking
+            minkowski_scalar_product(e1,e2) = e1'*e2-1
+            inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
+            K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
         else
             throw(error("Type of F is not yet supported. It is $(typeof(F))."))
         end
-        flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), type)
+        flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
         flex_mult = [1 for _ in 1:size(flex_space)[2]]
     end
     D = DeformationPath(F, filename, flex_mult, num_steps; step_size=step_size)
@@ -194,9 +216,13 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
         return animate3D_polytope(D, F, filename; kwargs...)
     elseif typeof(F)==DiskPacking
         return animate2D_diskpacking(D, F, filename; kwargs...)
+    elseif typeof(F)==SphericalDiskPacking
+        return animate3D_sphericaldiskpacking(D, F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework, DiskPacking, Polytope or VolumeHypergraph, but is $(typeof(F))"))
+        throw(error("The type of 'F' needs to be either Framework, DiskPacking, Polytope, SphericalDiskPacking or VolumeHypergraph, but is $(typeof(F))"))
     end
+
+
 end
 
 function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
@@ -391,6 +417,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
     foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(F.edges[i][1])], ($allVertices)[Int64(F.edges[i][2])]]); linewidth=line_width, color=line_color), 1:length(F.edges))
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
@@ -419,11 +446,12 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
     hidedecorations!(ax)
 
     time=Observable(1)
+    contacts=Observable(D._contacts[1])
     allVertices=@lift begin
         pointys = matrix_coords[$time]
         [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
-    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=dualgraph_color), F.contacts)
+    linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
     for index in 1:length(F.G.vertices)
         disk_vertices = @lift([Point2f(Vector($allVertices[index])+F.radii[index]*[cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments])
         diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
@@ -439,8 +467,71 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
     end
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
+        contacts[] = D._contacts[t]
     end
 end
+
+
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, step::Int=1, padding=0.025, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=8.5, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.35), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
+    fig = Figure(size=(1000,1000))
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+
+    ax = Axis3(fig[1,1], aspect=(1,1,1))
+    xlims!(ax,-1-padding, 1+padding)
+    ylims!(ax,-1-padding, 1+padding)
+    zlims!(ax,-1-padding, 1+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
+
+    time=Observable(1)
+    planePoints=@lift begin
+        pointys = matrix_coords[$time]
+        [Point3f(pointys[:,j]./norm(pointys[:,j])^2) for j in 1:size(pointys)[2]]
+    end
+    spherePoints=@lift begin
+        pointys = matrix_coords[$time]
+        [Point3f(pointys[:,j]./norm(pointys[:,j])) for j in 1:size(pointys)[2]]
+    end
+    linesegments!(ax, @lift(vcat([[($planePoints)[Int64(edge[1])], ($planePoints)[Int64(edge[2])]] for edge in F.contacts]...)); linewidth = line_width, color=dualgraph_color)
+    disk_vertices = @lift begin
+        output = []
+        for i in 1:length(F.G.vertices)
+            rotation_axis = cross([0, 0, 1], ($spherePoints)[i])
+            angle = acos([0, 0, 1]'* ($spherePoints)[i])
+            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            radius = sqrt(1-norm(($planePoints)[i])^2)
+            push!(output,[Point3f(inv(rotation_matrix)*([radius*cos(2*j*pi/n_circle_segments), radius*sin(2*j*pi/n_circle_segments), norm(($planePoints)[i])])) for j in 1:n_circle_segments])
+        end
+        output
+    end
+    foreach(i->lines!(ax, @lift([($disk_vertices)[i][v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=disk_color), 1:length(F.G.vertices))
+    rotatedPoints = @lift begin
+        output=[]
+        for i in 1:length(F.G.vertices)
+            rotation_axis = cross([0, 0, 1], ($spherePoints)[i])
+            angle = acos([0, 0, 1]'* ($spherePoints)[i])
+            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            push!(output, Point3f(inv(rotation_matrix)*[0,0,1]))
+        end
+        output
+    end
+    vertex_labels && foreach(i->text!(ax, @lift([($rotatedPoints)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    
+    timestamps = range(1, length(D.motion_samples), step=step)
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
+        time[] = t
+    end
+    return fig
+end
+
 
 
 function project_deformation_random(D::DeformationPath, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=:green3, markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)

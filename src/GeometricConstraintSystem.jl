@@ -2,11 +2,11 @@ module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
 import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere
-import LinearAlgebra: det, cross, norm
+import LinearAlgebra: det, cross, norm, inv
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 
-export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, DiskPacking
+export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, DiskPacking, SphericalDiskPacking
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -91,14 +91,13 @@ mutable struct SphericalDiskPacking
     contacts::Vector{Tuple{Int,Int}}
     inversive_distances::Union{Vector{Int},Vector{Float64}}
 
-    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-12)
-        length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")))
+    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
+        length(contacts)==length(inversive_distances) || throw(error(("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")))
         all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        contacts = [Tuple(contact) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=tolerance)]
         dimension==3 || raise(error("The dimension for DiskPackings must be 2."))
-        all(edge->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]]), inversive_distances[i], atol=1e-12), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
+        all(i->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])), inversive_distances[i], atol=tolerance), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
 
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
@@ -110,7 +109,6 @@ mutable struct SphericalDiskPacking
         inversive_distance_equation = [minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][1]]) * minkowski_scalar_product(xs[:,contacts[i][2]], xs[:,contacts[i][2]]) for i in 1:length(contacts)]
         inversive_distance_equation = filter(eq->eq!=0, inversive_distance_equation)
         G = ConstraintSystem(vertices, variables, inversive_distance_equation, realization, xs; pinned_vertices=pinned_vertices)
-        display(inversive_distances)
         new(G, contacts, inversive_distances)
     end
 
@@ -120,7 +118,7 @@ mutable struct SphericalDiskPacking
     end
 
     function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
-        inversive_distances = [minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[2]]) for contact in contacts]
+        inversive_distances = [minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[2]])/sqrt(minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[1]]) * minkowski_scalar_product(realization[:,contact[2]], realization[:,contact[2]])) for contact in contacts]
         SphericalDiskPacking(contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
     end
 
@@ -203,7 +201,7 @@ function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking,SphericalDiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
     return to_Array(F.G, p)
 end
 
@@ -227,7 +225,7 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
 end
 
 
-function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope,DiskPacking,SphericalDiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
 end
 
@@ -314,28 +312,34 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
 end
 
 
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.1, sphere_color=:lightgrey, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.025, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=8.5, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.3), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
-    ax = Axis3(fig[1,1])
+    ax = Axis3(fig[1,1], aspect=(1,1,1))
     xlims!(ax,-1-padding, 1+padding)
     ylims!(ax,-1-padding, 1+padding)
     zlims!(ax,-1-padding, 1+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    mesh!(ax, Sphere(Point3f0(0), 1f0), color = (sphere_color,0.15))
+    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
 
-    planePoints = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in 1:size(matrix_coords)[2]]
     spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
-    foreach(edge->linesegments!(ax, [(spherePoints)[Int64(edge[1])], (spherePoints)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    for index in 1:length(F.G.vertices)
-        disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
-        limit_vertices = vcat(limit_vertices, disk_vertices)
+    rotatedPoints=[]
+    #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
+    for i in 1:length(F.G.vertices)
+        rotation_axis = cross([0, 0, 1], spherePoints[i])
+        angle = acos([0, 0, 1]'* spherePoints[i])
+        rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                            rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                            rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+        radius = sqrt(1-norm(planePoints[i])^2)
+        disk_vertices = [Point3f(inv(rotation_matrix)*([radius*cos(2*j*pi/n_circle_segments), radius*sin(2*j*pi/n_circle_segments), norm(planePoints[i])])) for j in 1:n_circle_segments]
+        push!(rotatedPoints, Point3f(inv(rotation_matrix)*[0,0,1]))
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
-    #foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(spherePoints)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
