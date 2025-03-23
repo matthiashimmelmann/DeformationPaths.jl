@@ -110,6 +110,7 @@ mutable struct SphericalDiskPacking
         inversive_distance_equation = [minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][1]]) * minkowski_scalar_product(xs[:,contacts[i][2]], xs[:,contacts[i][2]]) for i in 1:length(contacts)]
         inversive_distance_equation = filter(eq->eq!=0, inversive_distance_equation)
         G = ConstraintSystem(vertices, variables, inversive_distance_equation, realization, xs; pinned_vertices=pinned_vertices)
+        display(inversive_distances)
         new(G, contacts, inversive_distances)
     end
 
@@ -147,7 +148,6 @@ mutable struct VolumeHypergraph
 
     function VolumeHypergraph(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        dimension = size(realization)[1]
         VolumeHypergraph(vertices, facets, realization)
     end
 end
@@ -241,6 +241,8 @@ function plot(F, filename::String; kwargs...)
         return plot_polytope(F, filename; kwargs...)
     elseif typeof(F)==DiskPacking
         return plot_diskpacking(F, filename; kwargs...)
+    elseif typeof(F)==SphericalDiskPacking
+        return plot_sphericaldiskpacking(F, filename; kwargs...)
     else
         throw(error("The type of 'F' needs to be either Framework, Polytope, DiskPacking or VolumeHypergraph, but is $(typeof(F))"))
     end
@@ -312,33 +314,28 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
 end
 
 
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.15, sphere_color=:lightgrey, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.1, sphere_color=:lightgrey, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
     ax = Axis3(fig[1,1])
-    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
-    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
-    zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
-    limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
-    xlims!(ax, limits[1]-padding, limits[2]+padding)
-    ylims!(ax, limits[1]-padding, limits[2]+padding)
-    zlims!(ax, limits[1]-padding, limits[2]+padding)
+    xlims!(ax,-1-padding, 1+padding)
+    ylims!(ax,-1-padding, 1+padding)
+    zlims!(ax,-1-padding, 1+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    mesh!(ax, Sphere(Point3f0(0), 1f0), color = (sphere_color,0.25))
+    mesh!(ax, Sphere(Point3f0(0), 1f0), color = (sphere_color,0.15))
 
-    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    allVertices = [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    limit_vertices = allVertices
+    planePoints = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
+    foreach(edge->linesegments!(ax, [(spherePoints)[Int64(edge[1])], (spherePoints)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     for index in 1:length(F.G.vertices)
         disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
         limit_vertices = vcat(limit_vertices, disk_vertices)
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
     #foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    foreach(i->text!(ax, [(spherePoints)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end

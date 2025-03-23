@@ -13,8 +13,24 @@ using Test
     plot(F,"diskpacking")
     F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 4 0; 5 sqrt(3)]'); pinned_vertices=[1])
     D = DeformationPath(F, [1,1], 250; step_size=0.025)
-    animate(D,F,"diskpacking_motion"; filetype="mp4")
+    animate(D,F,"diskpacking_motion")
 end
+
+@testset "squarediskpacking" begin
+    F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 0 2; 2 2]'); pinned_vertices=[1])
+    plot(F,"diskpacking")
+    D = DeformationPath(F, [1,1], 250; step_size=0.01)
+    animate(D,F,"squarediskpacking_motion")
+end
+
+@testset "sphericaldiskpacking" begin
+    F = DiskPacking([(1,2),(1,3),(1,4),(1,5),(2,4),(3,5)], Matrix([1/sqrt(2) 0 0; 0 1/sqrt(2) 0; 0 0 1/sqrt(2); 0 -1/sqrt(2) 0; 0 0 -1/sqrt(2)]'); pinned_vertices=[1])
+    plot(F,"sphericaldiskpacking")
+    D = DeformationPath(F, [1,1], 250; step_size=0.025)
+    animate(D,F,"sphericaldiskpacking_motion")
+end
+
+
 
 @testset "cube" begin
     F = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'))
