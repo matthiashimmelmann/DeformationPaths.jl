@@ -11,8 +11,8 @@ using Test
 @testset "diskpacking" begin
     F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 3 sqrt(3); 4 0; 6 0]'); pinned_vertices=[1,5])
     plot(F,"diskpacking")
-    F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 3 sqrt(3); 4 0]'); pinned_vertices=[1])
-    D = DeformationPath(F, [1], 100; step_size=0.025)
+    F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 4 0; 5 sqrt(3)]'); pinned_vertices=[1])
+    D = DeformationPath(F, [1,1], 250; step_size=0.025)
     animate(D,F,"diskpacking_motion"; filetype="mp4")
 end
 

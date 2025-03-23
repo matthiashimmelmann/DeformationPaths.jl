@@ -61,24 +61,35 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; step_size=step_size)
     end
 
-    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], step_size::Float64=1e-2, prev_flex=nothing)
         start_point = to_Array(F, F.G.realization)
-        flex_space = compute_nontrivial_inf_flexes(F.G, start_point, "diskpacking")
-        size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
-        prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
-        prev_flex = prev_flex ./ norm(prev_flex)
-        motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(F.G, Float64.(start_point))]
+        if prev_flex == nothing
+            flex_space = compute_nontrivial_inf_flexes(F.G, start_point, "diskpacking")
+            size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
+            prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
+            prev_flex = prev_flex ./ norm(prev_flex)
+        end
+        if length(motion_samples)==0
+            motion_samples = [Float64.(start_point)]
+        end
         @showprogress for i in 1:num_steps
-            q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], "diskpacking")
-            q = newton_correct(F.G, q)
+            try
+                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], "diskpacking")
+                global q = newton_correct(F.G, q)
+            catch e
+                display(e)
+                break
+            end
             cur_realization = to_Matrix(F,Float64.(q))
-            if any(t->norm(cur_realization[:,t[1]]-cur_realization[:,t[2]]) < F.radii[t[1]]+F.radii[t[2]]-F.tolerance, powerset(F.G.vertices,2,2))
+            if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
                 @warn "A pair of disks got too close!"
+                _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
+                DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, step_size=step_size, prev_flex=prev_flex)
                 break
             end
             push!(motion_samples, q)
-            push!(motion_matrices, cur_realization)
         end
+        motion_matrices = [to_Matrix(F, Float64.(sample)) for sample in motion_samples]
         new(F.G, step_size, motion_samples, motion_matrices, flex_mult)
     end
 

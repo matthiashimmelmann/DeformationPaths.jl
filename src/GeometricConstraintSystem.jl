@@ -59,8 +59,8 @@ mutable struct DiskPacking
     radii::Union{Vector{Int},Vector{Float64}}
     tolerance::Float64
 
-    function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-12)
-        length(vertices)==length(radii) && length(radii)==size(realization)[2] || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
+    function DiskPacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
+        length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
         all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
@@ -74,7 +74,7 @@ mutable struct DiskPacking
             xs[:,v] = realization[:,v]
         end
         variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
-        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in contacts]
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - (radii[bar[1]]+radii[bar[2]])^2 for bar in contacts]
         bar_equations = filter(eq->eq!=0, bar_equations)
         G = ConstraintSystem(vertices, variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
         new(G, contacts, radii, tolerance)
@@ -293,7 +293,6 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
     for index in 1:length(F.G.vertices)
         disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
         limit_vertices = vcat(limit_vertices, disk_vertices)
-        diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
         poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(disk_color, 0.08))
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
@@ -330,8 +329,15 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
     mesh!(ax, Sphere(Point3f0(0), 1f0), color = (sphere_color,0.25))
 
     allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    #foreach(i->linesegments!(ax, [(allVertices)[Int64(F.edges[i][1])], (allVertices)[Int64(F.edges[i][2])]]; linewidth=line_width, color=line_color), 1:length(F.edges))
-    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
+    allVertices = [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
+    limit_vertices = allVertices
+    for index in 1:length(F.G.vertices)
+        disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
+        limit_vertices = vcat(limit_vertices, disk_vertices)
+        lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
+    end
+    #foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
