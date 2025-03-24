@@ -456,7 +456,7 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
         lines!(ax, @lift([($disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=disk_color)
     end
 
-    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])

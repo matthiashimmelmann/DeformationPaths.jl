@@ -305,7 +305,7 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
     translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
     ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
 
-    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:utriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
