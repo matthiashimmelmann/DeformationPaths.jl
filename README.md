@@ -17,7 +17,7 @@ using DeformationPaths
 
 ### Bar-and-Joint Frameworks
 
-Bar-and-Joint frameworks are given by embedded graphs whose edges are equipped with Euclidean distance constraints. We can create a deformation path using the constructor `DeformationPath`. For example, a deformation path starting in a realization of the complete bipartite graph $K_{2,4]$ (giving rise to a `Framework`) can be computed using the following code.
+Bar-and-Joint frameworks are given by embedded graphs whose edges are equipped with Euclidean distance constraints. We can create a deformation path using the constructor `DeformationPath`. For example, a deformation path starting in a realization of the complete bipartite graph $K_{2,4}$ (giving rise to a `Framework`) can be computed using the following code.
 
 ```julia
 F = Framework([[1,3],[1,4],[1,5],[1,6],[2,3],[2,4],[2,5],[2,6]], Matrix([0 0; 0 1; 1 -1; 1 0; 1 1; 1 2]'))
