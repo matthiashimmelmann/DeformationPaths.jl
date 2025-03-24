@@ -312,7 +312,7 @@ function plot_diskpacking(F::DiskPacking, filename::String; padding::Float64=0.1
 end
 
 
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.025, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=8.5, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.3), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50)
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
@@ -325,6 +325,7 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
     mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
 
     planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in 1:size(matrix_coords)[2]]
+    linesegments!(ax, vcat([[(planePoints)[Int64(edge[1])], (planePoints)[Int64(edge[2])]] for edge in F.contacts]...); linewidth = line_width, color=dualgraph_color)
     spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
     rotatedPoints=[]
     #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
@@ -339,7 +340,7 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
         push!(rotatedPoints, Point3f(inv(rotation_matrix)*[0,0,1]))
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
-    vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end

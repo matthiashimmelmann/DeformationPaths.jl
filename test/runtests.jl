@@ -19,7 +19,7 @@ end
 @testset "diskpacking" begin
     F = DiskPacking([1.,1.,1.,1.,1.], Matrix([0 0; 2 0; 3 sqrt(3); 4 0; 6 0]'); pinned_vertices=[1,5])
     plot(F,"diskpacking")
-    F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 4 0; 5 sqrt(3)]'); pinned_vertices=[1])
+    F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 1.75 -sqrt(2^2-(1.75)^2); 3.5 0; 4.5 sqrt(3)]'); pinned_vertices=[1])
     D = DeformationPath(F, [1,1], 250; step_size=0.025)
     animate(D,F,"diskpacking_motion")
 end
@@ -76,6 +76,6 @@ end
 @testset "octehedral_decomposition" begin
     F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
     plot(F,"octahedral_decomposition")
-    D = DeformationPath(F, [0, 1], 200; step_size=0.001)
+    D = DeformationPath(F, [0.333, 1], 350; step_size=0.002)
     animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5)
 end

@@ -1,7 +1,7 @@
 module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det
 import GLMakie: Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
@@ -37,9 +37,9 @@ mutable struct DeformationPath
             throw(error("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type)."))
         end
         if type=="framework"
-            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
+            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization)
         elseif type=="hypergraph"
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
+            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization)
         elseif type=="polytope" || type == "diskpacking"
             K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
         elseif  type=="sphericaldiskpacking"
@@ -105,7 +105,6 @@ mutable struct DeformationPath
             end
             cur_realization = to_Matrix(F,Float64.(q))
             if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
-                @warn "A pair of disks got too close!"
                 _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
                 DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex)
                 break
@@ -119,8 +118,6 @@ mutable struct DeformationPath
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n)
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
-        realization = to_Matrix(G, point)
-        K_n.realization = realization
         trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]))
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
@@ -180,17 +177,17 @@ end
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
     if flex_mult==nothing
         if typeof(F)==Framework
-            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], realization)
+            K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization)
         elseif typeof(F)==VolumeHypergraph
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), realization)
+            K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
         elseif typeof(F)==DiskPacking
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+            K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
         elseif typeof(F)==Polytope
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+            K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
         elseif typeof(F)==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
-            inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
-            K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
+            inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
+            K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
         else
             throw(error("Type of F is not yet supported. It is $(typeof(F))."))
         end
@@ -472,7 +469,7 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
 end
 
 
-function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, step::Int=1, padding=0.025, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=8.5, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.35), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
@@ -497,11 +494,16 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     disk_vertices = @lift begin
         output = []
         for i in 1:length(F.G.vertices)
-            rotation_axis = cross([0, 0, 1], ($spherePoints)[i])
-            angle = acos([0, 0, 1]'* ($spherePoints)[i])
-            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
+            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            else
+                rotation_axis = rotation_axis ./ norm(rotation_axis)
+                angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))
+                rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            end
             radius = sqrt(1-norm(($planePoints)[i])^2)
             push!(output,[Point3f(inv(rotation_matrix)*([radius*cos(2*j*pi/n_circle_segments), radius*sin(2*j*pi/n_circle_segments), norm(($planePoints)[i])])) for j in 1:n_circle_segments])
         end
@@ -511,16 +513,21 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     rotatedPoints = @lift begin
         output=[]
         for i in 1:length(F.G.vertices)
-            rotation_axis = cross([0, 0, 1], ($spherePoints)[i])
-            angle = acos([0, 0, 1]'* ($spherePoints)[i])
-            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
+            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            else
+                rotation_axis = rotation_axis ./ norm(rotation_axis)
+                angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))
+                rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            end
             push!(output, Point3f(inv(rotation_matrix)*[0,0,1]))
         end
         output
     end
-    vertex_labels && foreach(i->text!(ax, @lift([($rotatedPoints)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, @lift([($rotatedPoints)[i]]), text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
