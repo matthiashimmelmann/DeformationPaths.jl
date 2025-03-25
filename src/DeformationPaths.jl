@@ -271,15 +271,29 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    pinned_vertex in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
+    pinned_edge[1] in D.G.vertices && pinned_edge[2] in D.G.vertices || throw(error("The elements of `pinned_edge`` are not vertices of the underlying graph."))
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,pinned_vertex]
+        p0 = matrix_coords[i][:,pinned_edge[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
+        end
+        edge_vector = Vector(matrix_coords[i][:,pinned_edge[2]] ./ norm(matrix_coords[i][:,pinned_edge[2]]))
+        rotation_axis = cross([1,0,0], edge_vector)
+        if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+        else
+            rotation_axis = rotation_axis ./ norm(rotation_axis)
+            angle = acos([1,0,0]'* edge_vector)
+            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+        end
+        for j in 1:size(matrix_coords[i])[2]
+            matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
         end
     end
 
@@ -382,16 +396,30 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_vertex::Int=1, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
-    pinned_vertex in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
+    pinned_edge[1] in D.G.vertices && pinned_edge[2] in D.G.vertices || throw(error("The elements of `pinned_edge`` are not vertices of the underlying graph."))
     ax = Axis3(fig[1,1])
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,pinned_vertex]
+        p0 = matrix_coords[i][:,pinned_edge[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
+        end
+        edge_vector = Vector(matrix_coords[i][:,pinned_edge[2]] ./ norm(matrix_coords[i][:,pinned_edge[2]]))
+        rotation_axis = cross([1,0,0], edge_vector)
+        if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+        else
+            rotation_axis = rotation_axis ./ norm(rotation_axis)
+            angle = acos([1,0,0]' * edge_vector)
+            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+        end
+        for j in 1:size(matrix_coords[i])[2]
+            matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
         end
     end
 
