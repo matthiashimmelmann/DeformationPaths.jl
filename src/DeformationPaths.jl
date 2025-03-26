@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: evaluate, differentiate, newton
+import HomotopyContinuation: evaluate, differentiate, newton, Expression
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det
 import GLMakie: Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress

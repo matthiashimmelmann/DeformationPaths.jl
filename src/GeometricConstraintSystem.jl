@@ -97,6 +97,7 @@ mutable struct SphericalDiskPacking
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
         dimension==3 || raise(error("The dimension for DiskPackings must be 2."))
+        display([minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])) for i in 1:length(contacts)])
         all(i->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])), inversive_distances[i], atol=tolerance), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
 
         @var x[1:dimension, 1:length(vertices)]
@@ -325,12 +326,14 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
     mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
 
     planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in 1:size(matrix_coords)[2]]
+    display(planePoints)
     linesegments!(ax, vcat([[(planePoints)[Int64(edge[1])], (planePoints)[Int64(edge[2])]] for edge in F.contacts]...); linewidth = line_width, color=dualgraph_color)
     spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
     rotatedPoints=[]
     #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     for i in 1:length(F.G.vertices)
         rotation_axis = cross([0, 0, 1], spherePoints[i])
+        rotation_axis = rotation_axis ./ norm(rotation_axis)
         angle = acos([0, 0, 1]'* spherePoints[i])
         rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
                             rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
@@ -407,6 +410,5 @@ function plot_polytope(F::Polytope, filename::String; padding=0.15, vertex_size=
     save("../data/$(filename).png", fig)
     return fig
 end
-
 
 end
