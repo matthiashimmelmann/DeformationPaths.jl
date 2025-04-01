@@ -97,7 +97,6 @@ mutable struct SphericalDiskPacking
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
         dimension==3 || raise(error("The dimension for DiskPackings must be 2."))
-        display([minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])) for i in 1:length(contacts)])
         all(i->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])), inversive_distances[i], atol=tolerance), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
 
         @var x[1:dimension, 1:length(vertices)]
@@ -318,31 +317,37 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
     matrix_coords = F.G.realization    
 
     ax = Axis3(fig[1,1], aspect=(1,1,1))
-    xlims!(ax,-1-padding, 1+padding)
-    ylims!(ax,-1-padding, 1+padding)
-    zlims!(ax,-1-padding, 1+padding)
+    xlims!(ax,-1.5-padding, 1.5+padding)
+    ylims!(ax,-1.5-padding, 1.5+padding)
+    zlims!(ax,-1.5-padding, 1.5+padding)
     hidespines!(ax)
     hidedecorations!(ax)
     mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
 
     planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in 1:size(matrix_coords)[2]]
-    display(planePoints)
-    linesegments!(ax, vcat([[(planePoints)[Int64(edge[1])], (planePoints)[Int64(edge[2])]] for edge in F.contacts]...); linewidth = line_width, color=dualgraph_color)
+    koebePoints =[]
     spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
     rotatedPoints=[]
     #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     for i in 1:length(F.G.vertices)
         rotation_axis = cross([0, 0, 1], spherePoints[i])
-        rotation_axis = rotation_axis ./ norm(rotation_axis)
-        angle = acos([0, 0, 1]'* spherePoints[i])
-        rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
-                            rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
-                            rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+        if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            angle = acos([0, 0, 1]'* spherePoints[i])
+            rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
+        else
+            rotation_axis = rotation_axis ./ norm(rotation_axis)
+            angle = acos([0, 0, 1]'* spherePoints[i])
+            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+        end
         radius = sqrt(1-norm(planePoints[i])^2)
         disk_vertices = [Point3f(inv(rotation_matrix)*([radius*cos(2*j*pi/n_circle_segments), radius*sin(2*j*pi/n_circle_segments), norm(planePoints[i])])) for j in 1:n_circle_segments]
+        push!(koebePoints, Point3f(inv(rotation_matrix)*([0,0,norm(matrix_coords[:,i])])))
         push!(rotatedPoints, Point3f(inv(rotation_matrix)*[0,0,1]))
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
+    foreach(edge->linesegments!(ax, [koebePoints[Int64(edge[1])], koebePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig

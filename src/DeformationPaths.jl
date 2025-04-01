@@ -501,9 +501,9 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
     ax = Axis3(fig[1,1], aspect=(1,1,1))
-    xlims!(ax,-1-padding, 1+padding)
-    ylims!(ax,-1-padding, 1+padding)
-    zlims!(ax,-1-padding, 1+padding)
+    xlims!(ax,-1.5-padding, 1.5+padding)
+    ylims!(ax,-1.5-padding, 1.5+padding)
+    zlims!(ax,-1.5-padding, 1.5+padding)
     hidespines!(ax)
     hidedecorations!(ax)
     mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
@@ -513,17 +513,40 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]./norm(pointys[:,j])^2) for j in 1:size(pointys)[2]]
     end
+
     spherePoints=@lift begin
         pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]./norm(pointys[:,j])) for j in 1:size(pointys)[2]]
     end
-    linesegments!(ax, @lift(vcat([[($planePoints)[Int64(edge[1])], ($planePoints)[Int64(edge[2])]] for edge in F.contacts]...)); linewidth = line_width, color=dualgraph_color)
+
+    koebePoints=@lift begin
+        pointys = matrix_coords[$time]
+        pointys = [Point3f(-pointys[:,j]) for j in 1:size(pointys)[2]]
+        output = []
+        for i in 1:length(F.G.vertices)
+            rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
+            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+                angle = acos([0, 0, 1]'* ($spherePoints)[i])
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
+            else
+                rotation_axis = rotation_axis ./ norm(rotation_axis)
+                angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))
+                rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+            end
+            push!(output,Point3f(inv(rotation_matrix)*[0,0,norm(pointys[i])]))
+        end
+        output
+    end
+    foreach(edge->linesegments!(ax, @lift([($koebePoints)[Int64(edge[1])], ($koebePoints)[Int64(edge[2])]]); linewidth = line_width, color=dualgraph_color), F.contacts)
     disk_vertices = @lift begin
         output = []
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-5)
-                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+                angle = acos([0, 0, 1]'* ($spherePoints)[i])
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
                 rotation_axis = rotation_axis ./ norm(rotation_axis)
                 angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))
@@ -542,7 +565,8 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-5)
-                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+                    angle = acos([0, 0, 1]'* ($spherePoints)[i])
+                    rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
                 rotation_axis = rotation_axis ./ norm(rotation_axis)
                 angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))
