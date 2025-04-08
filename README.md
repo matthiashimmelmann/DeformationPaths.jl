@@ -29,6 +29,16 @@ animate(D,F,"completebipartite_motion")
 
 There is only a single infinitesimal motion, which we select via setting `flex_mult=[1]`. This input selects the initial tangent vector $\sum_{i=1}^r c_i \mathbf{q}_i$ for a basis $(\mathbf{q}_1,\dots,\mathbf{q}_r)$ of nontrivial infinitesimal flexes. We compute `500` predictor corrector steps with a step size of `0.025` and save the resulting animation under the file name `"completebipartite_motion.png"` using the method `animate`.
 
+We can also pin vertices in the framework, which are depicted as triangles. This is exemplified through the following animation of the cuspidal double Watt mechanism:
+
+```julia
+F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
+D = DeformationPath(F, [-0.5,-0.5], 500; step_size=0.05)
+animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_direction=[4,2])
+```
+
+![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.gif)
+
 ### Sticky Disk Packings
 
 Disk packings are given by a non-overlapping arrangements of disks with fixed radii in $\mathbb{R}^2$. They are called sticky, when existing contacts cannot be broken. In this package, disks that form a contact during the deformation path computation remain in contact. The `DiskPacking` class takes a list of radii and a realization as input. As the optional parameter `pinned_vertices`, we can specify which vertices in the disk packings should be pinned. As an example, we can create an animation using the following code:
