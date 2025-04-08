@@ -32,24 +32,30 @@ mutable struct Framework
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
 
-    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
         all(t->length(t)==2, bars) && all(bar->bar[1] in vertices && bar[2] in vertices, bars) || throw(error("The bars don't have the correct format."))
         dimension = size(realization)[1]
+        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
         bars = [bar[1]<=bar[2] ? Tuple(bar) : Tuple([bar[2],bar[1]]) for bar in bars]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
         dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
         @var x[1:dimension, 1:length(vertices)]
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
-        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
+        for v in pinned_vertices
+            xs[:,v] = realization[:,v]
+        end
+        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         bar_equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices,variables, bar_equations, realization, x)
+        G = ConstraintSystem(vertices,variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
         new(G, bars)
     end
 
-    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
         dimension = size(realization)[1]
-        Framework(vertices, bars, realization)
+        Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
     end
 end
 
@@ -246,7 +252,7 @@ function plot(F, filename::String; kwargs...)
     end
 end
 
-function plot_framework(F::Framework, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, vertex_color=:black)
+function plot_framework(F::Framework, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
@@ -271,6 +277,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
+    foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)

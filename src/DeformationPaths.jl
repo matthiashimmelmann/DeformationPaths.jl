@@ -37,11 +37,11 @@ mutable struct DeformationPath
             throw(error("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type)."))
         end
         if type=="framework"
-            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization)
+            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization)
         elseif type=="polytope" || type == "diskpacking"
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs)
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
         elseif  type=="sphericaldiskpacking"
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
@@ -53,13 +53,31 @@ mutable struct DeformationPath
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
-
-        @showprogress for i in 1:num_steps
-            q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
-            q = newton_correct(G, q)
         
-            push!(motion_samples, q)
-            push!(motion_matrices, to_Matrix(G, Float64.(q)))
+        failure_to_converge = 0
+        @showprogress for i in 1:num_steps
+            try
+                q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
+                q = newton_correct(G, q)
+                failure_to_converge = 0
+                if isapprox(q, motion_samples[end]; atol=1e-12)
+                    throw(error("Slow Progress detected."))
+                end
+                push!(motion_samples, q)
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))    
+            catch e
+                @warn e
+                if failure_to_converge == 1
+                    break
+                else
+                    # If Newton's method only diverges once and we are in a singularity,
+                    # we first try to reverse the previous flex before exiting the routine.
+                    @warn "Direction was reversed."
+                    failure_to_converge = 1
+                    prev_flex = -prev_flex
+                    continue
+                end
+            end
         end
         new(G, step_size, motion_samples, motion_matrices, flex_mult, [])
     end
@@ -82,7 +100,7 @@ mutable struct DeformationPath
 
     function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing)
         start_point = to_Array(F, F.G.realization)
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
@@ -99,18 +117,18 @@ mutable struct DeformationPath
             try
                 q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
                 global q = newton_correct(F.G, q)
+                cur_realization = to_Matrix(F,Float64.(q))
+                if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
+                    _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
+                    DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex)
+                    break
+                end
+                push!(motion_samples, q)
+                push!(_contacts, F.contacts)    
             catch e
-                display(e)
+                @warn e
                 break
             end
-            cur_realization = to_Matrix(F,Float64.(q))
-            if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
-                _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
-                DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex)
-                break
-            end
-            push!(motion_samples, q)
-            push!(_contacts, F.contacts)
         end
         motion_matrices = [to_Matrix(F, Float64.(sample)) for sample in motion_samples]
         new(F.G, step_size, motion_samples, motion_matrices, flex_mult, _contacts)
@@ -133,7 +151,7 @@ mutable struct DeformationPath
     end
 
     function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14)
-        q = point
+        q = Base.copy(point)
         global damping = 0.15
         while(norm(evaluate(G.equations, G.variables=>q)) > tol)
             J = evaluate.(G.jacobian, G.variables=>q)
@@ -177,7 +195,7 @@ end
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
     if flex_mult==nothing
         if typeof(F)==Framework
-            K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization)
+            K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
         elseif typeof(F)==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
         elseif typeof(F)==DiskPacking
@@ -222,20 +240,27 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
 
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    fixed_edge[1] in D.G.vertices && fixed_edge[2] in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
+    fixed_pair[1] in D.G.vertices && fixed_pair[2] in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,fixed_edge[1]]
+        p0 = matrix_coords[i][:,fixed_pair[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
     end
-    fixed_direction = [1.,0]
+    
+    if isapprox(norm(fixed_direction),0;atol=1e-6)
+        @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0]"
+        fixed_direction = [1.,0]
+    end
+    fixed_direction = fixed_direction ./ norm(fixed_direction)
     for i in 1:length(matrix_coords)
-        theta = atan(matrix_coords[i][:,fixed_edge[2]][2], matrix_coords[i][:,fixed_edge[2]][1])
+        theta = atan(matrix_coords[i][:,fixed_pair[2]][2] , matrix_coords[i][:,fixed_pair[2]][1])
+        base_theta = atan(fixed_direction[2], fixed_direction[1])
+        theta = theta-base_theta
         rotation_matrix = [cos(theta) sin(theta); -sin(theta) cos(theta)]
         # Rotate the realization to the `fixed_direction`.
         for j in 1:size(matrix_coords[i])[2]
@@ -259,6 +284,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
         [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
+    foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=25, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
 
@@ -271,23 +297,30 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; pinned_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Framework, filename::String; fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, markercolor=:red3, pin_point_offset=0.2, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    pinned_edge[1] in D.G.vertices && pinned_edge[2] in D.G.vertices || throw(error("The elements of `pinned_edge`` are not vertices of the underlying graph."))
+    fixed_pair[1] in D.G.vertices && fixed_pair[2] in D.G.vertices || throw(error("The elements of `fixed_pair`` are not vertices of the underlying graph."))
+    
+    if isapprox(norm(fixed_direction),0;atol=1e-6)
+        @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0,0]"
+        fixed_direction = [1.,0]
+    end
+    fixed_direction = fixed_direction ./ norm(fixed_direction)
+
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,pinned_edge[1]]
+        p0 = matrix_coords[i][:,fixed_pair[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
-        edge_vector = Vector(matrix_coords[i][:,pinned_edge[2]] ./ norm(matrix_coords[i][:,pinned_edge[2]]))
-        rotation_axis = cross([1,0,0], edge_vector)
+        edge_vector = Vector(matrix_coords[i][:,fixed_pair[2]] ./ norm(matrix_coords[i][:,fixed_pair[2]]))
+        rotation_axis = cross(fixed_direction, edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-5)
             rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
-            angle = acos([1,0,0]'* edge_vector)
+            angle = acos(fixed_direction'* edge_vector)
             rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
@@ -313,6 +346,7 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
+    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])

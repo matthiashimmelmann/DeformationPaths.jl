@@ -9,6 +9,13 @@ import DeformationPaths:    Framework,
 using Test
 
 
+@testset "double_watt" begin
+    F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
+    plot(F,"double_watt"; padding=0.35)
+    D = DeformationPath(F, [-0.5,-0.5], 500; step_size=0.05)
+    animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_direction=[4,2], filetype="mp4")
+end
+
 @testset "sphericaldiskpacking" begin
     F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
     plot(F,"sphericaldiskpacking")
@@ -65,6 +72,7 @@ end
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02)
     animate(D,F,"coned_cube_motion")
 end
+
 
 @testset "two_triangles" begin
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
