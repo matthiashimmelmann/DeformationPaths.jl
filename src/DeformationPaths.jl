@@ -73,7 +73,7 @@ mutable struct DeformationPath
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     failure_to_converge += 1
-                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-4) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-4)
+                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-5) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-5)
                         @warn "Direction was reversed."
                         prev_flex = -prev_flex
                     end
@@ -139,7 +139,7 @@ mutable struct DeformationPath
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     failure_to_converge += 1
-                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-4) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-4)
+                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-5) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-5)
                         @warn "Direction was reversed."
                         prev_flex = -prev_flex
                     end
@@ -151,18 +151,18 @@ mutable struct DeformationPath
     end
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n)
-        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point))
-        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]))
+        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=1e-5)
+        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=1e-5)
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
             tmp_matrix = hcat(trivial_inf_flexes, inf_flex)
-            if !(rank(tmp_matrix; atol=1e-12) == rank(trivial_inf_flexes; atol=1e-12))
+            if !(rank(tmp_matrix; atol=1e-5) == rank(trivial_inf_flexes; atol=1e-5))
                 extend_basis_matrix = hcat(extend_basis_matrix, inf_flex)
             end
         end
         Q, R = qr(extend_basis_matrix)
-        Q = Q[:, s:rank(R, atol=1e-12)]
+        Q = Q[:, s:rank(R, atol=1e-5)]
         return Q
     end
 
@@ -172,7 +172,7 @@ mutable struct DeformationPath
         start_time=Base.time()
         while(norm(evaluate(G.equations, G.variables=>q)) > tol)
             J = evaluate.(G.jacobian, G.variables=>q)
-            stress_dimension = size(nullspace(J'; atol=1e-12))[2]
+            stress_dimension = size(nullspace(J'; atol=1e-5))[2]
             if stress_dimension > 0
                 rand_mat = randn(Float64, length(G.equations) - stress_dimension, length(G.equations))
                 equations = rand_mat*G.equations
