@@ -1,7 +1,7 @@
 module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton, Expression
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd
 import GLMakie: Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
@@ -72,10 +72,11 @@ mutable struct DeformationPath
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
-                    @warn "Direction was reversed."
-                    failure_to_converge = 1
-                    prev_flex = -prev_flex
-                    continue
+                    failure_to_converge += 1
+                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-4) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-4)
+                        @warn "Direction was reversed."
+                        prev_flex = -prev_flex
+                    end
                 end
             end
         end
@@ -137,10 +138,11 @@ mutable struct DeformationPath
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
-                    @warn "Direction was reversed."
-                    failure_to_converge = 1
-                    prev_flex = -prev_flex
-                    continue
+                    failure_to_converge += 1
+                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-4) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-4)
+                        @warn "Direction was reversed."
+                        prev_flex = -prev_flex
+                    end
                 end
             end
         end
@@ -167,6 +169,7 @@ mutable struct DeformationPath
     function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14)
         q = Base.copy(point)
         global damping = 0.15
+        start_time=Base.time()
         while(norm(evaluate(G.equations, G.variables=>q)) > tol)
             J = evaluate.(G.jacobian, G.variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-12))[2]
@@ -184,8 +187,8 @@ mutable struct DeformationPath
             else
                 global damping = damping/2
             end
-            if damping < 1e-15
-                throw(error("Newton's method did not converge"))
+            if damping < 1e-14 || Base.time()-start_time > 10
+                throw(error("Newton's method did not converge in time."))
             end
             q = qnew
             if damping > 1
