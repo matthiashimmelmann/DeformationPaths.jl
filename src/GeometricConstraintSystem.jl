@@ -6,7 +6,7 @@ import LinearAlgebra: det, cross, norm, inv
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 
-export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, DiskPacking, SphericalDiskPacking
+export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, DiskPacking, SphericalDiskPacking, equations!, realization!
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -27,6 +27,25 @@ mutable struct ConstraintSystem
         new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_vertices)
     end
 end
+
+function equations!(G::ConstraintSystem, equations::Vector{Expression})
+    set(System(equations).variables)==G.variables || throw(error("The variables in `equations` do not match the original variables."))
+    G.equations = equations
+    G.jacobian = hcat([differentiate(eq, G.variables) for eq in equations]...)'
+    G.system = System(equations; variables=G.variables)
+    return nothing
+end
+
+function realization!(G::ConstraintSystem, realization::Union{Matrix{Float64},Matrix{Int}})
+    size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw(error("The realization does not have the correct format."))
+    point = to_Array(G, realization)
+    re_matrix = to_Matrix(G, point)
+    norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw(error("The point does not satisfy the constraint system's equations!"))
+    G.realization = realization
+    return nothing
+end
+
+
 
 mutable struct Framework
     G::ConstraintSystem
@@ -59,6 +78,14 @@ mutable struct Framework
     end
 end
 
+function equations!(F::Framework, equations::Vector{Expression})
+    F.G.equations = equations
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
+    F.G.system = System(equations; variables=F.G.variables)
+    return nothing
+end
+
+
 mutable struct DiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
@@ -90,6 +117,13 @@ mutable struct DiskPacking
         vertices = [i for i in 1:length(radii)]
         DiskPacking(vertices, radii, realization; pinned_vertices=pinned_vertices)
     end
+end
+
+function equations!(F::DiskPacking, equations::Vector{Expression})
+    F.G.equations = equations
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
+    F.G.system = System(equations; variables=F.G.variables)
+    return nothing
 end
 
 mutable struct SphericalDiskPacking
@@ -131,6 +165,13 @@ mutable struct SphericalDiskPacking
     minkowski_scalar_product(e1,e2) = e1'*e2-1
 end
 
+function equations!(F::SphericalDiskPacking, equations::Vector{Expression})
+    F.G.equations = equations
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
+    F.G.system = System(equations; variables=F.G.variables)
+    return nothing
+end
+
 
 mutable struct VolumeHypergraph
     G::ConstraintSystem
@@ -154,6 +195,13 @@ mutable struct VolumeHypergraph
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
         VolumeHypergraph(vertices, facets, realization)
     end
+end
+
+function equations!(F::VolumeHypergraph, equations::Vector{Expression})
+    F.G.equations = equations
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
+    F.G.system = System(equations; variables=F.G.variables)
+    return nothing
 end
 
 mutable struct Polytope
@@ -201,6 +249,12 @@ mutable struct Polytope
     end
 end
 
+function equations!(F::Polytope, equations::Vector{Expression})
+    F.G.equations = equations
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
+    F.G.system = System(equations; variables=F.G.variables)
+    return nothing
+end
 
 
 function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})

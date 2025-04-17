@@ -8,7 +8,7 @@ import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, DiskPacking, SphericalDiskPacking
+using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, DiskPacking, SphericalDiskPacking
 
 export  ConstraintSystem, 
         Framework, 
@@ -21,7 +21,10 @@ export  ConstraintSystem,
         to_Matrix,
         to_Array,
         DiskPacking,
-        SphericalDiskPacking
+        SphericalDiskPacking,
+        equations!,
+        realization!,
+        newton_correct
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -31,7 +34,7 @@ mutable struct DeformationPath
     flex_mult::Vector{Float64}
     _contacts::Vector
 
-    function DeformationPath(G::ConstraintSystem, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int, type::String; step_size::Float64=1e-2)
+    function DeformationPath(G::ConstraintSystem, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14)
         start_point = to_Array(G, G.realization)
         if !(type in ["framework", "hypergraph", "polytope",  "sphericaldiskpacking"])
             throw(error("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type)."))
@@ -58,22 +61,31 @@ mutable struct DeformationPath
         @showprogress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
-                q = newton_correct(G, q)
+                q = newton_correct(G, q; tol=newton_tol)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
                     throw(error("Slow Progress detected."))
                 end
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))    
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
             catch e
                 @warn e
-                if failure_to_converge == 1
+                if failure_to_converge == 3
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     failure_to_converge += 1
-                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-5) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-5)
+                    if failure_to_converge==1
+                        try
+                            q, prev_flex = euler_step(G, step_size/10, prev_flex, motion_samples[end], K_n)
+                            q = newton_correct(G, q; tol=newton_tol)
+                            push!(motion_samples, q)
+                            push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
+                        catch
+                            continue
+                        end
+                    elseif length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-8) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-8)
                         @warn "Direction was reversed."
                         prev_flex = -prev_flex
                     end
@@ -83,23 +95,23 @@ mutable struct DeformationPath
         new(G, step_size, motion_samples, motion_matrices, flex_mult, [])
     end
 
-    function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+    function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
         DeformationPath(F.G, flex_mult, num_steps, "framework"; step_size=step_size)
     end
 
-    function DeformationPath(F::VolumeHypergraph, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+    function DeformationPath(F::VolumeHypergraph, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
         DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; step_size=step_size)
     end
 
-    function DeformationPath(F::Polytope, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+    function DeformationPath(F::Polytope, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; step_size=step_size)
     end
 
-    function DeformationPath(F::SphericalDiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2)
+    function DeformationPath(F::SphericalDiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
         DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; step_size=step_size)
     end
 
-    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing)
+    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14)
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
@@ -114,10 +126,12 @@ mutable struct DeformationPath
         if length(_contacts)==0
             _contacts = [F.contacts]
         end
+
+        failure_to_converge = 0
         @showprogress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
-                global q = newton_correct(F.G, q)
+                q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
+                q = newton_correct(G, q; tol=newton_tol)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
                     throw(error("Slow Progress detected."))
@@ -126,76 +140,55 @@ mutable struct DeformationPath
                 cur_realization = to_Matrix(F,Float64.(q))
                 if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
                     _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
-                    DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex)
+                    DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex, newton_tol=newton_tol)
                     break
                 end
+
                 push!(motion_samples, q)
                 push!(_contacts, F.contacts)    
             catch e
                 @warn e
-                if failure_to_converge == 1
+                if failure_to_converge == 3
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     failure_to_converge += 1
-                    if length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-5) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-5)
+                    if failure_to_converge==1
+                        try
+                            q, prev_flex = euler_step(G, step_size/10, prev_flex, motion_samples[end], K_n)
+                            q = newton_correct(G, q; tol=newton_tol)
+                            push!(motion_samples, q)
+                            push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
+                        catch
+                            continue
+                        end
+                    elseif length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-8) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-8)
                         @warn "Direction was reversed."
                         prev_flex = -prev_flex
                     end
                 end
             end
         end
+
         motion_matrices = [to_Matrix(F, Float64.(sample)) for sample in motion_samples]
         new(F.G, step_size, motion_samples, motion_matrices, flex_mult, _contacts)
     end
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n)
-        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=1e-5)
-        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=1e-5)
+        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=1e-8)
+        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=1e-8)
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
             tmp_matrix = hcat(trivial_inf_flexes, inf_flex)
-            if !(rank(tmp_matrix; atol=1e-5) == rank(trivial_inf_flexes; atol=1e-5))
+            if !(rank(tmp_matrix; atol=1e-8) == rank(trivial_inf_flexes; atol=1e-8))
                 extend_basis_matrix = hcat(extend_basis_matrix, inf_flex)
             end
         end
         Q, R = qr(extend_basis_matrix)
-        Q = Q[:, s:rank(R, atol=1e-5)]
+        Q = Q[:, s:rank(R, atol=1e-8)]
         return Q
-    end
-
-    function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14)
-        q = Base.copy(point)
-        global damping = 0.15
-        start_time=Base.time()
-        while(norm(evaluate(G.equations, G.variables=>q)) > tol)
-            J = evaluate.(G.jacobian, G.variables=>q)
-            stress_dimension = size(nullspace(J'; atol=1e-5))[2]
-            if stress_dimension > 0
-                rand_mat = randn(Float64, length(G.equations) - stress_dimension, length(G.equations))
-                equations = rand_mat*G.equations
-                J = rand_mat*J
-            else
-                equations = G.equations
-            end
-
-            qnew = q - damping*pinv(J)*evaluate(equations, G.variables=>q)
-            if norm(evaluate(G.equations, G.variables=>qnew)) < norm(evaluate(G.equations, G.variables=>q))
-                global damping = damping*1.2
-            else
-                global damping = damping/2
-            end
-            if damping < 1e-14 || Base.time()-start_time > 10
-                throw(error("Newton's method did not converge in time."))
-            end
-            q = qnew
-            if damping > 1
-                global damping = 1
-            end
-        end
-        return q
     end
 
     function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
@@ -206,6 +199,38 @@ mutable struct DeformationPath
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
         return point+step_size*predicted_inf_flex, predicted_inf_flex
     end
+end
+
+function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14)
+    q = Base.copy(point)
+    global damping = 0.15
+    start_time=Base.time()
+    while(norm(evaluate(G.equations, G.variables=>q)) > tol)
+        J = evaluate.(G.jacobian, G.variables=>q)
+        stress_dimension = size(nullspace(J'; atol=1e-8))[2]
+        if stress_dimension > 0
+            rand_mat = randn(Float64, length(G.equations) - stress_dimension, length(G.equations))
+            equations = rand_mat*G.equations
+            J = rand_mat*J
+        else
+            equations = G.equations
+        end
+
+        qnew = q - damping*pinv(J)*evaluate(equations, G.variables=>q)
+        if norm(evaluate(G.equations, G.variables=>qnew)) < norm(evaluate(G.equations, G.variables=>q))
+            global damping = damping*1.2
+        else
+            global damping = damping/2
+        end
+        if damping < 1e-14 || Base.time()-start_time > 10
+            throw(error("Newton's method did not converge in time."))
+        end
+        q = qnew
+        if damping > 1
+            global damping = 1
+        end
+    end
+    return q
 end
 
 
@@ -257,7 +282,7 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
 
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -283,6 +308,10 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
         end
+    end
+
+    if recompute_deformation_samples
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
     end
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
@@ -314,11 +343,11 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, markercolor=:red3, pin_point_offset=0.2, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    fixed_pair[1] in D.G.vertices && fixed_pair[2] in D.G.vertices || throw(error("The elements of `fixed_pair`` are not vertices of the underlying graph."))
+    length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw(error("The elements of `fixed_vertices`` are not vertices of the underlying graph."))
     
     if isapprox(norm(fixed_direction),0;atol=1e-6)
         @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0,0]"
@@ -327,13 +356,13 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     fixed_direction = fixed_direction ./ norm(fixed_direction)
 
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,fixed_pair[1]]
+        p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
-        edge_vector = Vector(matrix_coords[i][:,fixed_pair[2]] ./ norm(matrix_coords[i][:,fixed_pair[2]]))
+        edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
         rotation_axis = cross(fixed_direction, edge_vector)
-        if isapprox(norm(rotation_axis), 0, atol=1e-5)
+        if isapprox(norm(rotation_axis), 0, atol=1e-6)
             rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
@@ -343,8 +372,24 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
         end
         for j in 1:size(matrix_coords[i])[2]
-            matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
+            matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
         end
+
+        if length(fixed_vertices)==3
+            edge_vector_new = Vector(matrix_coords[i][:,fixed_vertices[3]] ./ norm(matrix_coords[i][:,fixed_vertices[3]]))
+            angle = pi/2 - acos([0,0,1]'* edge_vector_new)
+            rotation_matrix_new = [ cos(angle)+fixed_direction[1]^2*(1-cos(angle)) fixed_direction[1]*fixed_direction[2]*(1-cos(angle))-fixed_direction[3]*sin(angle) fixed_direction[1]*fixed_direction[3]*(1-cos(angle))+fixed_direction[2]*sin(angle); 
+                                fixed_direction[1]*fixed_direction[2]*(1-cos(angle))+fixed_direction[3]*sin(angle) cos(angle)+fixed_direction[2]^2*(1-cos(angle)) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))-fixed_direction[1]*sin(angle); 
+                                fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
+            for j in 1:size(matrix_coords[i])[2]
+                matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
+            end
+            display(matrix_coords[i])
+        end
+    end
+
+    if recompute_deformation_samples
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
     end
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
@@ -369,12 +414,19 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
     end
+
+    if animate_rotation
+        ax.viewmode = :fit # Prevent axis from resizing during animation
+    end
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
+        if animate_rotation
+            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+        end
     end
 end
 
-function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; recompute_deformation_samples::Bool=true, target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -418,6 +470,10 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
         end
     end
 
+    if recompute_deformation_samples
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+    end
+
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
     limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
@@ -442,25 +498,26 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
     end
+
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; pinned_edge::Tuple{Int,Int}=(1,2), framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
-    pinned_edge[1] in D.G.vertices && pinned_edge[2] in D.G.vertices || throw(error("The elements of `pinned_edge`` are not vertices of the underlying graph."))
+    fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw(error("The elements of `fixed_vertices`` are not vertices of the underlying graph."))
     ax = Axis3(fig[1,1])
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,pinned_edge[1]]
+        p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
-        edge_vector = Vector(matrix_coords[i][:,pinned_edge[2]] ./ norm(matrix_coords[i][:,pinned_edge[2]]))
+        edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
         rotation_axis = cross([1,0,0], edge_vector)
-        if isapprox(norm(rotation_axis), 0, atol=1e-5)
+        if isapprox(norm(rotation_axis), 0, atol=1e-6)
             rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
@@ -469,9 +526,25 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
                                 rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
         end
+
         for j in 1:size(matrix_coords[i])[2]
-            matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
+            matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
         end
+
+        if length(fixed_vertices)==3
+            edge_vector_new = Vector(matrix_coords[i][:,fixed_vertices[3]] ./ norm(matrix_coords[i][:,fixed_vertices[3]]))
+            angle = pi/2 - acos([0,0,1]'* edge_vector_new)
+            rotation_matrix_new = [ cos(angle)+fixed_direction[1]^2*(1-cos(angle)) fixed_direction[1]*fixed_direction[2]*(1-cos(angle))-fixed_direction[3]*sin(angle) fixed_direction[1]*fixed_direction[3]*(1-cos(angle))+fixed_direction[2]*sin(angle); 
+                                fixed_direction[1]*fixed_direction[2]*(1-cos(angle))+fixed_direction[3]*sin(angle) cos(angle)+fixed_direction[2]^2*(1-cos(angle)) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))-fixed_direction[1]*sin(angle); 
+                                fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
+            for j in 1:size(matrix_coords[i])[2]
+                matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
+            end
+        end
+    end
+
+    if recompute_deformation_samples
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
     end
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
@@ -498,8 +571,15 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; p
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
     end
+
+    if animate_rotation
+        ax.viewmode = :fit # Prevent axis from resizing during animation
+    end
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
+        if animate_rotation
+            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+        end
     end
 end
 
@@ -541,13 +621,14 @@ function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::Str
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
     end
+
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
         contacts[] = D._contacts[t]
     end
 end
 
-function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
@@ -576,7 +657,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         output = []
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
-            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            if isapprox(norm(rotation_axis), 0, atol=1e-6)
                 angle = acos([0, 0, 1]'* ($spherePoints)[i])
                 rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
@@ -595,7 +676,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         output = []
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
-            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            if isapprox(norm(rotation_axis), 0, atol=1e-6)
                 angle = acos([0, 0, 1]'* ($spherePoints)[i])
                 rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
@@ -615,7 +696,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         output=[]
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
-            if isapprox(norm(rotation_axis), 0, atol=1e-5)
+            if isapprox(norm(rotation_axis), 0, atol=1e-6)
                     angle = acos([0, 0, 1]'* ($spherePoints)[i])
                     rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
@@ -635,8 +716,15 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     if !(lowercase(filetype) in ["gif","mp4"])
         throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
     end
+    
+    if animate_rotation
+        ax.viewmode = :fit # Prevent axis from resizing during animation
+    end
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
+        if animate_rotation
+            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+        end
     end
     return fig
 end
