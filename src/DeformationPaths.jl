@@ -390,7 +390,6 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
             for j in 1:size(matrix_coords[i])[2]
                 matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
             end
-            display(" ")
         end
     end
 
@@ -539,7 +538,13 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; r
 
         if length(fixed_vertices)==3
             edge_vector_new = Vector(matrix_coords[i][:,fixed_vertices[3]] ./ norm(matrix_coords[i][:,fixed_vertices[3]]))
-            angle = pi/2 - acos([0,0,1]'* edge_vector_new)
+            target_vector = [0,edge_vector_new[2],edge_vector_new[3]]
+            target_vector = target_vector ./ norm(target_vector)
+            if isapprox(edge_vector_new[3],0; atol=1e-6)
+                angle = 0
+            else
+                angle = acos(target_vector'* [0,1,0])
+            end
             rotation_matrix_new = [ cos(angle)+fixed_direction[1]^2*(1-cos(angle)) fixed_direction[1]*fixed_direction[2]*(1-cos(angle))-fixed_direction[3]*sin(angle) fixed_direction[1]*fixed_direction[3]*(1-cos(angle))+fixed_direction[2]*sin(angle); 
                                 fixed_direction[1]*fixed_direction[2]*(1-cos(angle))+fixed_direction[3]*sin(angle) cos(angle)+fixed_direction[2]^2*(1-cos(angle)) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))-fixed_direction[1]*sin(angle); 
                                 fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
