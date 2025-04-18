@@ -5,15 +5,35 @@ import DeformationPaths:    Framework,
                             VolumeHypergraph,
                             DiskPacking,
                             plot,
-                            SphericalDiskPacking
+                            SphericalDiskPacking,
+                            to_Array,
+                            equations!
 using Test
+using HomotopyContinuation
+using LinearAlgebra
 
+
+@testset "volume_tetrahedron" begin
+    F = Framework([[1,2], [1,3], [1,4], [2,4],[2,3], [3,4]], Matrix([0 0 0; 1 0 0; 0 1 0; 0.5 0.5 0.5;]'); pinned_vertices=[1])
+    triangles = [(1,2,3),(1,2,4),(1,3,4),(2,3,4)]
+    area_equations = Vector{Expression}([])
+    for (i,triang) in enumerate(triangles)
+        parallelogram_area = sum(cross(F.G.xs[:,triang[2]]-F.G.xs[:,triang[1]], F.G.xs[:,triang[3]]-F.G.xs[:,triang[1]]).^2)
+        push!(area_equations, 1/4*parallelogram_area - evaluate(1/4*parallelogram_area, F.G.variables=>to_Array(F,F.G.realization)))
+    end
+    volume_constraint = 1/6*det(hcat([1 for _ in 1:4], F.G.xs[1,:], F.G.xs[2,:], F.G.xs[3,:])) - evaluate(1/6*det(hcat([1 for _ in 1:4], F.G.xs[1,:], F.G.xs[2,:], F.G.xs[3,:])) , F.G.variables=>to_Array(F,F.G.realization))
+    push!(area_equations, volume_constraint)
+    equations!(F, area_equations)
+    plot(F,"volume_tetrahedron"; padding=0.1)
+    D = DeformationPath(F, [1], 500; step_size=0.01)
+    animate(D,F,"volume_tetrahedron"; padding=0.1, fixed_vertices=(1,2,3), animate_rotation=true, rotation_frames=1500, fixed_direction=[1,0,0], filetype="mp4")
+end
 
 @testset "double_watt" begin
     F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
     plot(F,"double_watt"; padding=0.35)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.05)
-    animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_direction=[4,2])
+    animate(D,F,"double_watt_motion"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2])
 end
 
 @testset "sphericaldiskpacking" begin
