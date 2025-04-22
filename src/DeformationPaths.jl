@@ -78,16 +78,23 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/10, prev_flex, motion_samples[end], K_n)
+                            q, prev_flex = euler_step(G, step_size/3, prev_flex, motion_samples[end], K_n)
                             q = newton_correct(G, q; tol=newton_tol)
                             push!(motion_samples, q)
                             push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
                         catch
                             continue
                         end
-                    elseif length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-8) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-8)
-                        @warn "Direction was reversed."
+                    elseif length(motion_samples)==1
+                        @info "Direction was reversed."
                         prev_flex = -prev_flex
+                    else 
+                        @info "Acceleration-based cusp method is being used."
+                        J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
+                        acceleration = -3*pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
+                        acceleration = acceleration ./ norm(acceleration)
+                        prev_flex = - prev_flex - acceleration
+                        prev_flex = prev_flex ./ norm(prev_flex)
                     end
                 end
             end
@@ -148,7 +155,7 @@ mutable struct DeformationPath
                 push!(_contacts, F.contacts)    
             catch e
                 @warn e
-                if failure_to_converge == 3
+                if failure_to_converge == 2
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -156,16 +163,23 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/10, prev_flex, motion_samples[end], K_n)
+                            q, prev_flex = euler_step(G, step_size/3, prev_flex, motion_samples[end], K_n)
                             q = newton_correct(G, q; tol=newton_tol)
                             push!(motion_samples, q)
                             push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
                         catch
                             continue
                         end
-                    elseif length(motion_samples)==1 || rank(evaluate.(G.jacobian, G.variables=>motion_samples[end]); atol=1e-8) < rank(evaluate.(G.jacobian, G.variables=>motion_samples[end-1]); atol=1e-8)
+                    elseif length(motion_samples)==1
                         @warn "Direction was reversed."
                         prev_flex = -prev_flex
+                    else
+                        @info "Acceleration-based cusp method is being used."
+                        J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
+                        acceleration = -3*pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
+                        acceleration = acceleration ./ norm(acceleration)
+                        prev_flex = - prev_flex - acceleration
+                        prev_flex = prev_flex ./ norm(prev_flex)
                     end
                 end
             end
@@ -175,25 +189,25 @@ mutable struct DeformationPath
         new(F.G, step_size, motion_samples, motion_matrices, flex_mult, _contacts)
     end
 
-    function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n)
-        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=1e-8)
-        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=1e-8)
+    function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n; tol=1e-8)
+        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
+        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
             tmp_matrix = hcat(trivial_inf_flexes, inf_flex)
-            if !(rank(tmp_matrix; atol=1e-8) == rank(trivial_inf_flexes; atol=1e-8))
+            if !(rank(tmp_matrix; atol=tol) == rank(trivial_inf_flexes; atol=tol))
                 extend_basis_matrix = hcat(extend_basis_matrix, inf_flex)
             end
         end
         Q, R = qr(extend_basis_matrix)
-        Q = Q[:, s:rank(R, atol=1e-8)]
+        Q = Q[:, s:rank(R, atol=tol)]
         return Q
     end
 
     function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
         J = evaluate(G.jacobian, G.variables=>point)
-        flex_space = compute_nontrivial_inf_flexes(G, point, K_n)
+        flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-2)
         flex_coefficients = pinv(flex_space) * prev_flex
         predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
@@ -282,13 +296,13 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
 
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_pair::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    fixed_pair[1] in D.G.vertices && fixed_pair[2] in D.G.vertices || throw(error("pinned_vertex is not a vertex of the underlying graph."))
+    length(fixed_vertices)==2 && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices || throw(error("fixed_vertices is not a vertex of the underlying graph."))
     for i in 1:length(matrix_coords)
-        p0 = matrix_coords[i][:,fixed_pair[1]]
+        p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
@@ -300,7 +314,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
     fixed_direction = fixed_direction ./ norm(fixed_direction)
     for i in 1:length(matrix_coords)
-        theta = atan(matrix_coords[i][:,fixed_pair[2]][2] , matrix_coords[i][:,fixed_pair[2]][1])
+        theta = atan(matrix_coords[i][:,fixed_vertices[2]][2] , matrix_coords[i][:,fixed_vertices[2]][1])
         base_theta = atan(fixed_direction[2], fixed_direction[1])
         theta = theta-base_theta
         rotation_matrix = [cos(theta) sin(theta); -sin(theta) cos(theta)]
