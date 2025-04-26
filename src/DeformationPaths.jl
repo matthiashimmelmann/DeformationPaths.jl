@@ -137,8 +137,8 @@ mutable struct DeformationPath
         failure_to_converge = 0
         @showprogress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
-                q = newton_correct(G, q; tol=newton_tol)
+                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
+                q = newton_correct(F.G, q; tol=newton_tol)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
                     throw(error("Slow Progress detected."))
@@ -163,10 +163,10 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/3, prev_flex, motion_samples[end], K_n)
-                            q = newton_correct(G, q; tol=newton_tol)
+                            q, prev_flex = euler_step(F.G, step_size/3, prev_flex, motion_samples[end], K_n)
+                            q = newton_correct(F.G, q; tol=newton_tol)
                             push!(motion_samples, q)
-                            push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
+                            push!(motion_matrices, to_Matrix(F, Float64.(q)))                    
                         catch
                             continue
                         end
@@ -175,8 +175,8 @@ mutable struct DeformationPath
                         prev_flex = -prev_flex
                     else
                         @info "Acceleration-based cusp method is being used."
-                        J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
-                        acceleration = -3*pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
+                        J = evaluate.(F.G.jacobian, F.G.variables=>motion_samples[end])
+                        acceleration = -3*pinv(J)*evaluate.(F.G.jacobian, F.G.variables=>prev_flex)*prev_flex
                         acceleration = acceleration ./ norm(acceleration)
                         prev_flex = - prev_flex - acceleration
                         prev_flex = prev_flex ./ norm(prev_flex)
@@ -207,7 +207,7 @@ mutable struct DeformationPath
 
     function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
         J = evaluate(G.jacobian, G.variables=>point)
-        flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-2)
+        flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-3)
         flex_coefficients = pinv(flex_space) * prev_flex
         predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
@@ -230,7 +230,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
             equations = G.equations
         end
 
-        qnew = q - damping*pinv(J)*evaluate(equations, G.variables=>q)
+        qnew = q - damping* (J \ evaluate(equations, G.variables=>q))
         if norm(evaluate(G.equations, G.variables=>qnew)) < norm(evaluate(G.equations, G.variables=>q))
             global damping = damping*1.2
         else
@@ -453,14 +453,14 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     if facet_colors==nothing
-        facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.facets), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
+        facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.volumes), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
     skip_scaling = false
     if fixed_triangle==nothing
         fixed_triangle=(1,2,3)
         skip_scaling=true
     else
-        all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.facets]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.facets]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.facets]) || throw(error("fixed_triangle is not a vertex of the underlying graph."))
+        all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.volumes]) || throw(error("fixed_triangle is not a vertex of the underlying graph."))
     end
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_triangle[1]]
@@ -511,8 +511,8 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
         pointys = matrix_coords[$time]
         [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
-    foreach(i->poly!(ax, @lift([($allVertices)[Int64(v)] for v in F.facets[i]]); color=(facet_colors[i], 0.25)), 1:length(F.facets))
-    foreach(i->lines!(ax, @lift([($allVertices)[Int64(v)] for v in vcat(F.facets[i], F.facets[i][1])]); linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.facets))
+    foreach(i->poly!(ax, @lift([($allVertices)[Int64(v)] for v in F.volumes[i]]); color=(facet_colors[i], 0.25)), 1:length(F.volumes))
+    foreach(i->lines!(ax, @lift([($allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]); linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(F.G.vertices))
     foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=26, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
 

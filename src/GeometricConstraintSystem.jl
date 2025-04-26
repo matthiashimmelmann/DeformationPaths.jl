@@ -175,25 +175,25 @@ end
 
 mutable struct VolumeHypergraph
     G::ConstraintSystem
-    facets::Vector{Vector{Int}}
+    volumes::Vector{Vector{Int}}
 
-    function VolumeHypergraph(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         dimension = size(realization)[1]
-        all(t->length(t)==dimension+1, facets) && all(facet->all(v->v in vertices, facet), facets) || throw(error("The facets don't have the correct format."))
-        facets = [Vector(facet) for facet in facets]
+        all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw(error("The volumes don't have the correct format."))
+        volumes = [Vector(facet) for facet in volumes]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
         dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
         @var x[1:dimension, 1:length(vertices)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
-        facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([x[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in facets]
+        facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([x[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
         facet_equations = filter(eq->eq!=0, facet_equations)
         G = ConstraintSystem(vertices,variables, facet_equations, realization, x)
-        new(G, facets)
+        new(G, volumes)
     end
 
-    function VolumeHypergraph(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
-        vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        VolumeHypergraph(vertices, facets, realization)
+    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+        vertices = sort(collect(Set(vcat([[v for v in facet] for facet in volumes]...))))
+        VolumeHypergraph(vertices, volumes, realization)
     end
 end
 
@@ -442,8 +442,8 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     hidedecorations!(ax)
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.facets[i]]; color=(facet_colors[i], 0.25)), 1:length(F.facets))
-    foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.facets[i], F.facets[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.facets))
+    foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.volumes[i]]; color=(facet_colors[i], 0.25)), 1:length(F.volumes))
+    foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
