@@ -8,7 +8,7 @@ import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, DiskPacking, SphericalDiskPacking
+using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking
 
 export  ConstraintSystem, 
         Framework, 
@@ -20,7 +20,7 @@ export  ConstraintSystem,
         Polytope,
         to_Matrix,
         to_Array,
-        DiskPacking,
+        SpherePacking,
         SphericalDiskPacking,
         equations!,
         realization!,
@@ -69,8 +69,9 @@ mutable struct DeformationPath
                 push!(motion_samples, q)
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
             catch e
-                @warn e
-                if failure_to_converge == 3
+                i = i - 1
+                @warn e.msg
+                if failure_to_converge == 3 || e.msg == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -118,7 +119,7 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; step_size=step_size)
     end
 
-    function DeformationPath(F::DiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14)
+    function DeformationPath(F::SpherePacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14)
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
@@ -146,7 +147,7 @@ mutable struct DeformationPath
 
                 cur_realization = to_Matrix(F,Float64.(q))
                 if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
-                    _F = DiskPacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
+                    _F = SpherePacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
                     DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex, newton_tol=newton_tol)
                     break
                 end
@@ -154,8 +155,9 @@ mutable struct DeformationPath
                 push!(motion_samples, q)
                 push!(_contacts, F.contacts)    
             catch e
-                @warn e
-                if failure_to_converge == 2
+                i = i - 1
+                @warn e.msg
+                if failure_to_converge == 3 || e.msg == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -208,6 +210,9 @@ mutable struct DeformationPath
     function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
         J = evaluate(G.jacobian, G.variables=>point)
         flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-3)
+        if size(flex_space)[2]==0
+            throw(error("The space of nontrivial infinitesimal motions is empty."))
+        end
         flex_coefficients = pinv(flex_space) * prev_flex
         predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
@@ -254,7 +259,7 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
             K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
         elseif typeof(F)==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
-        elseif typeof(F)==DiskPacking
+        elseif typeof(F)==SpherePacking
             K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
         elseif typeof(F)==Polytope
             K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
@@ -285,12 +290,18 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
         return animate2D_hypergraph(D, F, filename; kwargs...)
     elseif typeof(F)==Polytope
         return animate3D_polytope(D, F, filename; kwargs...)
-    elseif typeof(F)==DiskPacking
-        return animate2D_diskpacking(D, F, filename; kwargs...)
+    elseif typeof(F)==SpherePacking
+        if F.G.dimension==2
+            return animate2D_diskpacking(D, F, filename; kwargs...)
+        elseif F.G.dimension==3
+            return animate3D_spherepacking(D, F, filename; kwargs...)
+        else
+            throw(error("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)"))
+        end
     elseif typeof(F)==SphericalDiskPacking
         return animate3D_sphericaldiskpacking(D, F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework, DiskPacking, Polytope, SphericalDiskPacking or VolumeHypergraph, but is $(typeof(F))"))
+        throw(error("The type of 'F' needs to be either Framework, SpherePacking, Polytope, SphericalDiskPacking or VolumeHypergraph, but is $(typeof(F))"))
     end
 
 
@@ -615,7 +626,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; r
 end
 
 
-function animate2D_diskpacking(D::DeformationPath, F::DiskPacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
+function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
