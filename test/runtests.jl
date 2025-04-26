@@ -8,7 +8,8 @@ import DeformationPaths:    Framework,
                             SphericalDiskPacking,
                             to_Array,
                             equations!,
-                            to_Matrix
+                            to_Matrix,
+                            newton_correct
 using Test
 using HomotopyContinuation
 using LinearAlgebra
