@@ -12,10 +12,19 @@ import DeformationPaths:    Framework,
                             newton_correct,
                             realization!,
                             project_deformation_random,
-                            FrameworkOnSurface
+                            FrameworkOnSurface,
+                            is_rigid,
+                            is_inf_rigid
 using Test
 using HomotopyContinuation
 using LinearAlgebra
+
+
+@testset "is_rigid_test" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'))
+    @test !is_inf_rigid(F)
+    @test is_rigid(F)
+end
 
 
 @testset "square" begin
@@ -56,6 +65,7 @@ end
     D = DeformationPath(F, [1], 500; step_size=0.025)
     animate(D,F,"completebipartite_motion")
 end
+
 
 @testset "coned_cube" begin
     F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 sqrt(2)]'))

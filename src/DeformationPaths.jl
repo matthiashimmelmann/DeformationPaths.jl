@@ -27,7 +27,9 @@ export  ConstraintSystem,
         add_equations!,
         realization!,
         newton_correct,
-        FrameworkOnSurface
+        FrameworkOnSurface,
+        is_rigid,
+        is_inf_rigid
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -57,6 +59,9 @@ mutable struct DeformationPath
         end
 
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
+        if flex_mult==[]
+            flex_mult = [1 for _ in 1:size(flex_space)[2]]
+        end
         size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
@@ -108,24 +113,24 @@ mutable struct DeformationPath
         new(G, step_size, motion_samples, motion_matrices, flex_mult, [])
     end
 
-    function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
-        DeformationPath(F.G, flex_mult, num_steps, "framework"; step_size=step_size)
+    function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "framework"; kwargs...)
     end
 
-    function DeformationPath(F::FrameworkOnSurface, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
-        DeformationPath(F.G, flex_mult, num_steps, "frameworkonsurface"; step_size=step_size)
+    function DeformationPath(F::FrameworkOnSurface, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "frameworkonsurface"; kwargs...)
     end
 
-    function DeformationPath(F::VolumeHypergraph, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
-        DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; step_size=step_size)
+    function DeformationPath(F::VolumeHypergraph, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; kwargs...)
     end
 
-    function DeformationPath(F::Polytope, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
-        DeformationPath(F.G, flex_mult, num_steps, "polytope"; step_size=step_size)
+    function DeformationPath(F::Polytope, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "polytope"; kwargs...)
     end
 
-    function DeformationPath(F::SphericalDiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
-        DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; step_size=step_size)
+    function DeformationPath(F::SphericalDiskPacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; kwargs...)
     end
 
     function DeformationPath(F::SpherePacking, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14)
@@ -133,6 +138,9 @@ mutable struct DeformationPath
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
+            if flex_mult==[]
+                flex_mult = [1 for _ in 1:size(flex_space)[2]]
+            end
             size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
             prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
             prev_flex = prev_flex ./ norm(prev_flex)
@@ -262,12 +270,47 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
 end
 
 
+function is_rigid(F; tol=1e-7)
+    if is_inf_rigid(F; tol=tol)
+        return true
+    end
+    D = DeformationPath(F, Vector{Int}([]), 10; step_size=sqrt(tol), newton_tol=1e-15)
+    display([norm(sample-D.motion_samples[1]) for sample in D.motion_samples])
+    return !any(sample->norm(sample-D.motion_samples[1])>tol, D.motion_samples)
+end
+
+function is_inf_rigid(F; tol=1e-10)
+    if typeof(F)==Framework
+        K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+    elseif typeof(F)==FrameworkOnSurface
+        K_n = deepcopy(G)
+        add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
+    elseif typeof(F)==VolumeHypergraph
+        K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
+    elseif typeof(F)==SpherePacking
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+    elseif typeof(F)==Polytope
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+    elseif typeof(F)==SphericalDiskPacking
+        minkowski_scalar_product(e1,e2) = e1'*e2-1
+        inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
+    else
+        throw("Type of F is not yet supported. It is $(typeof(F)).")
+    end
+    inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol)
+    trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
+    return length(inf_flexes) == length(trivial_inf_flexes)
+end
+
+
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
     if flex_mult==nothing
         if typeof(F)==Framework
             K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
         elseif typeof(F)==FrameworkOnSurface
-
+            K_n = deepcopy(G)
+            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
         elseif typeof(F)==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
         elseif typeof(F)==SpherePacking
