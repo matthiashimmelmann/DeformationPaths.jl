@@ -18,6 +18,14 @@ using HomotopyContinuation
 using LinearAlgebra
 
 
+@testset "squareonhyperboloid" begin
+    F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([-sqrt(1/2) -sqrt(1/2) -1; -1 0 0; 0 1 0; sqrt(1/2) sqrt(1/2) 1]'), x->x[1]^2+x[2]^2-x[3]^2-1)
+    plot(F,"squareonhyperboloid")
+    D = DeformationPath(F, [1,1], 200; step_size=0.025)
+    animate(D,F,"squareonhyperboloid_motion")
+end
+
+
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F,"square")
@@ -73,10 +81,6 @@ end
 end
 
 
-@testset "squareonhyperboloid" begin
-    F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([0. -1 0; 1 0 0; 0 1 0; -1 0 0]'), x->x[1]^2+x[2]^2-x[3]^2-1)
-    plot(F,"squareonhyperboloid")
-end
 
 
 @testset "sphericaldiskpacking" begin

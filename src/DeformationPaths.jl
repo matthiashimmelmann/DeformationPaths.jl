@@ -2,10 +2,11 @@ module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton, Expression
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
-import GLMakie: Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
+import GLMakie: GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
+import MarchingCubes: MC, march, makemesh
 
 include("GeometricConstraintSystem.jl")
 using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!
@@ -38,13 +39,10 @@ mutable struct DeformationPath
 
     function DeformationPath(G::ConstraintSystem, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14)
         start_point = to_Array(G, G.realization)
-        if !(type in ["framework", "hypergraph", "polytope",  "sphericaldiskpacking"])
-            throw("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type).")
-        end
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
         elseif type=="frameworkonsurface"
-            K_n = Base.copy(G)
+            K_n = deepcopy(G)
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization)
@@ -54,6 +52,8 @@ mutable struct DeformationPath
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
             K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
+        else
+            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type).")
         end
 
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
@@ -473,14 +473,10 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
 end
 
 
-function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-
-    if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
-    end
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
@@ -491,6 +487,15 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
+
+    x = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    y = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    z = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    A = [F.surface([xi,yi,zi]) for xi in x, yi in y, zi in z]
+    mc_ranged = MC(A, Int; x, y, z)
+    march(mc_ranged, 0.)
+    msh = makemesh(GeometryBasics, mc_ranged)
+    mesh!(ax, msh, color=(surface_color,0.5), transparency=true)
 
     time=Observable(1)
     allVertices=@lift begin

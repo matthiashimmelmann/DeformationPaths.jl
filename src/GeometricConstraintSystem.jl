@@ -1,10 +1,11 @@
 module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
-import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere
+import GLMakie: GeometryBasics, Vec, Rect, Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere
 import LinearAlgebra: det, cross, norm, inv, zeros, I
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
+import MarchingCubes: MC, march, makemesh
 
 export GeometricConstraintSystem, Framework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!
 
@@ -273,7 +274,7 @@ function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::Union{Framework,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(F::Union{Framework,FrameworkOnSurface,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
     return to_Array(F.G, p)
 end
 
@@ -297,7 +298,7 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
 end
 
 
-function to_Matrix(F::Union{Framework,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(F::Union{Framework,FrameworkOnSurface,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
 end
 
@@ -355,7 +356,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, surface_color=:grey80, surface_samples=(150,150,150))
+function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, surface_color=:grey80, surface_samples=150)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==3
@@ -373,6 +374,16 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
     zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
+
+    x = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    y = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    z = collect(Float64, range(limits[1]-padding, step=(limits[2]-limits[1]+2*padding)/surface_samples, length = surface_samples+1))
+    A = [F.surface([xi,yi,zi]) for xi in x, yi in y, zi in z]
+    mc_ranged = MC(A, Int; x, y, z)
+    march(mc_ranged, 0.)
+    msh = makemesh(GeometryBasics, mc_ranged)
+
+    mesh!(ax, msh, color=(surface_color,0.5), transparency=true)
 
     allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
