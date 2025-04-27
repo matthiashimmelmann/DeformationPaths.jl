@@ -39,12 +39,12 @@ animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_directio
 
 ![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.gif)
 
-### Sticky Disk Packings
+### Sticky Sphere Packings
 
-Disk packings are given by a non-overlapping arrangements of disks with fixed radii in $\mathbb{R}^2$. They are called sticky, when existing contacts cannot be broken. In this package, disks that form a contact during the deformation path computation remain in contact. The `DiskPacking` class takes a list of radii and a realization as input. As the optional parameter `pinned_vertices`, we can specify which vertices in the disk packings should be pinned. As an example, we can create an animation using the following code:
+Sphere packings are given by a non-overlapping arrangements of spheres with fixed radii in $\mathbb{R}^2$. They are called sticky, when existing contacts cannot be broken. In this package, spheres that form a contact during the deformation path computation remain in contact. The `SpherePacking` class takes a list of radii and a realization as input. As the optional parameter `pinned_vertices`, we can specify which vertices in the disk packings should be pinned. As an example, we can create an animation using the following code:
 
 ```julia
-F = DiskPacking([1.,1.,1.,1.], Matrix([0 0; 1.75 -sqrt(2^2-(1.75)^2); 3.5 0; 4.5 sqrt(3)]'); pinned_vertices=[1])
+F = SpherePacking([1.,1.,1.,1.], Matrix([0 0; 1.75 -sqrt(2^2-(1.75)^2); 3.5 0; 4.5 sqrt(3)]'); pinned_vertices=[1])
 D = DeformationPath(F, [1,1], 250; step_size=0.025)
 animate(D,F,"diskpacking_motion")
 ```
