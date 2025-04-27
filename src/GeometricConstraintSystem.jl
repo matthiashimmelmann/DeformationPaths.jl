@@ -6,7 +6,7 @@ import LinearAlgebra: det, cross, norm, inv, zeros, I
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 
-export GeometricConstraintSystem, Framework, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot
+export GeometricConstraintSystem, Framework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -22,25 +22,30 @@ mutable struct ConstraintSystem
     function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
-        size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw(error("The realization does not have the correct format."))
-        size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw(error("The matrix 'xs' does not have the correct format."))
+        size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw("The realization does not have the correct format.")
+        size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
         new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_vertices)
     end
 end
 
 function equations!(G::ConstraintSystem, equations::Vector{Expression})
-    set(System(equations).variables)==G.variables || throw(error("The variables in `equations` do not match the original variables."))
+    Set(System(equations).variables)==Set(G.variables) && length(System(equations).variables)==length(G.variables) || throw("The variables in `equations` do not match the original variables.")
     G.equations = equations
     G.jacobian = hcat([differentiate(eq, G.variables) for eq in equations]...)'
     G.system = System(equations; variables=G.variables)
     return nothing
 end
 
+function add_equations!(G::ConstraintSystem, equations::Vector{Expression})
+    equations!(G, vcat(G.equations, equations))
+end
+
+
 function realization!(G::ConstraintSystem, realization::Union{Matrix{Float64},Matrix{Int}})
-    size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw(error("The realization does not have the correct format."))
+    size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw("The realization does not have the correct format.")
     point = to_Array(G, realization)
     re_matrix = to_Matrix(G, point)
-    norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw(error("The point does not satisfy the constraint system's equations!"))
+    norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw("The point does not satisfy the constraint system's equations!")
     G.realization = realization
     return nothing
 end
@@ -52,12 +57,12 @@ mutable struct Framework
     bars::Vector{Tuple{Int,Int}}
 
     function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
-        all(t->length(t)==2, bars) && all(bar->bar[1] in vertices && bar[2] in vertices, bars) || throw(error("The bars don't have the correct format."))
+        all(t->length(t)==2, bars) && all(bar->bar[1] in vertices && bar[2] in vertices, bars) || throw("The bars don't have the correct format.")
         dimension = size(realization)[1]
-        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
+        all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         bars = [bar[1]<=bar[2] ? Tuple(bar) : Tuple([bar[2],bar[1]]) for bar in bars]
-        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        dimension>=1 || throw("The dimension is not an integer bigger than 0.")
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
@@ -78,12 +83,33 @@ mutable struct Framework
     end
 end
 
-function equations!(F::Framework, equations::Vector{Expression})
-    F.G.equations = equations
-    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
-    F.G.system = System(equations; variables=F.G.variables)
-    return nothing
+
+mutable struct FrameworkOnSurface
+    G::ConstraintSystem
+    bars::Vector{Tuple{Int,Int}}
+    surface::Function
+
+    function FrameworkOnSurface(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}, surface::Function; pinned_vertices=Vector{Int}([]))
+        try
+            surface([1,1,1])
+        catch
+            throw("The specified implicit surface function does not take 3 arguments.")
+        end
+        dimension = size(realization)[1]
+        dimension==3 || throw("The dimension for FrameworkOnSurface needs to be equal to 3.")
+        
+        F = Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
+        G = F.G
+        add_equations!(G, [surface(G.xs[:,i]) for i in 1:length(G.vertices)])
+        new(G, F.bars, surface)
+    end
+
+    function FrameworkOnSurface(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}, surface::Function; pinned_vertices=Vector{Int}([]))
+        vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
+        FrameworkOnSurface(vertices, bars, realization, surface; pinned_vertices=pinned_vertices)
+    end
 end
+
 
 
 mutable struct SpherePacking
@@ -93,13 +119,13 @@ mutable struct SpherePacking
     tolerance::Float64
 
     function SpherePacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
-        length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw(error(("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")))
-        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
+        length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")
+        all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         dimension = size(realization)[1]
-        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        all(t->norm(realization[:,t[1]]-realization[:,t[2]]) >= radii[t[1]]+radii[t[2]]-tolerance, powerset(length(vertices),2,2)) || throw(error("Some of the disks are too close"))
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        all(t->norm(realization[:,t[1]]-realization[:,t[2]]) >= radii[t[1]]+radii[t[2]]-tolerance, powerset(length(vertices),2,2)) || throw("Some of the disks are too close")
         contacts = [Tuple([i,j]) for i in 1:length(vertices) for j in i+1:length(vertices) if isapprox(norm(realization[:,i]-realization[:,j]),radii[i]+radii[j],atol=tolerance)]
-        dimension in [2,3] || raise(error("The dimension for SpherePacking must be 2."))
+        dimension in [2,3] || throw("The dimension for SpherePacking must be 2.")
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
@@ -119,12 +145,6 @@ mutable struct SpherePacking
     end
 end
 
-function equations!(F::SpherePacking, equations::Vector{Expression})
-    F.G.equations = equations
-    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
-    F.G.system = System(equations; variables=F.G.variables)
-    return nothing
-end
 
 mutable struct SphericalDiskPacking
     G::ConstraintSystem
@@ -132,12 +152,12 @@ mutable struct SphericalDiskPacking
     inversive_distances::Union{Vector{Int},Vector{Float64}}
 
     function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
-        length(contacts)==length(inversive_distances) || throw(error(("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")))
-        all(v->v in vertices, pinned_vertices) || throw(error("Some of the pinned_vertices are not contained in vertices."))
+        length(contacts)==length(inversive_distances) || throw("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")
+        all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         dimension = size(realization)[1]
-        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        dimension==3 || raise(error("The dimension for SphericalDiskPacking must be 3."))
-        all(i->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])), inversive_distances[i], atol=tolerance), 1:length(contacts)) || throw(error("The Minkowski distances do not match the given realization."))
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        dimension==3 || throw("The dimension for SphericalDiskPacking must be 3.")
+        all(i->isapprox(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][2]])/sqrt(minkowski_scalar_product(realization[:,contacts[i][1]], realization[:,contacts[i][1]]) * minkowski_scalar_product(realization[:,contacts[i][2]], realization[:,contacts[i][2]])), inversive_distances[i], atol=tolerance), 1:length(contacts)) || throw("The Minkowski distances do not match the given realization.")
 
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
@@ -165,13 +185,6 @@ mutable struct SphericalDiskPacking
     minkowski_scalar_product(e1,e2) = e1'*e2-1
 end
 
-function equations!(F::SphericalDiskPacking, equations::Vector{Expression})
-    F.G.equations = equations
-    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
-    F.G.system = System(equations; variables=F.G.variables)
-    return nothing
-end
-
 
 mutable struct VolumeHypergraph
     G::ConstraintSystem
@@ -179,10 +192,10 @@ mutable struct VolumeHypergraph
 
     function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         dimension = size(realization)[1]
-        all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw(error("The volumes don't have the correct format."))
+        all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw("The volumes don't have the correct format.")
         volumes = [Vector(facet) for facet in volumes]
-        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw(error("The realization does not have the correct format."))
-        dimension>=1 || raise(error("The dimension is not an integer bigger than 0."))
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        dimension>=1 || throw("The dimension is not an integer bigger than 0.")
         @var x[1:dimension, 1:length(vertices)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
         facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([x[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
@@ -197,12 +210,6 @@ mutable struct VolumeHypergraph
     end
 end
 
-function equations!(F::VolumeHypergraph, equations::Vector{Expression})
-    F.G.equations = equations
-    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
-    F.G.system = System(equations; variables=F.G.variables)
-    return nothing
-end
 
 mutable struct Polytope
     G::ConstraintSystem
@@ -213,10 +220,10 @@ mutable struct Polytope
 
     function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         dimension = size(realization)[1]
-        dimension==3 || raise(error("The dimension needs to be 3, but is $(dimension)"))
-        all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw(error("The facets don't have the correct format. They need to contain at least 3 vertices each."))
+        dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
+        all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [Vector(facet) for facet in facets]
-        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw(error("The realization does not have the correct format."))
+        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format.")
         normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
         for j in 1:length(facets)
             normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
@@ -230,7 +237,7 @@ mutable struct Polytope
             end
         end
         _realization = hcat(realization, normal_realization)
-        length(vertices)-length(bars)+length(facets)==2 || throw(error("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(bars)+length(facets))"))
+        length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
@@ -249,13 +256,18 @@ mutable struct Polytope
     end
 end
 
-function equations!(F::Polytope, equations::Vector{Expression})
+
+function equations!(F::Union{SpherePacking,Framework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}, equations::Vector{Expression})
+    Set(System(equations).variables)==Set(F.G.variables) && length(System(equations).variables)==length(F.G.variables) || throw("The variables in `equations` do not match the original variables.")
     F.G.equations = equations
     F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
     F.G.system = System(equations; variables=F.G.variables)
     return nothing
 end
 
+function add_equations!(F::Union{SpherePacking,Framework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}, equations::Vector{Expression})
+    equations!(F, vcat(F.G.equations, equations))
+end
 
 function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
@@ -293,6 +305,8 @@ end
 function plot(F, filename::String; kwargs...)
     if typeof(F)==Framework
         return plot_framework(F, filename; kwargs...)
+    elseif typeof(F)==FrameworkOnSurface
+        return plot_frameworkonsurface(F, filename; kwargs...)    
     elseif typeof(F)==VolumeHypergraph
         return plot_hypergraph(F, filename; kwargs...)
     elseif typeof(F)==Polytope
@@ -302,7 +316,7 @@ function plot(F, filename::String; kwargs...)
     elseif typeof(F)==SphericalDiskPacking
         return plot_sphericaldiskpacking(F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework, Polytope, DiskPacking or VolumeHypergraph, but is $(typeof(F))"))
+        throw("The type of 'F' needs to be either Framework, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
     end
 end
 
@@ -315,7 +329,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
         ax = Axis3(fig[1,1])
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
-        throw(error("The dimension must either be 2 or 3!"))
+        throw("The dimension must either be 2 or 3!")
     end
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
@@ -325,7 +339,10 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
     translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
     ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
-    F.G.dimension==3 && zlims!(ax, limits[1]-padding, limits[2]+padding)
+    if F.G.dimension==3
+        translation = (zlims[1]-limits[1]) - (limits[2]-zlims[2])
+        zlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+    end
     hidespines!(ax)
     hidedecorations!(ax)
 
@@ -338,6 +355,35 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
+function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, surface_color=:grey80, surface_samples=(150,150,150))
+    fig = Figure(size=(1000,1000))
+    matrix_coords = F.G.realization
+    if F.G.dimension==3
+        ax = Axis3(fig[1,1])
+    else
+        throw("The dimension must either be 2 or 3!")
+    end
+    xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
+    ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
+    zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
+    limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    zlims!(ax, limits[1]-padding, limits[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
+    foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
+    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    save("../data/$(filename).png", fig)
+    return fig
+end
+
+
 function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, kwargs...)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
@@ -349,7 +395,7 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
     elseif F.G.dimension==3
         ax = Axis3(fig[1,1])
     else
-        throw(error("The dimension must either be 2 or 3!"))
+        throw("The dimension must either be 2 or 3!")
     end
 
     if !haskey(kwargs, "dualgraph_color")
@@ -449,7 +495,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
         ax = Axis3(fig[1,1])
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
-        throw(error("The dimension must either be 2 or 3!"))
+        throw("The dimension must either be 2 or 3!")
     end
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]

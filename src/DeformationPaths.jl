@@ -8,7 +8,7 @@ import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking
+using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!
 
 export  ConstraintSystem, 
         Framework, 
@@ -23,8 +23,10 @@ export  ConstraintSystem,
         SpherePacking,
         SphericalDiskPacking,
         equations!,
+        add_equations!,
         realization!,
-        newton_correct
+        newton_correct,
+        FrameworkOnSurface
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -37,10 +39,13 @@ mutable struct DeformationPath
     function DeformationPath(G::ConstraintSystem, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14)
         start_point = to_Array(G, G.realization)
         if !(type in ["framework", "hypergraph", "polytope",  "sphericaldiskpacking"])
-            throw(error("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type)."))
+            throw("The type must either be 'framework', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type).")
         end
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
+        elseif type=="frameworkonsurface"
+            K_n = Base.copy(G)
+            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization)
         elseif type=="polytope" || type == "diskpacking"
@@ -52,7 +57,7 @@ mutable struct DeformationPath
         end
 
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
-        size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
+        size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
         prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
@@ -64,14 +69,14 @@ mutable struct DeformationPath
                 q = newton_correct(G, q; tol=newton_tol)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
-                    throw(error("Slow Progress detected."))
+                    throw("Slow Progress detected.")
                 end
                 push!(motion_samples, q)
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
             catch e
                 i = i - 1
-                @warn e.msg
-                if failure_to_converge == 3 || e.msg == "The space of nontrivial infinitesimal motions is empty."
+                @warn e
+                if failure_to_converge == 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -107,6 +112,10 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "framework"; step_size=step_size)
     end
 
+    function DeformationPath(F::FrameworkOnSurface, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
+        DeformationPath(F.G, flex_mult, num_steps, "frameworkonsurface"; step_size=step_size)
+    end
+
     function DeformationPath(F::VolumeHypergraph, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; step_size::Float64=1e-2, newton_tol=1e-14)
         DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; step_size=step_size)
     end
@@ -124,7 +133,7 @@ mutable struct DeformationPath
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
-            size(flex_space)[2]==length(flex_mult) || throw(error("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2])."))
+            size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
             prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
             prev_flex = prev_flex ./ norm(prev_flex)
         end
@@ -142,7 +151,7 @@ mutable struct DeformationPath
                 q = newton_correct(F.G, q; tol=newton_tol)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
-                    throw(error("Slow Progress detected."))
+                    throw("Slow Progress detected.")
                 end
 
                 cur_realization = to_Matrix(F,Float64.(q))
@@ -156,8 +165,8 @@ mutable struct DeformationPath
                 push!(_contacts, F.contacts)    
             catch e
                 i = i - 1
-                @warn e.msg
-                if failure_to_converge == 3 || e.msg == "The space of nontrivial infinitesimal motions is empty."
+                @warn e
+                if failure_to_converge == 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -211,7 +220,7 @@ mutable struct DeformationPath
         J = evaluate(G.jacobian, G.variables=>point)
         flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-3)
         if size(flex_space)[2]==0
-            throw(error("The space of nontrivial infinitesimal motions is empty."))
+            throw("The space of nontrivial infinitesimal motions is empty.")
         end
         flex_coefficients = pinv(flex_space) * prev_flex
         predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
@@ -242,7 +251,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
             global damping = damping/2
         end
         if damping < 1e-14 || Base.time()-start_time > 10
-            throw(error("Newton's method did not converge in time."))
+            throw("Newton's method did not converge in time.")
         end
         q = qnew
         if damping > 1
@@ -257,6 +266,8 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
     if flex_mult==nothing
         if typeof(F)==Framework
             K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        elseif typeof(F)==FrameworkOnSurface
+
         elseif typeof(F)==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
         elseif typeof(F)==SpherePacking
@@ -268,7 +279,7 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
             inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
             K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
         else
-            throw(error("Type of F is not yet supported. It is $(typeof(F))."))
+            throw("Type of F is not yet supported. It is $(typeof(F)).")
         end
         flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
         flex_mult = [1 for _ in 1:size(flex_space)[2]]
@@ -284,24 +295,26 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
         elseif F.G.dimension==3
             animate3D_framework(D, F, filename; kwargs...)
         else
-            throw(error("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)"))
+            throw("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)")
         end
+    elseif typeof(F)==FrameworkOnSurface
+        animate3D_frameworkonsurface(D, F, filename; kwargs...)
     elseif typeof(F)==VolumeHypergraph
-        return animate2D_hypergraph(D, F, filename; kwargs...)
+        animate2D_hypergraph(D, F, filename; kwargs...)
     elseif typeof(F)==Polytope
-        return animate3D_polytope(D, F, filename; kwargs...)
+        animate3D_polytope(D, F, filename; kwargs...)
     elseif typeof(F)==SpherePacking
         if F.G.dimension==2
-            return animate2D_diskpacking(D, F, filename; kwargs...)
+            animate2D_diskpacking(D, F, filename; kwargs...)
         elseif F.G.dimension==3
-            return animate3D_spherepacking(D, F, filename; kwargs...)
+            animate3D_spherepacking(D, F, filename; kwargs...)
         else
-            throw(error("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)"))
+            throw("The dimension of 'F' needs to be either 2 or 3, but is $(F.G.dimension)")
         end
     elseif typeof(F)==SphericalDiskPacking
-        return animate3D_sphericaldiskpacking(D, F, filename; kwargs...)
+        animate3D_sphericaldiskpacking(D, F, filename; kwargs...)
     else
-        throw(error("The type of 'F' needs to be either Framework, SpherePacking, Polytope, SphericalDiskPacking or VolumeHypergraph, but is $(typeof(F))"))
+        throw("The type of 'F' needs to be either Framework, SpherePacking, Polytope, SphericalDiskPacking or VolumeHypergraph, but is $(typeof(F))")
     end
 
 
@@ -311,7 +324,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    length(fixed_vertices)==2 && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices || throw(error("fixed_vertices is not a vertex of the underlying graph."))
+    length(fixed_vertices)==2 && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices || throw("fixed_vertices is not a vertex of the underlying graph.")
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
@@ -361,7 +374,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
 
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
@@ -372,7 +385,7 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     fig = Figure(size=(800,800))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw(error("The elements of `fixed_vertices`` are not vertices of the underlying graph."))
+    length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     
     if isapprox(norm(fixed_direction),0;atol=1e-6)
         @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0,0]"
@@ -445,7 +458,7 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
     if animate_rotation
@@ -459,6 +472,51 @@ function animate3D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
+
+function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+    fig = Figure(size=(800,800))
+    ax = Axis3(fig[1,1])
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+
+    if recompute_deformation_samples
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+    end
+
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+    xlims!(ax, limits[1]-padding, limits[2]+padding)
+    ylims!(ax, limits[1]-padding, limits[2]+padding)
+    zlims!(ax, limits[1]-padding, limits[2]+padding)
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    time=Observable(1)
+    allVertices=@lift begin
+        pointys = matrix_coords[$time]
+        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+    end
+    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
+    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
+    timestamps = range(1, length(D.motion_samples), step=step)
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
+    end
+
+    if animate_rotation
+        ax.viewmode = :fit # Prevent axis from resizing during animation
+    end
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
+        time[] = t
+        if animate_rotation
+            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+        end
+    end
+end
+
+
 function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; recompute_deformation_samples::Bool=true, target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(800,800))
     ax = Axis(fig[1,1])
@@ -471,7 +529,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
         fixed_triangle=(1,2,3)
         skip_scaling=true
     else
-        all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.volumes]) || throw(error("fixed_triangle is not a vertex of the underlying graph."))
+        all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.volumes]) || throw("fixed_triangle is not a vertex of the underlying graph.")
     end
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_triangle[1]]
@@ -529,7 +587,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
 
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
@@ -541,7 +599,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; r
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
-    fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw(error("The elements of `fixed_vertices`` are not vertices of the underlying graph."))
+    fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1])
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
@@ -611,7 +669,7 @@ function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; r
     
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
     if animate_rotation
@@ -631,7 +689,7 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::S
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     if F.G.dimension!=2
-        throw(error("The dimension must be 2, but is $(F.G.dimension)!"))
+        throw("The dimension must be 2, but is $(F.G.dimension)!")
     end
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
@@ -661,7 +719,7 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::S
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
@@ -675,7 +733,7 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     if F.G.dimension!=3
-        throw(error("The dimension must be 3, but is $(F.G.dimension)!"))
+        throw("The dimension must be 3, but is $(F.G.dimension)!")
     end
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
@@ -705,7 +763,7 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
@@ -801,7 +859,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
-        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+        throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
     
     if animate_rotation
@@ -820,7 +878,7 @@ end
 
 function project_deformation_random(D::DeformationPath, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=:green3, markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
-        throw(error("The projected_dimension is neither 2 nor 3."))
+        throw("The projected_dimension is neither 2 nor 3.")
     end
     randmat = hcat([rand(Float64,projected_dimension) for _ in 1:length(D.G.variables)]...)
     proj_curve = [(pinv(randmat'*randmat)*randmat')'*entry for entry in D.motion_samples]

@@ -11,7 +11,8 @@ import DeformationPaths:    Framework,
                             to_Matrix,
                             newton_correct,
                             realization!,
-                            project_deformation_random
+                            project_deformation_random,
+                            FrameworkOnSurface
 using Test
 using HomotopyContinuation
 using LinearAlgebra
@@ -72,6 +73,12 @@ end
 end
 
 
+@testset "squareonhyperboloid" begin
+    F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([0. -1 0; 1 0 0; 0 1 0; -1 0 0]'), x->x[1]^2+x[2]^2-x[3]^2-1)
+    plot(F,"squareonhyperboloid")
+end
+
+
 @testset "sphericaldiskpacking" begin
     F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
     plot(F,"sphericaldiskpacking")
@@ -110,6 +117,14 @@ end
     plot(F,"cube")
     D = DeformationPath(F, [1,1,1], 100; step_size=0.025)
     animate(D,F,"cube_motion")
+end
+
+
+@testset "two_triangles" begin
+    F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
+    plot(F,"two_triangles")
+    D = DeformationPath(F, [1], 100; step_size=0.01)
+    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false)
 end
 
 
