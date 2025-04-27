@@ -2,11 +2,11 @@ module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
 import GLMakie: Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere
-import LinearAlgebra: det, cross, norm, inv
+import LinearAlgebra: det, cross, norm, inv, zeros, I
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 
-export GeometricConstraintSystem, Framework, plot_framework, VolumeHypergraph, Polytope, plot_hypergraph, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!
+export GeometricConstraintSystem, Framework, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -338,7 +338,7 @@ function plot_framework(F::Framework, filename::String; padding::Float64=0.15, v
     return fig
 end
 
-function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, disk_color=:steelblue, markersize=75, markercolor=:red3, line_width=7, dualgraph_color=:grey80, n_circle_segments::Int=50)
+function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, kwargs...)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
@@ -348,21 +348,32 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
         ax = Axis3(fig[1,1])
-        zlims = [minimum([limit_vertices[i][3] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][3] for i in 1:length(limit_vertices)])]
     else
         throw(error("The dimension must either be 2 or 3!"))
     end
 
+    if !haskey(kwargs, "dualgraph_color")
+        dualgraph_color = F.G.dimension==2 ? D2_dualgraph_color : D3_dualgraph_color
+    end
+
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     for index in 1:length(F.G.vertices)
-        disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
-        limit_vertices = vcat(limit_vertices, disk_vertices)
-        poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(disk_color, 0.08))
-        lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
+        if F.G.dimension==2
+            disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
+            limit_vertices = vcat(limit_vertices, disk_vertices)
+            poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(sphere_color, 0.08))
+            lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=sphere_color)
+        else
+            mesh!(ax, Sphere(allVertices[index], F.radii[index]); transparency=true, color = (sphere_color,0.2))
+            append!(limit_vertices, vcat([[allVertices[index]+F.radii[index]*Vector{Float64}(I[1:3, i]), allVertices[index]-F.radii[index]*Vector{Float64}(I[1:3, i])] for i in 1:3]...))
+        end
     end
 
     xlims = [minimum([limit_vertices[i][1] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][1] for i in 1:length(limit_vertices)])]
     ylims = [minimum([limit_vertices[i][2] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][2] for i in 1:length(limit_vertices)])]
+    if F.G.dimension==3
+        zlims = [minimum([limit_vertices[i][3] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][3] for i in 1:length(limit_vertices)])]
+    end
     limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
 
     translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
@@ -373,8 +384,11 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
     hidespines!(ax)
     hidedecorations!(ax)
 
+    if !haskey(kwargs, "markersize")
+        markersize = F.G.dimension==2 ? D2_markersize : D3_markersize
+    end
     foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
-    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end

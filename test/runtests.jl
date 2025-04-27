@@ -9,7 +9,9 @@ import DeformationPaths:    Framework,
                             to_Array,
                             equations!,
                             to_Matrix,
-                            newton_correct
+                            newton_correct,
+                            realization!,
+                            project_deformation_random
 using Test
 using HomotopyContinuation
 using LinearAlgebra
@@ -92,6 +94,14 @@ end
     plot(F,"squarediskpacking")
     D = DeformationPath(F, [1], 250; step_size=0.01)
     animate(D,F,"squarediskpacking_motion")
+end
+
+
+@testset "spherepacking" begin
+    F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_vertices = [1,2])
+    plot(F,"spherepacking")
+    D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
+    animate(D,F,"spherepacking_motion")
 end
 
 

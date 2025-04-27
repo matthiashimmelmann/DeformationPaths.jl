@@ -1,8 +1,8 @@
 module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton, Expression
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I
-import GLMakie: Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
+import GLMakie: Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
@@ -670,7 +670,52 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::S
     end
 end
 
-function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_labels=true, line_width::Union{Float64,Int}=7, sphere_color=:steelblue, markersize::Union{Float64,Int}=55, markercolor=:red3, dualgraph_color=:grey50, n_circle_segments::Int=50, filetype::String="gif")
+    fig = Figure(size=(1000,1000))
+    ax = Axis3(fig[1,1])
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    if F.G.dimension!=3
+        throw(error("The dimension must be 3, but is $(F.G.dimension)!"))
+    end
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+    translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
+    xlims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
+    translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
+    ylims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
+    translation = (zlims[1]-limits[1]) - (limits[2]-zlims[2])
+    zlims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    time=Observable(1)
+    contacts=Observable(D._contacts[1])
+    allVertices=@lift begin
+        pointys = matrix_coords[$time]
+        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+    end
+    for index in 1:length(F.G.vertices)
+        mesh!(ax, @lift(Sphere(($allVertices)[index], F.radii[index]));  transparency=true, color = (sphere_color,0.2))
+    end
+    linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
+    
+    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    timestamps = range(1, length(D.motion_samples), step=step)
+    if !(lowercase(filetype) in ["gif","mp4"])
+        throw(error("The chosen filetype needs to be either gif or mp4, but is $(filetype)"))
+    end
+
+    record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
+        time[] = t
+        contacts[] = D._contacts[t]
+    end
+end
+
+
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
