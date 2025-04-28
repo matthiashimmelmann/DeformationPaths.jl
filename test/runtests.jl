@@ -1,4 +1,5 @@
-import DeformationPaths:    Framework, 
+import DeformationPaths:    Framework,
+                            AngularFramework,
                             DeformationPath,
                             Polytope,
                             animate, 
@@ -18,6 +19,14 @@ import DeformationPaths:    Framework,
 using Test
 using HomotopyContinuation
 using LinearAlgebra
+
+
+@testset "thales" begin
+    F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
+    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
+    D = DeformationPath(F, [1], 250; step_size=0.035)
+    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
+end
 
 
 @testset "is_rigid_test" begin
@@ -77,9 +86,17 @@ end
 
 @testset "double_watt" begin
     F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
-    plot(F,"double_watt"; padding=0.35)
+    plot(F,"double_watt"; padding=0.35, pin_point_offset=0.2)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.05)
-    animate(D,F,"double_watt_motion"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2])
+    animate(D,F,"double_watt_motion"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2)
+end
+
+
+@testset "thales" begin
+    F = AngularFramework([[1,2,3]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
+    plot(F,"thales"; padding=0.1)
+    D = DeformationPath(F, [1], 500; step_size=0.01)
+    animate(D,F,"thales_motion"; padding=0.1)
 end
 
 

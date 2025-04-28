@@ -9,10 +9,11 @@ import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!
+using .GeometricConstraintSystem: ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework
 
 export  ConstraintSystem, 
-        Framework, 
+        Framework,
+        AngularFramework,
         DeformationPath,
         VolumeHypergraph,
         animate,
@@ -43,6 +44,8 @@ mutable struct DeformationPath
         start_point = to_Array(G, G.realization)
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
+        elseif type=="angularframework"
+            K_n = AngularFramework([[i,j,k] for i in 1:length(G.vertices) for j in 1:length(G.vertices) for k in 1:length(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_vertices=G.pinned_vertices)
         elseif type=="frameworkonsurface"
             K_n = deepcopy(G)
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
@@ -115,6 +118,10 @@ mutable struct DeformationPath
 
     function DeformationPath(F::Framework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
         DeformationPath(F.G, flex_mult, num_steps, "framework"; kwargs...)
+    end
+
+    function DeformationPath(F::AngularFramework, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "angularframework"; kwargs...)
     end
 
     function DeformationPath(F::FrameworkOnSurface, flex_mult::Union{Vector{Float64}, Vector{Int}}, num_steps::Int; kwargs...)
@@ -209,8 +216,13 @@ mutable struct DeformationPath
     end
 
     function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n; tol=1e-8)
+        display(G.jacobian)
+        display(evaluate(G.jacobian, G.variables=>point))
         inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
+        display(inf_flexes)
         trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
+        display(trivial_inf_flexes)
+        display("")
         s = size(trivial_inf_flexes)[2]+1
         extend_basis_matrix = trivial_inf_flexes
         for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
@@ -275,13 +287,14 @@ function is_rigid(F; tol=1e-7)
         return true
     end
     D = DeformationPath(F, Vector{Int}([]), 10; step_size=sqrt(tol), newton_tol=1e-15)
-    display([norm(sample-D.motion_samples[1]) for sample in D.motion_samples])
     return !any(sample->norm(sample-D.motion_samples[1])>tol, D.motion_samples)
 end
 
 function is_inf_rigid(F; tol=1e-10)
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+    elseif typeof(F)==AngularFramework
+        K_n = AngularFramework([[i,j,k] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) for k in 1:length(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif typeof(F)==FrameworkOnSurface
         K_n = deepcopy(G)
         add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
@@ -308,6 +321,8 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
     if flex_mult==nothing
         if typeof(F)==Framework
             K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        elseif typeof(F)==AngularFramework
+            K_n = AngularFramework([[i,j,k] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) for k in 1:length(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
         elseif typeof(F)==FrameworkOnSurface
             K_n = deepcopy(G)
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
@@ -332,7 +347,7 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
 end
 
 function animate(D::DeformationPath, F, filename::String; kwargs...)
-    if typeof(F)==Framework
+    if typeof(F)==Framework || typeof(F)==AngularFramework
         if F.G.dimension==2
             animate2D_framework(D, F, filename; kwargs...)
         elseif F.G.dimension==3
@@ -363,7 +378,7 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
 
 end
 
-function animate2D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.2, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -424,7 +439,7 @@ function animate2D_framework(D::DeformationPath, F::Framework, filename::String;
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Framework, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]

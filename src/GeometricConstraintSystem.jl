@@ -7,7 +7,7 @@ import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 import MarchingCubes: MC, march, makemesh
 
-export GeometricConstraintSystem, Framework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!
+export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -83,6 +83,41 @@ mutable struct Framework
         Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
     end
 end
+
+
+mutable struct AngularFramework
+    G::ConstraintSystem
+    bars::Vector{Tuple{Int,Int}}
+    angles::Vector{Tuple{Int,Int,Int}}
+
+    function AngularFramework(vertices::Vector{Int}, angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+        all(t->length(t)==3, angles) && all(angle->angle[1] in vertices && angle[2] in vertices && angle[3] in vertices, angles) || throw("The angles don't have the correct format.")
+        dimension = size(realization)[1]
+        all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
+        angles = [(angle[1],angle[2],angle[3]) for angle in angles]
+        bars = vcat([[angle[1], angle[2]] for angle in angles], [[angle[2], angle[3]] for angle in angles])
+        bars = [bar[1]<=bar[2] ? Tuple(bar) : Tuple([bar[2],bar[1]]) for bar in bars]
+        bars = collect(Set(bars))
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        dimension>=1 || throw("The dimension is not an integer bigger than 0.")
+        @var x[1:dimension, 1:length(vertices)]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
+        for v in pinned_vertices
+            xs[:,v] = realization[:,v]
+        end
+        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+        angle_constraints = [((xs[:,angle[1]]-xs[:,angle[2]])'*(xs[:,angle[3]]-xs[:,angle[2]])) * sqrt(sum((realization[:,angle[1]]-realization[:,angle[2]]).^2)*sum((realization[:,angle[3]]-realization[:,angle[2]]).^2)) - sqrt(sum((xs[:,angle[1]]-xs[:,angle[2]]).^2)*sum((xs[:,angle[3]]-xs[:,angle[2]]).^2)) * ((realization[:,angle[1]]-realization[:,angle[2]])'*(realization[:,angle[3]]-realization[:,angle[2]])) for angle in angles]
+        G = ConstraintSystem(vertices,variables, angle_constraints, realization, xs; pinned_vertices=pinned_vertices)
+        new(G, bars, angles)
+    end
+
+    function AngularFramework(angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+        vertices = sort(collect(Set(vcat([angle[1] for angle in angles], [angle[2] for angle in angles], [angle[3] for angle in angles]))))
+        AngularFramework(vertices, angles, realization; pinned_vertices=pinned_vertices)
+    end
+end
+
 
 
 mutable struct FrameworkOnSurface
@@ -258,7 +293,10 @@ mutable struct Polytope
 end
 
 
-function equations!(F::Union{SpherePacking,Framework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}, equations::Vector{Expression})
+AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}
+
+
+function equations!(F::AllTypes, equations::Vector{Expression})
     Set(System(equations).variables)==Set(F.G.variables) && length(System(equations).variables)==length(F.G.variables) || throw("The variables in `equations` do not match the original variables.")
     F.G.equations = equations
     F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
@@ -266,7 +304,7 @@ function equations!(F::Union{SpherePacking,Framework,FrameworkOnSurface,Spherica
     return nothing
 end
 
-function add_equations!(F::Union{SpherePacking,Framework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}, equations::Vector{Expression})
+function add_equations!(F::AllTypes, equations::Vector{Expression})
     equations!(F, vcat(F.G.equations, equations))
 end
 
@@ -274,7 +312,7 @@ function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::Union{Framework,FrameworkOnSurface,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(F::AllTypes, p::Union{Matrix{Int},Matrix{Float64}})
     return to_Array(F.G, p)
 end
 
@@ -298,13 +336,13 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
 end
 
 
-function to_Matrix(F::Union{Framework,FrameworkOnSurface,VolumeHypergraph,Polytope,SpherePacking,SphericalDiskPacking}, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(F::AllTypes, q::Union{Vector{Float64}, Vector{Int}})
     return to_Matrix(F.G, q)
 end
 
 
 function plot(F, filename::String; kwargs...)
-    if typeof(F)==Framework
+    if typeof(F)==Framework || typeof(F)==AngularFramework
         return plot_framework(F, filename; kwargs...)
     elseif typeof(F)==FrameworkOnSurface
         return plot_frameworkonsurface(F, filename; kwargs...)    
@@ -317,11 +355,11 @@ function plot(F, filename::String; kwargs...)
     elseif typeof(F)==SphericalDiskPacking
         return plot_sphericaldiskpacking(F, filename; kwargs...)
     else
-        throw("The type of 'F' needs to be either Framework, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
+        throw("The type of 'F' needs to be either Framework, AngularFramework, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
     end
 end
 
-function plot_framework(F::Framework, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black)
+function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
