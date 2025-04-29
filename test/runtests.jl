@@ -21,14 +21,12 @@ using HomotopyContinuation
 using LinearAlgebra
 
 
-
-@testset "K4_angular" begin
-    F = AngularFramework([[4,1,3],[4,3,2],[2,4,1],[1,2,3]], Matrix([0 0; 0 1; 1 0; 1 1;]');)
-    plot(F,"K4_angular"; padding=0.1, pin_point_offset=0.04)
-    D = DeformationPath(F, [1], 250; step_size=0.035)
-    animate(D,F,"K4_angular_motion"; padding=0.075, pin_point_offset=0.04)
+@testset "thales" begin
+    F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
+    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
+    D = DeformationPath(F, [1], 250; step_size=0.025)
+    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
 end
-
 
 
 @testset "is_rigid_test" begin
@@ -148,6 +146,14 @@ end
     plot(F,"cube")
     D = DeformationPath(F, [1,1,1], 100; step_size=0.025)
     animate(D,F,"cube_motion")
+end
+
+
+@testset "cuboctahedron" begin
+    F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
+    plot(F,"cuboctahedron")
+    D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
+    animate(D,F,"cuboctahedron_motion")
 end
 
 

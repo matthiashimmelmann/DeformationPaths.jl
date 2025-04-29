@@ -7,7 +7,7 @@ import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 import MarchingCubes: MC, march, makemesh
 
-export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!
+export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -292,8 +292,54 @@ mutable struct Polytope
     end
 end
 
+mutable struct BodyHinge
+    G::ConstraintSystem
+    facets::Vector{Vector{Int}}
+    edges::Vector{Tuple{Int,Int}}
+    x_variables::Vector{Variable}
+    n_variables::Vector{Variable}
 
-AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope}
+    function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+        dimension = size(realization)[1]
+        dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
+        all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
+        facets = [Vector(facet) for facet in facets]
+        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format.")
+        normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
+        for j in 1:length(facets)
+            normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
+            normal_realization[:,j] = normal_realization[:,j] ./ norm(normal_realization[:,j])
+            for i in j+1:length(facets)
+                edge = facets[i][findall(q -> q in facets[j], facets[i])]
+                if length(edge) != 2
+                    continue
+                end
+                push!(bars, Tuple(edge))
+            end
+        end
+        _realization = hcat(realization, normal_realization)
+        length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the BodyHinge needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
+                
+        @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
+        normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
+        facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j%length(facets[i])+1])]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
+        normal_equations = [n[:,i]'*n[:,i]-1 for i in 1:length(facets)]
+        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
+        equations = filter(eq->eq!=0, vcat(facet_equations, normal_equations, bar_equations))
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, hcat(x,n))
+        new(G, facets, bars, variables, normal_variables)
+    end
+
+    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+        vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
+        BodyHinge(vertices, facets, realization)
+    end
+end
+
+
+
+AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
 
 
 function equations!(F::AllTypes, equations::Vector{Expression})
@@ -359,7 +405,7 @@ function plot(F, filename::String; kwargs...)
     end
 end
 
-function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=60, line_width=12, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black)
+function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, angle_size=0.25, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
@@ -386,6 +432,22 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
     hidedecorations!(ax)
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    if typeof(F)==AngularFramework
+        L = angle_size*maximum([minimum([norm(matrix_coords[:,bar[1]]-matrix_coords[:,bar[2]]) for bar in F.bars]),0])
+        for angle in F.angles
+            poly_points=[F.G.dimension==2 ? Point2f(matrix_coords[:,angle[2]]) : Point3f(matrix_coords[:,angle[2]])]
+            if norm(matrix_coords[:,angle[2]]-matrix_coords[:,angle[1]])==0 || norm(matrix_coords[:,angle[2]]-matrix_coords[:,angle[3]])==0
+                continue
+            end
+            for t in 0:0.05:1
+                curpt = matrix_coords[:,angle[2]] + L*((1-t)*(matrix_coords[:,angle[1]]-matrix_coords[:,angle[2]]) + t*(matrix_coords[:,angle[3]]-matrix_coords[:,angle[2]])) ./ norm((1-t)*(matrix_coords[:,angle[1]]-matrix_coords[:,angle[2]]) + t*(matrix_coords[:,angle[3]]-matrix_coords[:,angle[2]]))
+                push!(poly_points, F.G.dimension==2 ? Point2f(curpt) : Point3f(curpt))
+            end
+            poly!(ax, poly_points, color=(angle_color,0.6), strokewidth=0)
+            lines!(ax, poly_points[2:end], color=angle_color, linewidth=line_width/2)
+        end
+    end
+    
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
     foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
