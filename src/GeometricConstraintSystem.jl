@@ -405,7 +405,7 @@ function plot(F, filename::String; kwargs...)
     end
 end
 
-function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, angle_size=0.25, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black)
+function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
     if F.G.dimension==2
