@@ -442,7 +442,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
             output
         end
 
-        foreach(i->poly!(ax,@lift(($angle_points)[i]), color=(angle_color,0.6), strokewidth=0), 1:length(F.angles))
+        foreach(i->poly!(ax,@lift(($angle_points)[i]), color=(angle_color,0.5), strokewidth=0), 1:length(F.angles))
         foreach(i->lines!(ax,@lift(($angle_points)[i][2:end]), color=angle_color, linewidth=line_width/2), 1:length(F.angles))    
     end
 
@@ -554,7 +554,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
             output
         end
 
-        foreach(i->poly!(ax,@lift(($angle_points)[i]), color=(angle_color,0.6), strokewidth=0), 1:length(F.angles))
+        foreach(i->poly!(ax,@lift(($angle_points)[i]), color=(angle_color,0.5), strokewidth=0), 1:length(F.angles))
         foreach(i->lines!(ax,@lift(($angle_points)[i][2:end]), color=angle_color, linewidth=line_width/2), 1:length(F.angles))    
     end
 

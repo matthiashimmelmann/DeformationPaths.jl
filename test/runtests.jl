@@ -21,13 +21,6 @@ using HomotopyContinuation
 using LinearAlgebra
 
 
-@testset "thales" begin
-    F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
-    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
-    D = DeformationPath(F, [1], 250; step_size=0.025)
-    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
-end
-
 
 @testset "is_rigid_test" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'))
@@ -94,9 +87,9 @@ end
 
 @testset "thales" begin
     F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
-    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
-    D = DeformationPath(F, [1], 250; step_size=0.035)
-    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
+    plot(F,"thales"; padding=0.1, pin_point_offset=0.075)
+    D = DeformationPath(F, [1], 250; step_size=0.025)
+    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075)
 end
 
 

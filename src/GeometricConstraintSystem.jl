@@ -443,7 +443,7 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
                 curpt = matrix_coords[:,angle[2]] + L*((1-t)*(matrix_coords[:,angle[1]]-matrix_coords[:,angle[2]]) + t*(matrix_coords[:,angle[3]]-matrix_coords[:,angle[2]])) ./ norm((1-t)*(matrix_coords[:,angle[1]]-matrix_coords[:,angle[2]]) + t*(matrix_coords[:,angle[3]]-matrix_coords[:,angle[2]]))
                 push!(poly_points, F.G.dimension==2 ? Point2f(curpt) : Point3f(curpt))
             end
-            poly!(ax, poly_points, color=(angle_color,0.6), strokewidth=0)
+            poly!(ax, poly_points, color=(angle_color,0.5), strokewidth=0)
             lines!(ax, poly_points[2:end], color=angle_color, linewidth=line_width/2)
         end
     end
