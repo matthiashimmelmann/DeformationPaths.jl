@@ -21,12 +21,14 @@ using HomotopyContinuation
 using LinearAlgebra
 
 
-@testset "thales" begin
-    F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
-    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
+
+@testset "K4_angular" begin
+    F = AngularFramework([[4,1,3],[4,3,2],[2,4,1],[1,2,3]], Matrix([0 0; 0 1; 1 0; 1 1;]');)
+    plot(F,"K4_angular"; padding=0.1, pin_point_offset=0.04)
     D = DeformationPath(F, [1], 250; step_size=0.035)
-    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
+    animate(D,F,"K4_angular_motion"; padding=0.075, pin_point_offset=0.04)
 end
+
 
 
 @testset "is_rigid_test" begin
@@ -93,10 +95,10 @@ end
 
 
 @testset "thales" begin
-    F = AngularFramework([[1,2,3]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
-    plot(F,"thales"; padding=0.1)
-    D = DeformationPath(F, [1], 500; step_size=0.01)
-    animate(D,F,"thales_motion"; padding=0.1)
+    F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
+    plot(F,"thales"; padding=0.1, pin_point_offset=0.04)
+    D = DeformationPath(F, [1], 250; step_size=0.035)
+    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.04)
 end
 
 
