@@ -26,7 +26,7 @@ animate(D,F,"completebipartite_motion")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/a5c1a468-52c0-4a90-938d-f330256d5d90" controls="controls" style="max-width: 1000px;">
+<video src="https://github.com/user-attachments/assets/a5c1a468-52c0-4a90-938d-f330256d5d90" controls="controls" style="max-width: 850px;">
 </video></div>
 
 There is only a single infinitesimal motion, which we select via setting `flex_mult=[1]`. This input selects the initial tangent vector $\sum_{i=1}^r c_i \mathbf{q}_i$ for a basis $(\mathbf{q}_1,\dots,\mathbf{q}_r)$ of nontrivial infinitesimal flexes. We compute `500` predictor corrector steps with a step size of `0.025` and save the resulting animation under the file name `"completebipartite_motion.png"` using the method `animate`.
@@ -72,7 +72,7 @@ animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/18ca1876-d875-4c70-acd3-d4546ffdb6a8" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/18ca1876-d875-4c70-acd3-d4546ffdb6a8" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Sticky Sphere Packings
@@ -86,7 +86,7 @@ animate(D,F,"diskpacking_motion")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/5169996b-e73a-4c4a-9d55-66c8317f7073" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/5169996b-e73a-4c4a-9d55-66c8317f7073" controls="controls" style="max-width: 850px;">
 </video></div>
 
 This construction also works in 3D, as demonstrated by the following code:
@@ -98,7 +98,7 @@ animate(D,F,"spherepacking_motion"; filetype="mp4")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/9e56bb93-e631-44bb-a041-81447662065a" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/9e56bb93-e631-44bb-a041-81447662065a" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Body-Hinge Frameworks
@@ -112,7 +112,7 @@ animate(D,F,"bodyhinge_motion"; filetype="mp4")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/e8ec59cd-c6ef-4be4-a04e-58c0a7f25793" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/e8ec59cd-c6ef-4be4-a04e-58c0a7f25793" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Polytopes with Coplanarity Constraints
@@ -126,7 +126,7 @@ animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/35e62ea7-3487-45ce-8ec1-30c285f15082" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/35e62ea7-3487-45ce-8ec1-30c285f15082" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Volume Hypergraphs
@@ -140,7 +140,7 @@ animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_str
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/4750e51d-1dde-45e1-aa79-bc10cdb35cb4" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/4750e51d-1dde-45e1-aa79-bc10cdb35cb4" controls="controls" style="max-width: 850px;">
 </video></div>
 
 In this class, we have additional options. We can fix a triangle using `fixed_triangle=(6,4,5)`. The rescaling can be skipped using `skip_stretch=true`. The first two vertices are fixed to the origin and the $x$-axis, respectively. The third vertex is transformed to the point `(target_stretch, tip_value)`.
@@ -156,7 +156,7 @@ animate(D,F,"sphericaldiskpacking_motion")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/fda9a103-2a58-4414-9e3f-e9232baa08fa" controls="controls" style="max-width: 800px;">
+<video src="https://github.com/user-attachments/assets/fda9a103-2a58-4414-9e3f-e9232baa08fa" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ## Exported functions
