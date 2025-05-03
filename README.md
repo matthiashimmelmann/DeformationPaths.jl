@@ -25,7 +25,8 @@ D = DeformationPath(F, [1], 500; step_size=0.025)
 animate(D,F,"completebipartite_motion")
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/completebipartite_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 There is only a single infinitesimal motion, which we select via setting `flex_mult=[1]`. This input selects the initial tangent vector $\sum_{i=1}^r c_i \mathbf{q}_i$ for a basis $(\mathbf{q}_1,\dots,\mathbf{q}_r)$ of nontrivial infinitesimal flexes. We compute `500` predictor corrector steps with a step size of `0.025` and save the resulting animation under the file name `"completebipartite_motion.png"` using the method `animate`.
 
@@ -33,11 +34,14 @@ We can also pin vertices in the framework, which are depicted as triangles. This
 
 ```julia
 F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
-D = DeformationPath(F, [-0.5,-0.5], 500; step_size=0.05)
+D = DeformationPath(F, [], 500; step_size=0.05)
 animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_direction=[4,2])
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
+
+By setting `flex_mult` to be an empty array `[]`, we tell the program to automatically select the flex given by the sum of the basis vectors of the nontrivial infinitesimal flex space at the starting configuration. 
 
 Remarkably, this mechanism has a cusp singularity that the deformation path approximation algorithm manages to accurately traverse via an acceleration-based direction-detection method. Moreover, this is a stressed framework, for which typically Newton's method does not converge well; our choice of implementation for Newton's method does not have this problem.
 
@@ -53,6 +57,8 @@ D = DeformationPath(F, [1], 250; step_size=0.025)
 animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp4")
 ```
 
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/thales_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 ### Sticky Sphere Packings
 
@@ -64,7 +70,8 @@ D = DeformationPath(F, [1,1], 250; step_size=0.025)
 animate(D,F,"diskpacking_motion")
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/diskpacking_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/diskpacking_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 ### Body-Hinge Frameworks
 
@@ -76,17 +83,21 @@ D = DeformationPath(F, [], 200; step_size=0.025)
 animate(D,F,"bodyhinge_motion"; filetype="mp4")
 ```
 
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/bodyhinge_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
+
 ### Polytopes with Coplanarity Constraints
 
-Polytopes are geometric objects with flat sides. We model them as a collection of vertices, edges and facets. We fix their edge lengths and constrain facets to remain flat by requiring that all edges are normal to the unit outer facet normal. We can compute a deformation of the regular cube using the following code:
+Polytopes are geometric objects with flat sides. We model them as a collection of vertices, edges and facets. We fix their edge lengths and constrain facets to remain flat by requiring that all edges are normal to the unit outer facet normal. We can compute a deformation of the cuboctahedron using the following code:
 
 ```julia
-F = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'))
-D = DeformationPath(F, [1,1,1], 100; step_size=0.025)
-animate(D,F,"cube_motion")
+F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
+D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
+animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/cube_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/cuboctahedron_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 ### Volume Hypergraphs
 
@@ -98,7 +109,8 @@ D = DeformationPath(F, [0.333, 1], 350; step_size=0.002)
 animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=false, target_stretch=0.5, tip_value=0.5)
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/octahedral_decomposition_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/octahedral_decomposition_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 In this class, we have additional options. We can fix a triangle using `fixed_triangle=(6,4,5)`. The rescaling can be skipped using `skip_stretch=true`. The first two vertices are fixed to the origin and the $x$-axis, respectively. The third vertex is transformed to the point `(target_stretch, tip_value)`.
 
@@ -112,7 +124,8 @@ D = DeformationPath(F, [1], 250; step_size=0.01)
 animate(D,F,"sphericaldiskpacking_motion")
 ```
 
-![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/sphericaldiskpacking_motion.gif)
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/sphericaldiskpacking_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 This construction also works in 3D, as demonstrated by the following code:
 
@@ -121,6 +134,9 @@ F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_v
 D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
 animate(D,F,"spherepacking_motion"; filetype="mp4")
 ```
+
+<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/spherepacking_motion.mp4" controls="controls" style="max-width: 800px;">
+</video>
 
 ## Exported functions
 
