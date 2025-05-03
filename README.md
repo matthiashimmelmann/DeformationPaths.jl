@@ -39,6 +39,21 @@ animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_directio
 
 ![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.gif)
 
+Remarkably, this mechanism has a cusp singularity that the deformation path approximation algorithm manages to accurately traverse via an acceleration-based direction-detection method. Moreover, this is a stressed framework, for which typically Newton's method does not converge well; our choice of implementation for Newton's method does not have this problem.
+
+### Frameworks on Surfaces
+
+### Angle-Constrained Frameworks
+
+Beyond bar-joint frameworks, angle-constrained frameworks are popular objects of study in rigidity theory. These objects come with sequences of three vertices, whose interior angle is constrained to be constant, and can be created using the command `AngularFramework`. We provide a visual representation of Thales' Theorem as an example:
+
+```julia
+F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
+D = DeformationPath(F, [1], 250; step_size=0.025)
+animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp4")
+```
+
+
 ### Sticky Sphere Packings
 
 Sphere packings are given by a non-overlapping arrangements of spheres with fixed radii in $\mathbb{R}^2$. They are called sticky, when existing contacts cannot be broken. In this package, spheres that form a contact during the deformation path computation remain in contact. The `SpherePacking` class takes a list of radii and a realization as input. As the optional parameter `pinned_vertices`, we can specify which vertices in the disk packings should be pinned. As an example, we can create an animation using the following code:
@@ -50,6 +65,16 @@ animate(D,F,"diskpacking_motion")
 ```
 
 ![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/diskpacking_motion.gif)
+
+### Body-Hinge Frameworks
+
+Body-hinge frameworks are composed of rigid bodies -- think of polygonal faces that are not allowed to shift shapes -- that are joined along edges. Therefore, bodies are allowed to rotate around edges, comparable to a hinge. Such an object can be created using the `BodyHinge` constructor. The following example creates two rigid squares that share an edge. 
+
+```julia
+F = BodyHinge([[1,2,3,4],[3,4,5,6]], Matrix([0 0 0; 1 0 0; 1 1 0; 0 1 0; 0 1 1; 1 1 1]'))
+D = DeformationPath(F, [], 200; step_size=0.025)
+animate(D,F,"bodyhinge_motion"; filetype="mp4")
+```
 
 ### Polytopes with Coplanarity Constraints
 
@@ -88,6 +113,14 @@ animate(D,F,"sphericaldiskpacking_motion")
 ```
 
 ![](https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/sphericaldiskpacking_motion.gif)
+
+This construction also works in 3D, as demonstrated by the following code:
+
+```julia
+F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_vertices = [1,2])
+D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
+animate(D,F,"spherepacking_motion"; filetype="mp4")
+```
 
 ## Exported functions
 
