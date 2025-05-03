@@ -30,7 +30,8 @@ export  ConstraintSystem,
         newton_correct,
         FrameworkOnSurface,
         is_rigid,
-        is_inf_rigid
+        is_inf_rigid,
+        BodyHinge
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -51,14 +52,14 @@ mutable struct DeformationPath
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
         elseif type=="hypergraph"
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization)
-        elseif type=="polytope" || type == "diskpacking"
+        elseif type=="polytope" || type == "diskpacking" || type == "bodyhinge"
             K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
         elseif  type=="sphericaldiskpacking"
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
             K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
         else
-            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph' or 'polytope', but is $(type).")
+            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge' or 'polytope', but is '$(type)'.")
         end
 
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
@@ -134,6 +135,10 @@ mutable struct DeformationPath
 
     function DeformationPath(F::Polytope, flex_mult::Vector, num_steps::Int; kwargs...)
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; kwargs...)
+    end
+
+    function DeformationPath(F::BodyHinge, flex_mult::Vector, num_steps::Int; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "bodyhinge"; kwargs...)
     end
 
     function DeformationPath(F::SphericalDiskPacking, flex_mult::Vector, num_steps::Int; kwargs...)
@@ -295,9 +300,7 @@ function is_inf_rigid(F; tol=1e-10)
         add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
     elseif typeof(F)==VolumeHypergraph
         K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
-    elseif typeof(F)==SpherePacking
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
-    elseif typeof(F)==Polytope
+    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
     elseif typeof(F)==SphericalDiskPacking
         minkowski_scalar_product(e1,e2) = e1'*e2-1
@@ -323,9 +326,7 @@ function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, ste
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
         elseif typeof(F)==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
-        elseif typeof(F)==SpherePacking
-            K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
-        elseif typeof(F)==Polytope
+        elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
             K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
         elseif typeof(F)==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
@@ -354,7 +355,7 @@ function animate(D::DeformationPath, F, filename::String; kwargs...)
         animate3D_frameworkonsurface(D, F, filename; kwargs...)
     elseif typeof(F)==VolumeHypergraph
         animate2D_hypergraph(D, F, filename; kwargs...)
-    elseif typeof(F)==Polytope
+    elseif typeof(F)==Polytope || typeof(F)==BodyHinge
         animate3D_polytope(D, F, filename; kwargs...)
     elseif typeof(F)==SpherePacking
         if F.G.dimension==2
@@ -705,7 +706,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Polytope, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, line_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 

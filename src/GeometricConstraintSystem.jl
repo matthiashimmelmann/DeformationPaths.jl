@@ -296,8 +296,7 @@ mutable struct BodyHinge
     G::ConstraintSystem
     facets::Vector{Vector{Int}}
     edges::Vector{Tuple{Int,Int}}
-    x_variables::Vector{Variable}
-    n_variables::Vector{Variable}
+    variables::Vector{Variable}
 
     function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         dimension = size(realization)[1]
@@ -305,30 +304,19 @@ mutable struct BodyHinge
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [Vector(facet) for facet in facets]
         !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format.")
-        normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
-        for j in 1:length(facets)
-            normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
-            normal_realization[:,j] = normal_realization[:,j] ./ norm(normal_realization[:,j])
-            for i in j+1:length(facets)
-                edge = facets[i][findall(q -> q in facets[j], facets[i])]
-                if length(edge) != 2
-                    continue
-                end
-                push!(bars, Tuple(edge))
-            end
+        edges = []
+        for facet in facets
+            foreach(i->push!(edges, (facet[i],facet[i%length(facet)+1])), 1:length(facet))
         end
-        _realization = hcat(realization, normal_realization)
-        length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the BodyHinge needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
-                
-        @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
+
+        @var x[1:dimension, 1:length(vertices)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
-        normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
-        facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j%length(facets[i])+1])]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
-        normal_equations = [n[:,i]'*n[:,i]-1 for i in 1:length(facets)]
+        bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
+        bars = collect(Set(bars))
         bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
-        equations = filter(eq->eq!=0, vcat(facet_equations, normal_equations, bar_equations))
-        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, hcat(x,n))
-        new(G, facets, bars, variables, normal_variables)
+        equations = filter(eq->eq!=0, vcat(bar_equations))
+        G = ConstraintSystem(vertices, variables, equations, realization, x)
+        new(G, facets, edges, variables)
     end
 
     function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
@@ -394,14 +382,14 @@ function plot(F, filename::String; kwargs...)
         return plot_frameworkonsurface(F, filename; kwargs...)    
     elseif typeof(F)==VolumeHypergraph
         return plot_hypergraph(F, filename; kwargs...)
-    elseif typeof(F)==Polytope
+    elseif typeof(F)==Polytope || typeof(F)==BodyHinge
         return plot_polytope(F, filename; kwargs...)
     elseif typeof(F)==SpherePacking
         return plot_spherepacking(F, filename; kwargs...)
     elseif typeof(F)==SphericalDiskPacking
         return plot_sphericaldiskpacking(F, filename; kwargs...)
     else
-        throw("The type of 'F' needs to be either Framework, AngularFramework, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
+        throw("The type of 'F' needs to be either Framework, AngularFramework, Polytope, BodyHinge, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
     end
 end
 
@@ -628,7 +616,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     return fig
 end
 
-function plot_polytope(F::Polytope, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
+function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 

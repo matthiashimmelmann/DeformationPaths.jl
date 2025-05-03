@@ -15,11 +15,19 @@ import DeformationPaths:    Framework,
                             project_deformation_random,
                             FrameworkOnSurface,
                             is_rigid,
-                            is_inf_rigid
+                            is_inf_rigid,
+                            BodyHinge
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 
+
+@testset "bodyhinge" begin
+    F = BodyHinge([[1,2,3,4],[3,4,5,6]], Matrix([0 0 0; 1 0 0; 1 1 0; 0 1 0; 0 1 1; 1 1 1]'))
+    plot(F,"bodyhinge")
+    D = DeformationPath(F, [], 200; step_size=0.025)
+    animate(D,F,"bodyhinge_motion"; filetype="mp4")
+end
 
 
 @testset "is_rigid_test" begin
@@ -33,7 +41,7 @@ end
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F,"square")
     D = DeformationPath(F, [1], 200; step_size=0.025)
-    animate(D,F,"square_motion")
+    animate(D,F,"square_motion"; filetype="mp4")
 end
 
 
@@ -41,7 +49,7 @@ end
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5],[1,6]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2; 0 -1]'))
     plot(F,"prestress_stable_component")
     D = DeformationPath(F, [1,1], 200; step_size=0.025)
-    animate(D,F,"prestress_stable_component_motion")
+    animate(D,F,"prestress_stable_component_motion"; filetype="mp4")
 end
 
 
@@ -65,7 +73,7 @@ end
     F = Framework([[1,3],[1,4],[1,5],[1,6],[2,3],[2,4],[2,5],[2,6]], Matrix([0 0; 0 1; 1 -1; 1 0; 1 1; 1 2]'))
     plot(F,"completebipartite")
     D = DeformationPath(F, [1], 500; step_size=0.025)
-    animate(D,F,"completebipartite_motion")
+    animate(D,F,"completebipartite_motion"; filetype="mp4")
 end
 
 
@@ -73,7 +81,7 @@ end
     F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 sqrt(2)]'))
     plot(F,"coned_cube")
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02)
-    animate(D,F,"coned_cube_motion")
+    animate(D,F,"coned_cube_motion"; filetype="mp4")
 end
 
 
@@ -81,7 +89,7 @@ end
     F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
     plot(F,"double_watt"; padding=0.35, pin_point_offset=0.2)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.05)
-    animate(D,F,"double_watt_motion"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2)
+    animate(D,F,"double_watt_motion"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2, filetype="mp4")
 end
 
 
@@ -89,7 +97,7 @@ end
     F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
     plot(F,"thales"; padding=0.1, pin_point_offset=0.075)
     D = DeformationPath(F, [1], 250; step_size=0.025)
-    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075)
+    animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp4")
 end
 
 
@@ -105,7 +113,7 @@ end
     F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
     plot(F,"sphericaldiskpacking")
     D = DeformationPath(F, [1], 250; step_size=0.01)
-    animate(D,F,"sphericaldiskpacking_motion")
+    animate(D,F,"sphericaldiskpacking_motion"; filetype="mp4")
 end
 
 
@@ -114,7 +122,7 @@ end
     plot(F,"diskpacking")
     F = SpherePacking([1.,1.,1.,1.], Matrix([0 0; 1.75 -sqrt(2^2-(1.75)^2); 3.5 0; 4.5 sqrt(3)]'); pinned_vertices=[1])
     D = DeformationPath(F, [1,1], 250; step_size=0.025)
-    animate(D,F,"diskpacking_motion")
+    animate(D,F,"diskpacking_motion"; filetype="mp4")
 end
 
 
@@ -122,7 +130,7 @@ end
     F = SpherePacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 0 2; 2 2]'); pinned_vertices=[1])
     plot(F,"squarediskpacking")
     D = DeformationPath(F, [1], 250; step_size=0.01)
-    animate(D,F,"squarediskpacking_motion")
+    animate(D,F,"squarediskpacking_motion"; filetype="mp4")
 end
 
 
@@ -130,7 +138,7 @@ end
     F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_vertices = [1,2])
     plot(F,"spherepacking")
     D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
-    animate(D,F,"spherepacking_motion")
+    animate(D,F,"spherepacking_motion"; filetype="mp4")
 end
 
 
@@ -138,7 +146,7 @@ end
     F = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'))
     plot(F,"cube")
     D = DeformationPath(F, [1,1,1], 100; step_size=0.025)
-    animate(D,F,"cube_motion")
+    animate(D,F,"cube_motion"; filetype="mp4")
 end
 
 
@@ -146,7 +154,7 @@ end
     F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
     plot(F,"cuboctahedron")
     D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
-    animate(D,F,"cuboctahedron_motion")
+    animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 end
 
 
@@ -154,7 +162,7 @@ end
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F,"two_triangles")
     D = DeformationPath(F, [1], 100; step_size=0.01)
-    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false)
+    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
 end
 
 
@@ -162,7 +170,7 @@ end
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F,"two_triangles")
     D = DeformationPath(F, [1], 100; step_size=0.01)
-    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false)
+    animate(D, F,"two_triangles_motion"; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
 end
 
 
@@ -170,7 +178,7 @@ end
     F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
     plot(F,"octahedral_decomposition")
     D = DeformationPath(F, [0.333, 1], 350; step_size=0.002)
-    animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5)
+    animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5, filetype="mp4")
 end
 
 
