@@ -25,8 +25,9 @@ D = DeformationPath(F, [1], 500; step_size=0.025)
 animate(D,F,"completebipartite_motion")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/a5c1a468-52c0-4a90-938d-f330256d5d90" controls="controls" style="max-width: 1000px;">
+</video></div>
 
 There is only a single infinitesimal motion, which we select via setting `flex_mult=[1]`. This input selects the initial tangent vector $\sum_{i=1}^r c_i \mathbf{q}_i$ for a basis $(\mathbf{q}_1,\dots,\mathbf{q}_r)$ of nontrivial infinitesimal flexes. We compute `500` predictor corrector steps with a step size of `0.025` and save the resulting animation under the file name `"completebipartite_motion.png"` using the method `animate`.
 
@@ -38,14 +39,27 @@ D = DeformationPath(F, [], 500; step_size=0.05)
 animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_direction=[4,2])
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/double_watt_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/0fafbd2e-3488-4ac0-8942-c62ef57f0a84" controls="controls" style="max-width: 850px;">
+</video></div>
 
 By setting `flex_mult` to be an empty array `[]`, we tell the program to automatically select the flex given by the sum of the basis vectors of the nontrivial infinitesimal flex space at the starting configuration. 
 
 Remarkably, this mechanism has a cusp singularity that the deformation path approximation algorithm manages to accurately traverse via an acceleration-based direction-detection method. Moreover, this is a stressed framework, for which typically Newton's method does not converge well; our choice of implementation for Newton's method does not have this problem.
 
 ### Frameworks on Surfaces
+
+Constraining a bar-and-joint frameworks' vertices to a surface provides an important and well-studied restriction. In the `FrameworkOnSurface` constructor, the underlying surface is provided as an implicit function in the method's third argument. The following example provides a motion of a framework on a 4-cycle graph that is constrained to the one hyperboloid.
+
+```julia
+F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([-sqrt(1/2) -sqrt(1/2) -1; -1 0 0; 0 1 0; sqrt(1/2) sqrt(1/2) 1]'), x->x[1]^2+x[2]^2-x[3]^2-1)
+D = DeformationPath(F, [1,1], 350; step_size=0.035)
+animate(D,F,"squareonhyperboloid_motion"; animate_rotation=true, filetype="mp4")
+```
+
+<div align="center">
+<video src="https://github.com/user-attachments/assets/d6f4c396-c1e8-4001-8783-8a76a9a4b593" controls="controls" style="max-width: 850px;">
+</video></div>
 
 ### Angle-Constrained Frameworks
 
@@ -57,8 +71,9 @@ D = DeformationPath(F, [1], 250; step_size=0.025)
 animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp4")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/thales_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/18ca1876-d875-4c70-acd3-d4546ffdb6a8" controls="controls" style="max-width: 800px;">
+</video></div>
 
 ### Sticky Sphere Packings
 
@@ -70,8 +85,21 @@ D = DeformationPath(F, [1,1], 250; step_size=0.025)
 animate(D,F,"diskpacking_motion")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/diskpacking_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/5169996b-e73a-4c4a-9d55-66c8317f7073" controls="controls" style="max-width: 800px;">
+</video></div>
+
+This construction also works in 3D, as demonstrated by the following code:
+
+```julia
+F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_vertices = [1,2])
+D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
+animate(D,F,"spherepacking_motion"; filetype="mp4")
+```
+
+<div align="center">
+<video src="https://github.com/user-attachments/assets/9e56bb93-e631-44bb-a041-81447662065a" controls="controls" style="max-width: 800px;">
+</video></div>
 
 ### Body-Hinge Frameworks
 
@@ -83,8 +111,9 @@ D = DeformationPath(F, [], 200; step_size=0.025)
 animate(D,F,"bodyhinge_motion"; filetype="mp4")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/bodyhinge_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/e8ec59cd-c6ef-4be4-a04e-58c0a7f25793" controls="controls" style="max-width: 800px;">
+</video></div>
 
 ### Polytopes with Coplanarity Constraints
 
@@ -96,8 +125,9 @@ D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
 animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/cuboctahedron_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/35e62ea7-3487-45ce-8ec1-30c285f15082" controls="controls" style="max-width: 800px;">
+</video></div>
 
 ### Volume Hypergraphs
 
@@ -109,8 +139,9 @@ D = DeformationPath(F, [0.333, 1], 350; step_size=0.002)
 animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_stretch=false, target_stretch=0.5, tip_value=0.5)
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/octahedral_decomposition_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/4750e51d-1dde-45e1-aa79-bc10cdb35cb4" controls="controls" style="max-width: 800px;">
+</video></div>
 
 In this class, we have additional options. We can fix a triangle using `fixed_triangle=(6,4,5)`. The rescaling can be skipped using `skip_stretch=true`. The first two vertices are fixed to the origin and the $x$-axis, respectively. The third vertex is transformed to the point `(target_stretch, tip_value)`.
 
@@ -124,19 +155,9 @@ D = DeformationPath(F, [1], 250; step_size=0.01)
 animate(D,F,"sphericaldiskpacking_motion")
 ```
 
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/sphericaldiskpacking_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
-
-This construction also works in 3D, as demonstrated by the following code:
-
-```julia
-F = SpherePacking([1.,1.,1.,1.], Matrix([0 0 0; 2 0 0; 0 2 0; 0 0 2]'), pinned_vertices = [1,2])
-D = DeformationPath(F, [1,1,1], 500; step_size=0.04)
-animate(D,F,"spherepacking_motion"; filetype="mp4")
-```
-
-<video src="https://github.com/matthiashimmelmann/DeformationPaths.jl/blob/master/data/spherepacking_motion.mp4" controls="controls" style="max-width: 800px;">
-</video>
+<div align="center">
+<video src="https://github.com/user-attachments/assets/fda9a103-2a58-4414-9e3f-e9232baa08fa" controls="controls" style="max-width: 800px;">
+</video></div>
 
 ## Exported functions
 
