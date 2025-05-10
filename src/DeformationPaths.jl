@@ -31,7 +31,8 @@ export  ConstraintSystem,
         FrameworkOnSurface,
         is_rigid,
         is_inf_rigid,
-        BodyHinge
+        BodyHinge,
+        compute_nontrivial_inf_flexes
 
 mutable struct DeformationPath
     G::ConstraintSystem
@@ -41,7 +42,7 @@ mutable struct DeformationPath
     flex_mult::Vector{Float64}
     _contacts::Vector
 
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14)
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14, random_flex=false)
         start_point = to_Array(G, G.realization)
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
@@ -64,10 +65,14 @@ mutable struct DeformationPath
 
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
         if flex_mult==[]
-            flex_mult = [1 for _ in 1:size(flex_space)[2]]
+            if random_flex
+                flex_mult = randn(Float64, size(flex_space)[2])
+            else
+                flex_mult = [1 for _ in 1:size(flex_space)[2]]
+            end
         end
         size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
-        prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
+        prev_flex = length(flex_mult)==0 ? [0 for _ in 1:size(flex_space)[1]] : sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
         
@@ -106,7 +111,7 @@ mutable struct DeformationPath
                     else 
                         @info "Acceleration-based cusp method is being used."
                         J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
-                        acceleration = -3*pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
+                        acceleration = -pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
                         acceleration = acceleration ./ norm(acceleration)
                         prev_flex = - prev_flex - acceleration
                         prev_flex = prev_flex ./ norm(prev_flex)
@@ -145,13 +150,17 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "sphericaldiskpacking"; kwargs...)
     end
 
-    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14)
+    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Float64=1e-2, prev_flex=nothing, newton_tol=1e-14, random_flex=false)
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             if flex_mult==[]
-                flex_mult = [1 for _ in 1:size(flex_space)[2]]
+                if random_flex
+                    flex_mult = randn(Float64, size(flex_space)[2])
+                else
+                    flex_mult = [1 for _ in 1:size(flex_space)[2]]
+                end
             end
             size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
             prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
@@ -207,7 +216,7 @@ mutable struct DeformationPath
                     else
                         @info "Acceleration-based cusp method is being used."
                         J = evaluate.(F.G.jacobian, F.G.variables=>motion_samples[end])
-                        acceleration = -3*pinv(J)*evaluate.(F.G.jacobian, F.G.variables=>prev_flex)*prev_flex
+                        acceleration = -pinv(J)*evaluate.(F.G.jacobian, F.G.variables=>prev_flex)*prev_flex
                         acceleration = acceleration ./ norm(acceleration)
                         prev_flex = - prev_flex - acceleration
                         prev_flex = prev_flex ./ norm(prev_flex)
@@ -220,25 +229,9 @@ mutable struct DeformationPath
         new(F.G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), _contacts)
     end
 
-    function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n; tol=1e-8)
-        inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
-        trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
-        s = size(trivial_inf_flexes)[2]+1
-        extend_basis_matrix = trivial_inf_flexes
-        for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
-            tmp_matrix = hcat(trivial_inf_flexes, inf_flex)
-            if !(rank(tmp_matrix; atol=tol) == rank(trivial_inf_flexes; atol=tol))
-                extend_basis_matrix = hcat(extend_basis_matrix, inf_flex)
-            end
-        end
-        Q, R = qr(extend_basis_matrix)
-        Q = Q[:, s:rank(R, atol=tol)]
-        return Q
-    end
-
     function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Float64}, point::Union{Vector{Int},Vector{Float64}}, K_n)
         J = evaluate(G.jacobian, G.variables=>point)
-        flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-3)
+        flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-6)
         if size(flex_space)[2]==0
             throw("The space of nontrivial infinitesimal motions is empty.")
         end
@@ -282,12 +275,21 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
 end
 
 
-function is_rigid(F; tol=1e-7)
+function is_rigid(F; tol=1e-6, newton_tol=1e-14, tested_random_flexes=10)
     if is_inf_rigid(F; tol=tol)
         return true
     end
-    D = DeformationPath(F, Vector{Int}([]), 10; step_size=sqrt(tol), newton_tol=1e-15)
-    return !any(sample->norm(sample-D.motion_samples[1])>tol, D.motion_samples)
+    D = DeformationPath(F, Vector{Int}([]), 6; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=false)
+    if any(sample->norm(sample-D.motion_samples[1])>tol, D.motion_samples)
+        return false
+    end
+    for _ in 1:tested_random_flexes
+        D = DeformationPath(F, Vector{Int}([]), 6; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=true)
+        if any(sample->norm(sample-D.motion_samples[1])>tol, D.motion_samples)
+            return false
+        end
+    end
+    return true
 end
 
 function is_inf_rigid(F; tol=1e-10)
@@ -987,12 +989,19 @@ end
 
 
 
-function project_deformation_random(D::DeformationPath, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=:green3, markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=[:green3], markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
-    randmat = hcat([rand(Float64,projected_dimension) for _ in 1:length(D.G.variables)]...)
-    proj_curve = [(pinv(randmat'*randmat)*randmat')'*entry for entry in D.motion_samples]
+    if DeformationPath isa DeformationPath
+        D = [D]
+    else
+        length(DeformationPath) > 0 || throw("The length of the vector 'DeformationPath' is 0.")
+    end
+
+    line_color = vcat([line_color for _ in 1:length(DeformationPath)]...)
+    randmat = hcat([rand(Float64,projected_dimension) for _ in 1:length(D[1].G.variables)]...)
+    proj_curve = [[(pinv(randmat'*randmat)*randmat')'*entry for entry in Defo.motion_samples] for Defo in D]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
         ax = Axis3(fig[1,1])
@@ -1002,13 +1011,14 @@ function project_deformation_random(D::DeformationPath, projected_dimension::Int
     hidespines!(ax)
     hidedecorations!(ax)
     if projected_dimension==3
-        lines!(ax, [Point3f(proj_curve[i]) for i in 1:length(proj_curve)]; linewidth=line_width, color=line_color)
-        draw_start && scatter!(ax, [proj_curve[1][1]], [proj_curve[1][2]], [proj_curve[1][3]]; markersize=markersize, color=markercolor, marker=:pentagon)
+        foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_color), 1:length(proj_curve))
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=markersize, color=markercolor, marker=:pentagon)
     else
-        lines!(ax, [Point2f(proj_curve[i]) for i in 1:length(proj_curve)]; linewidth=line_width, color=line_color)
-        draw_start && scatter!(ax, [proj_curve[1][1]], [proj_curve[1][2]]; markersize=markersize, color=markercolor, marker=:pentagon)
+        foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_color), 1:length(proj_curve))
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=markersize, color=markercolor, marker=:pentagon)
     end
     return fig
 end
+
 
 end 
