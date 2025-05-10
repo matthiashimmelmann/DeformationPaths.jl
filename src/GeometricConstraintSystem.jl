@@ -706,8 +706,9 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
 
     for facet in F.facets
-        poly_points=vcat([allVertices[v] for v in facet],[allVertices[facet[1]]])
-        mesh!(ax, poly_points, color=(facet_color,0.3), transparency=true)
+        triangles = [[facet[1],facet[i],facet[i+1],facet[1]] for i in 2:length(facet)-1]
+        poly_points=[[allVertices[v] for v in triangle] for triangle in triangles]
+        foreach(pts->mesh!(ax, pts, color=(facet_color,0.2), transparency=true), poly_points)
     end
 
     if plot_flexes
