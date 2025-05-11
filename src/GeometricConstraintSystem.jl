@@ -689,7 +689,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     return fig
 end
 
-function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:grey80, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
