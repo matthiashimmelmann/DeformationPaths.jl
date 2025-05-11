@@ -1,0 +1,15 @@
+# Compiled source #
+###################
+*.mp4
+*.gif
+*.png
+*.jpg
+*.jpeg
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
