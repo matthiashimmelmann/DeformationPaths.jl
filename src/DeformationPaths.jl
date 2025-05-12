@@ -9,7 +9,7 @@ import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: BodyHinge, ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework
+using .GeometricConstraintSystem: BodyHinge, ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework, compute_nontrivial_inf_flexes
 
 export  ConstraintSystem, 
         Framework,
@@ -263,7 +263,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
         else
             global damping = damping/2
         end
-        if damping < 1e-14 || Base.time()-start_time > 10
+        if damping < 1e-14 || Base.time()-start_time > length(point)/10
             throw("Newton's method did not converge in time.")
         end
         q = qnew
@@ -275,7 +275,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
 end
 
 
-function is_rigid(F; tol=1e-6, newton_tol=1e-14, tested_random_flexes=10)
+function is_rigid(F; tol=1e-6, newton_tol=1e-14, tested_random_flexes=4)
     if is_inf_rigid(F; tol=tol)
         return true
     end
@@ -313,6 +313,7 @@ function is_inf_rigid(F; tol=1e-10)
     end
     inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol)
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
+    display(inf_flexes)
     return length(inf_flexes) == length(trivial_inf_flexes)
 end
 
@@ -782,7 +783,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     end
 
     for i in 1:length(F.facets)
-        for j in 1:length(F.facets[i])
+        for j in 1:length(F.facets[i])-2
             mesh!(ax, @lift(($poly_points)[i][j]), color=(facet_color,0.2), transparency=true)
         end
     end
@@ -1005,13 +1006,13 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         throw("The projected_dimension is neither 2 nor 3.")
     end
 
-    if DeformationPath isa DeformationPath
+    if D isa DeformationPath
         D = [D]
     else
-        length(DeformationPath) > 0 || throw("The length of the vector 'DeformationPath' is 0.")
+        length(D) > 0 || throw("The length of the vector 'DeformationPath' is 0.")
     end
 
-    line_color = vcat([line_color for _ in 1:length(DeformationPath)]...)
+    line_color = vcat([line_color for _ in 1:length(D)]...)
     randmat = hcat([rand(Float64,projected_dimension) for _ in 1:length(D[1].G.variables)]...)
     proj_curve = [[(pinv(randmat'*randmat)*randmat')'*entry for entry in Defo.motion_samples] for Defo in D]
     fig = Figure(size=(1000,1000))

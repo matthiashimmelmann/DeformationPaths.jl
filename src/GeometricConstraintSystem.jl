@@ -271,7 +271,7 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
@@ -303,7 +303,7 @@ mutable struct Polytope
         new(G, facets, bars, variables, normal_variables)
     end
 
-    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
         Polytope(vertices, facets, realization)
     end
