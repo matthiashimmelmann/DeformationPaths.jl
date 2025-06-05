@@ -1001,7 +1001,7 @@ end
 
 
 
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_color=[:green3], markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int; line_width::Union{Float64,Int}=8, line_colors=[:green3], markersize::Union{Float64,Int}=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
@@ -1012,9 +1012,13 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         length(D) > 0 || throw("The length of the vector 'DeformationPath' is 0.")
     end
 
-    line_color = vcat([line_color for _ in 1:length(D)]...)
-    randmat = hcat([rand(Float64,projected_dimension) for _ in 1:length(D[1].G.variables)]...)
-    proj_curve = [[(pinv(randmat'*randmat)*randmat')'*entry for entry in Defo.motion_samples] for Defo in D]
+    if length(line_colors) < length(D)
+        @warn "The length of `line_colors` is $(length(line_colors)) but needs to be at least $(length(D)). Choosing distinguishable colors instead."
+        line_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
+        display(line_colors)
+    end
+    randmats = [hcat([rand(Float64,projected_dimension) for _ in 1:length(D[i].G.variables)]...) for i in 1:length(D)]
+    proj_curve = [[(pinv(randmats[i]'*randmats[i])*randmats[i]')'*entry for entry in Defo.motion_samples] for (i,Defo) in enumerate(D)]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
         ax = Axis3(fig[1,1])
@@ -1024,10 +1028,10 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     hidespines!(ax)
     hidedecorations!(ax)
     if projected_dimension==3
-        foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_color), 1:length(proj_curve))
+        foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_colors[j]), 1:length(proj_curve))
         draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=markersize, color=markercolor, marker=:pentagon)
     else
-        foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_color), 1:length(proj_curve))
+        foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=line_colors[j]), 1:length(proj_curve))
         draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=markersize, color=markercolor, marker=:pentagon)
     end
     return fig
