@@ -1015,7 +1015,6 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     if length(line_colors) < length(D)
         @warn "The length of `line_colors` is $(length(line_colors)) but needs to be at least $(length(D)). Choosing distinguishable colors instead."
         line_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
-        display(line_colors)
     end
     randmats = [hcat([rand(Float64,projected_dimension) for _ in 1:length(D[i].G.variables)]...) for i in 1:length(D)]
     proj_curve = [[(pinv(randmats[i]'*randmats[i])*randmats[i]')'*entry for entry in Defo.motion_samples] for (i,Defo) in enumerate(D)]
