@@ -1,11 +1,12 @@
 module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
-import GLMakie: GeometryBasics, Polygon, arrows!, Vec, Rect, Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere, Vec3f, Vec2f
+import GLMakie: NoShading, GeometryBasics, Polygon, arrows!, Vec, Rect, Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere, Vec3f, Vec2f
 import LinearAlgebra: det, cross, norm, inv, zeros, I, nullspace, rank, qr
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 import MarchingCubes: MC, march, makemesh
+import Polyhedra
 
 export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge, compute_nontrivial_inf_flexes
 
@@ -13,7 +14,7 @@ mutable struct ConstraintSystem
     vertices::Vector{Int}
     variables::Vector{Variable}
     equations::Vector{Expression}
-    realization::Union{Matrix{Int},Matrix{Float64}}
+    realization::Matrix{Float64}
     jacobian::Matrix{Expression}
     dimension::Int
     xs::Union{Matrix{Variable},Matrix{Expression}}
@@ -42,7 +43,7 @@ function add_equations!(G::ConstraintSystem, equations::Vector{Expression})
 end
 
 
-function realization!(G::ConstraintSystem, realization::Union{Matrix{Float64},Matrix{Int}})
+function realization!(G::ConstraintSystem, realization::Matrix{<:Number})
     size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw("The realization does not have the correct format.")
     point = to_Array(G, realization)
     re_matrix = to_Matrix(G, point)
@@ -52,7 +53,7 @@ function realization!(G::ConstraintSystem, realization::Union{Matrix{Float64},Ma
 end
 
 
-function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Union{Vector{Float64},Vector{Int}}, K_n; tol=1e-8)
+function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Number}, K_n; tol=1e-8)
     inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
     s = size(trivial_inf_flexes)[2]+1
@@ -74,8 +75,9 @@ mutable struct Framework
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
 
-    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         all(t->length(t)==2, bars) && all(bar->bar[1] in vertices && bar[2] in vertices, bars) || throw("The bars don't have the correct format.")
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         bars = [bar[1]<=bar[2] ? Tuple(bar) : Tuple([bar[2],bar[1]]) for bar in bars]
@@ -94,7 +96,7 @@ mutable struct Framework
         new(G, bars)
     end
 
-    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
         dimension = size(realization)[1]
         Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
@@ -107,8 +109,9 @@ mutable struct AngularFramework
     bars::Vector{Tuple{Int,Int}}
     angles::Vector{Tuple{Int,Int,Int}}
 
-    function AngularFramework(vertices::Vector{Int}, angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+    function AngularFramework(vertices::Vector{Int}, angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         all(t->length(t)==3, angles) && all(angle->angle[1] in vertices && angle[2] in vertices && angle[3] in vertices, angles) || throw("The angles don't have the correct format.")
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         angles = [(angle[1],angle[2],angle[3]) for angle in angles]
@@ -129,7 +132,7 @@ mutable struct AngularFramework
         new(G, bars, angles)
     end
 
-    function AngularFramework(angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices=Vector{Int}([]))
+    function AngularFramework(angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([angle[1] for angle in angles], [angle[2] for angle in angles], [angle[3] for angle in angles]))))
         AngularFramework(vertices, angles, realization; pinned_vertices=pinned_vertices)
     end
@@ -142,12 +145,13 @@ mutable struct FrameworkOnSurface
     bars::Vector{Tuple{Int,Int}}
     surface::Function
 
-    function FrameworkOnSurface(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}, surface::Function; pinned_vertices=Vector{Int}([]))
+    function FrameworkOnSurface(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Number}, surface::Function; pinned_vertices=Vector{Int}([]))
         try
             surface([1,1,1])
         catch
             throw("The specified implicit surface function does not take 3 arguments.")
         end
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension for FrameworkOnSurface needs to be equal to 3.")
         
@@ -157,7 +161,7 @@ mutable struct FrameworkOnSurface
         new(G, F.bars, surface)
     end
 
-    function FrameworkOnSurface(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}, surface::Function; pinned_vertices=Vector{Int}([]))
+    function FrameworkOnSurface(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Number}, surface::Function; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
         FrameworkOnSurface(vertices, bars, realization, surface; pinned_vertices=pinned_vertices)
     end
@@ -168,12 +172,13 @@ end
 mutable struct SpherePacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
-    radii::Union{Vector{Int},Vector{Float64}}
+    radii::Vector{<:Number}
     tolerance::Float64
 
-    function SpherePacking(vertices::Vector{Int}, radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
+    function SpherePacking(vertices::Vector{Int}, radii::Vector{<:Number}, realization::Matrix{<:Number}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
         length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
         all(t->norm(realization[:,t[1]]-realization[:,t[2]]) >= radii[t[1]]+radii[t[2]]-tolerance, powerset(length(vertices),2,2)) || throw("Some of the disks are too close")
@@ -192,7 +197,7 @@ mutable struct SpherePacking
         new(G, contacts, radii, tolerance)
     end
 
-    function SpherePacking(radii::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function SpherePacking(radii::Vector{<:Number}, realization::Matrix{<:Number}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         vertices = [i for i in 1:length(radii)]
         SpherePacking(vertices, radii, realization; pinned_vertices=pinned_vertices)
     end
@@ -202,11 +207,12 @@ end
 mutable struct SphericalDiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
-    inversive_distances::Union{Vector{Int},Vector{Float64}}
+    inversive_distances::Vector{<:Number}
 
-    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
+    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Number}, realization::Matrix{<:Number}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Float64=1e-8)
         length(contacts)==length(inversive_distances) || throw("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
         dimension==3 || throw("The dimension for SphericalDiskPacking must be 3.")
@@ -225,12 +231,12 @@ mutable struct SphericalDiskPacking
         new(G, contacts, inversive_distances)
     end
 
-    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Union{Vector{Int},Vector{Float64}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Number}, realization::Matrix{<:Number}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([bar[1] for bar in contacts], [bar[2] for bar in contacts]))))
         SphericalDiskPacking(vertices, contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
     end
 
-    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, realization::Union{Matrix{Int},Matrix{Float64}}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, realization::Matrix{<:Number}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         inversive_distances = [minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[2]])/sqrt(minkowski_scalar_product(realization[:,contact[1]], realization[:,contact[1]]) * minkowski_scalar_product(realization[:,contact[2]], realization[:,contact[2]])) for contact in contacts]
         SphericalDiskPacking(contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
     end
@@ -243,7 +249,8 @@ mutable struct VolumeHypergraph
     G::ConstraintSystem
     volumes::Vector{Vector{Int}}
 
-    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Number})
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw("The volumes don't have the correct format.")
         volumes = [Vector(facet) for facet in volumes]
@@ -257,7 +264,7 @@ mutable struct VolumeHypergraph
         new(G, volumes)
     end
 
-    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Number})
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in volumes]...))))
         VolumeHypergraph(vertices, volumes, realization)
     end
@@ -271,12 +278,13 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number})
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [[f for f in facet] for facet in facets]
-        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format.")
+        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
         normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
         for j in 1:length(facets)
             normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
@@ -303,7 +311,7 @@ mutable struct Polytope
         new(G, facets, bars, variables, normal_variables)
     end
 
-    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}, Vector{Tuple{Int64, Int64, Int64, Int64, Int64, Int64, Vararg{Int64}}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number})
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
         Polytope(vertices, facets, realization)
     end
@@ -315,7 +323,8 @@ mutable struct BodyHinge
     edges::Vector{Tuple{Int,Int}}
     variables::Vector{Variable}
 
-    function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Number})
+        realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
@@ -336,7 +345,7 @@ mutable struct BodyHinge
         new(G, facets, edges, variables)
     end
 
-    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Union{Matrix{Int},Matrix{Float64}})
+    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Number})
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
         BodyHinge(vertices, facets, realization)
     end
@@ -359,17 +368,17 @@ function add_equations!(F::AllTypes, equations::Vector{Expression})
     equations!(F, vcat(F.G.equations, equations))
 end
 
-function to_Array(G::ConstraintSystem, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(G::ConstraintSystem, p::Matrix{<:Number})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::AllTypes, p::Union{Matrix{Int},Matrix{Float64}})
+function to_Array(F::AllTypes, p::Matrix{<:Number})
     return to_Array(F.G, p)
 end
 
 
 
-function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(G::ConstraintSystem, q::Vector{<:Number})
     counts = 1
     point = Matrix{Float64}(Base.copy(G.realization))
 
@@ -387,7 +396,7 @@ function to_Matrix(G::ConstraintSystem, q::Union{Vector{Float64}, Vector{Int}})
 end
 
 
-function to_Matrix(F::AllTypes, q::Union{Vector{Float64}, Vector{Int}})
+function to_Matrix(F::AllTypes, q::Vector{<:Number})
     return to_Matrix(F.G, q)
 end
 
@@ -444,13 +453,18 @@ function plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arr
     end
 end
 
-function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, rotation_start_angle=pi/4, vertex_labels=true, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
-    matrix_coords = F.G.realization
+    matrix_coords = Base.copy(F.G.realization)
+    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
+    for i in 1:size(matrix_coords)[2]
+        matrix_coords[:,i] = matrix_coords[:,i] - centroid
+    end
+
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1])
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
         throw("The dimension must either be 2 or 3!")
@@ -494,17 +508,18 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
     foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     
     save("../data/$(filename).png", fig)
     return fig
 end
 
-function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
+
     if F.G.dimension==3
-        ax = Axis3(fig[1,1])
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
     else
         throw("The dimension must either be 2 or 3!")
     end
@@ -527,7 +542,7 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
     march(mc_ranged, 0.)
     msh = makemesh(GeometryBasics, mc_ranged)
 
-    mesh!(ax, msh, color=(surface_color,0.5), transparency=true)
+    mesh!(ax, msh; color=(surface_color,0.5), transparency=true)
 
     if plot_flexes
         plot_flexes!(ax, F, flex_number, flex_color, flex_scale, line_width-2, arrowsize)
@@ -537,22 +552,27 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
     foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
 
 
-function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, disk_strokewidth=8.5, vertex_labels::Bool=true, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
+function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     fig = Figure(size=(1000,1000))
-    matrix_coords = F.G.realization
+    matrix_coords = Base.copy(F.G.realization)
+    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
+    for i in 1:size(matrix_coords)[2]
+        matrix_coords[:,i] = matrix_coords[:,i] - centroid
+    end
+
     allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
     limit_vertices = allVertices
 
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1])
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
     else
         throw("The dimension must either be 2 or 3!")
     end
@@ -598,17 +618,17 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
     end
     
     foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
-    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
 
 
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; rotation_start_angle=pi/4, padding=0.015, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
-    ax = Axis3(fig[1,1], aspect=(1,1,1))
+    ax = Axis3(fig[1,1], aspect=(1,1,1), azimuth=rotation_start_angle)
     xlims!(ax,-1.5-padding, 1.5+padding)
     ylims!(ax,-1.5-padding, 1.5+padding)
     zlims!(ax,-1.5-padding, 1.5+padding)
@@ -644,15 +664,20 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; pa
         lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=disk_color)
     end
     foreach(edge->linesegments!(ax, [koebePoints[Int64(edge[1])], koebePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[:black]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
     
 
-function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
-    matrix_coords = F.G.realization    
+    matrix_coords = Base.copy(F.G.realization)
+    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
+    for i in 1:size(matrix_coords)[2]
+        matrix_coords[:,i] = matrix_coords[:,i] - centroid
+    end
+
     if facet_colors==nothing
         facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.volumes), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
@@ -660,7 +685,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1])
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
         throw("The dimension must either be 2 or 3!")
@@ -684,40 +709,51 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.volumes[i]]; color=(facet_colors[i], 0.25)), 1:length(F.volumes))
     foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
 
-function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.15, vertex_size=60, line_width=8, line_color=:steelblue, facet_color=:grey80, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.1, vertex_size=60, line_width=12, edge_color=:steelblue, rotation_start_angle = π / 10, facet_color=:grey97, font_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
-    matrix_coords = F.G.realization    
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
 
-    ax = Axis3(fig[1,1])
+    matrix_coords = Base.copy(F.G.realization)[:,1:length(F.G.vertices)]
+    centroid = sum([matrix_coords[:,i] for i in 1:length(F.G.vertices)]) ./ length(F.G.vertices)
+    for i in 1:length(F.G.vertices)
+        matrix_coords[:,i] = matrix_coords[:,i] - centroid
+    end
+
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
     zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
-    limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+    limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
     xlims!(ax, limits[1]-padding, limits[2]+padding)
     ylims!(ax, limits[1]-padding, limits[2]+padding)
     zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:length(F.G.vertices)]
 
-    for facet in F.facets
-        triangles = [[facet[1],facet[i],facet[i+1],facet[1]] for i in 2:length(facet)-1]
-        poly_points=[[allVertices[v] for v in triangle] for triangle in triangles]
-        foreach(pts->mesh!(ax, pts, color=(facet_color,0.2), transparency=true), poly_points)
+    if typeof(F) <: Polytope
+        P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in 1:length(F.G.vertices)]))
+        m = Polyhedra.Mesh(P)
+        mesh!(ax, m; color=(facet_color,0.5), shading=NoShading, transparency=true)
+    else
+        for face in F.facets
+            P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in face]))
+            m = Polyhedra.Mesh(P)
+            mesh!(ax, m; color=(facet_color,0.5), shading=NoShading, transparency=true)
+        end
     end
 
     if plot_flexes
         plot_flexes!(ax, F, flex_number, flex_color, flex_scale, line_width-2, arrowsize)
     end
 
-    foreach(i->linesegments!(ax, [(allVertices)[Int64(F.edges[i][1])], (allVertices)[Int64(F.edges[i][2])]]; linewidth=line_width, color=line_color), 1:length(F.edges))
+    foreach(i->linesegments!(ax, [(allVertices)[Int64(F.edges[i][1])], (allVertices)[Int64(F.edges[i][2])]]; linewidth=line_width, color=edge_color), 1:length(F.edges))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[:lightgrey]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     save("../data/$(filename).png", fig)
     return fig
 end
