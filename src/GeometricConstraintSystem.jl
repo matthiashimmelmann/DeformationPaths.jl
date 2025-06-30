@@ -70,6 +70,7 @@ function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Numb
 end
 
 
+#TODO Allow random realizations
 
 mutable struct Framework
     G::ConstraintSystem
@@ -453,7 +454,7 @@ function plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arr
     end
 end
 
-function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, rotation_start_angle=pi/4, vertex_labels=true, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, azimuth=π / 10, elevation=pi/10, perspectiveness=0., vertex_labels=true, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
     centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
@@ -464,7 +465,7 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
         throw("The dimension must either be 2 or 3!")
@@ -514,12 +515,12 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
     return fig
 end
 
-function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, azimuth=pi/10, alpha=0.45, elevation=pi/8, perspectiveness=0., vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
 
     if F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
     else
         throw("The dimension must either be 2 or 3!")
     end
@@ -542,7 +543,7 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
     march(mc_ranged, 0.)
     msh = makemesh(GeometryBasics, mc_ranged)
 
-    mesh!(ax, msh; color=(surface_color,0.5), transparency=true)
+    mesh!(ax, msh; color=(surface_color,alpha), transparency=true)
 
     if plot_flexes
         plot_flexes!(ax, F, flex_number, flex_color, flex_scale, line_width-2, arrowsize)
@@ -558,7 +559,7 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
 end
 
 
-function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
+function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, azimuth=pi/10, alpha=0.1, elevation=pi/8, perspectiveness=0., disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
     centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
@@ -572,7 +573,7 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
     else
         throw("The dimension must either be 2 or 3!")
     end
@@ -586,10 +587,10 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
         if F.G.dimension==2
             disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
             limit_vertices = vcat(limit_vertices, disk_vertices)
-            poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(sphere_color, 0.08))
+            poly!(ax, [(disk_vertices)[i] for i in 1:n_circle_segments]; color=(sphere_color, alpha))
             lines!(ax, [(disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]; linewidth = disk_strokewidth, color=sphere_color)
         else
-            mesh!(ax, Sphere(allVertices[index], F.radii[index]); transparency=true, color = (sphere_color,0.2))
+            mesh!(ax, Sphere(allVertices[index], F.radii[index]); transparency=true, color = (sphere_color,alpha))
             append!(limit_vertices, vcat([[allVertices[index]+F.radii[index]*Vector{Float64}(I[1:3, i]), allVertices[index]-F.radii[index]*Vector{Float64}(I[1:3, i])] for i in 1:3]...))
         end
     end
@@ -624,17 +625,17 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
 end
 
 
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; rotation_start_angle=pi/4, padding=0.015, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; azimuth=pi/10, elevation=pi/8, perspectiveness=0., padding=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
 
-    ax = Axis3(fig[1,1], aspect=(1,1,1), azimuth=rotation_start_angle)
+    ax = Axis3(fig[1,1], aspect=(1,1,1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
     xlims!(ax,-1.5-padding, 1.5+padding)
     ylims!(ax,-1.5-padding, 1.5+padding)
     zlims!(ax,-1.5-padding, 1.5+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
+    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,alpha))
 
     if plot_flexes
         plot_flexes!(ax, F, flex_number, flex_color, flex_scale, line_width-2, arrowsize)
@@ -670,7 +671,7 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; ro
 end
     
 
-function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, rotation_start_angle=pi/4, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, alpha=0.25, azimuth=pi/10, elevation=pi/8, perspectiveness=0., vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
     centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
@@ -685,7 +686,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     if F.G.dimension==2
         ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
         zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
     else
         throw("The dimension must either be 2 or 3!")
@@ -706,7 +707,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     end
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.volumes[i]]; color=(facet_colors[i], 0.25)), 1:length(F.volumes))
+    foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.volumes[i]]; color=(facet_colors[i], alpha)), 1:length(F.volumes))
     foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -714,9 +715,9 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     return fig
 end
 
-function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.1, vertex_size=60, line_width=12, edge_color=:steelblue, rotation_start_angle = π / 10, facet_color=:grey97, font_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.1, vertex_size=60, alpha=0.55, line_width=12, edge_color=:steelblue, perspectiveness=0., azimuth=π/10, elevation=pi/8, facet_color=:grey98, font_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=rotation_start_angle)
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
 
     matrix_coords = Base.copy(F.G.realization)[:,1:length(F.G.vertices)]
     centroid = sum([matrix_coords[:,i] for i in 1:length(F.G.vertices)]) ./ length(F.G.vertices)
@@ -738,12 +739,12 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     if typeof(F) <: Polytope
         P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in 1:length(F.G.vertices)]))
         m = Polyhedra.Mesh(P)
-        mesh!(ax, m; color=(facet_color,0.5), shading=NoShading, transparency=true)
+        mesh!(ax, m; color=(facet_color,alpha), shading=NoShading, transparency=true)
     else
         for face in F.facets
             P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in face]))
             m = Polyhedra.Mesh(P)
-            mesh!(ax, m; color=(facet_color,0.5), shading=NoShading, transparency=true)
+            mesh!(ax, m; color=(facet_color,alpha), shading=NoShading, transparency=true)
         end
     end
 

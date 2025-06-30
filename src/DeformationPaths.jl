@@ -68,8 +68,9 @@ mutable struct DeformationPath
         if flex_mult==[]
             if random_flex
                 flex_mult = randn(Float64, size(flex_space)[2])
+                flex_mult = flex_mult ./ norm(flex_mult)
             else
-                flex_mult = [1. for _ in 1:size(flex_space)[2]]
+                flex_mult = [1/size(flex_space)[2] for _ in 1:size(flex_space)[2]]
             end
         else
             flex_mult = Float64.(flex_mult)
@@ -245,7 +246,7 @@ mutable struct DeformationPath
     end
 end
 
-function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14)
+function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14, time_penalty=15)
     q = Base.copy(point)
     global damping = 0.15
     start_time=Base.time()
@@ -266,7 +267,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
         else
             global damping = damping/2
         end
-        if damping < 1e-14 || Base.time()-start_time > length(point)/8
+        if damping < 1e-14 || Base.time()-start_time > length(point)/time_penalty
             throw("Newton's method did not converge in time.")
         end
         q = qnew
@@ -278,7 +279,7 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
 end
 
 
-function is_rigid(F; tol=1e-4, newton_tol=1e-13, tested_random_flexes=5)
+function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=10)
     if is_inf_rigid(F; tol=tol)
         return true
     end
@@ -463,9 +464,9 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 end
 
-function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=55, vertex_labels=false, font_color=:lightgrey, line_width::Union{Float64,Int}=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=55, vertex_labels=false, font_color=:lightgrey, line_width::Union{Float64,Int}=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1))
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     
@@ -577,15 +578,16 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
         if animate_rotation
-            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+            ax.elevation[] = elevation
+            ax.azimuth[] = azimuth + 2pi * t / rotation_frames
         end
     end
 end
 
 
-function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = 0, rotation_frames = 480, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=55, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_labels=true, font_color=:lightgrey, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
+function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::String; alpha=0.45, framerate::Int=25, animate_rotation=false, azimuth = pi/4, elevation=pi/8, perspectiveness=0., rotation_frames = 480, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=55, line_width::Union{Float64,Int}=10, edge_color=:steelblue, vertex_labels=true, font_color=:lightgrey, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
     fig = Figure(size=(1000,1000))
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1))
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
@@ -605,7 +607,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     mc_ranged = MC(A, Int; x, y, z)
     march(mc_ranged, 0.)
     msh = makemesh(GeometryBasics, mc_ranged)
-    mesh!(ax, msh, color=(surface_color,0.5), transparency=true)
+    mesh!(ax, msh, color=(surface_color,alpha), transparency=true)
 
     time=Observable(1)
     allVertices=@lift begin
@@ -627,13 +629,14 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
         if animate_rotation
-            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+            ax.elevation[] = elevation
+            ax.azimuth[] = azimuth + 2pi * t / rotation_frames
         end
     end
 end
 
 
-function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; recompute_deformation_samples::Bool=true, target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, font_color=:black, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::String; alpha=0.2, recompute_deformation_samples::Bool=true, target_stretch::Union{Float64,Int}=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, font_color=:black, skip_stretch::Bool=true, tip_value::Union{Float64,Int}=0.5, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -696,7 +699,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
         pointys = matrix_coords[$time]
         [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
-    foreach(i->poly!(ax, @lift([($allVertices)[Int64(v)] for v in F.volumes[i]]); color=(facet_colors[i], 0.25)), 1:length(F.volumes))
+    foreach(i->poly!(ax, @lift([($allVertices)[Int64(v)] for v in F.volumes[i]]); color=(facet_colors[i], alpha)), 1:length(F.volumes))
     foreach(i->lines!(ax, @lift([($allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]); linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=26, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -711,11 +714,11 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), font_color=:lightgrey, facet_color=:grey97, framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
     fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1))
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
@@ -782,9 +785,9 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     if typeof(F) <: Polytope
-        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in 1:length(F.G.vertices)])))); color=(facet_color,0.5), shading=NoShading, transparency=true)
+        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in 1:length(F.G.vertices)])))); color=(facet_color,alpha), shading=NoShading, transparency=true)
     else
-        foreach(face->mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in face])))); color=(facet_color,0.5), shading=NoShading, transparency=true), F.facets)
+        foreach(face->mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in face])))); color=(facet_color,alpha), shading=NoShading, transparency=true), F.facets)
     end
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
@@ -797,13 +800,14 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
         if animate_rotation
-            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+            ax.elevation[] = elevation
+            ax.azimuth[] = azimuth + 2pi * t / rotation_frames
         end
     end
 end
 
 
-function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, font_color=:black, disk_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
+function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::String; alpha=0.08, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, vertex_labels=true, disk_strokewidth::Union{Float64,Int}=8.5, line_width::Union{Float64,Int}=7, font_color=:black, sphere_color=:steelblue, markersize::Union{Float64,Int}=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -830,8 +834,8 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::S
     for index in 1:length(F.G.vertices)
         disk_vertices = @lift([Point2f(Vector($allVertices[index])+F.radii[index]*[cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments])
         diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
-        poly!(ax, @lift([($disk_vertices)[i] for i in 1:n_circle_segments]); color=(disk_color, 0.08))
-        lines!(ax, @lift([($disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=disk_color)
+        poly!(ax, @lift([($disk_vertices)[i] for i in 1:n_circle_segments]); color=(sphere_color, alpha))
+        lines!(ax, @lift([($disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=sphere_color)
     end
 
     foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
@@ -847,7 +851,7 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::S
     end
 end
 
-function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::String; framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_labels=true, font_color=:black, line_width::Union{Float64,Int}=7, sphere_color=:steelblue, markersize::Union{Float64,Int}=55, markercolor=:red3, dualgraph_color=:grey50, n_circle_segments::Int=50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::String; alpha=0.2, framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_labels=true, font_color=:black, line_width::Union{Float64,Int}=7, sphere_color=:steelblue, markersize::Union{Float64,Int}=55, markercolor=:red3, dualgraph_color=:grey50, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -874,7 +878,7 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
     for index in 1:length(F.G.vertices)
-        mesh!(ax, @lift(Sphere(($allVertices)[index], F.radii[index]));  transparency=true, color = (sphere_color,0.2))
+        mesh!(ax, @lift(Sphere(($allVertices)[index], F.radii[index]));  transparency=true, color = (sphere_color,alpha))
     end
     linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
     
@@ -892,17 +896,17 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
 end
 
 
-function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; framerate::Int=25, animate_rotation=false, rotation_start_angle = π / 4, font_color=:black, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::String; alpha=0.15, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., font_color=:black, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
 
-    ax = Axis3(fig[1,1], aspect=(1,1,1))
+    ax = Axis3(fig[1,1], aspect=(1,1,1), perspectiveness=perspectiveness)
     xlims!(ax,-1.5-padding, 1.5+padding)
     ylims!(ax,-1.5-padding, 1.5+padding)
     zlims!(ax,-1.5-padding, 1.5+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,0.15))
+    mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,alpha))
 
     time=Observable(1)
     planePoints=@lift begin
@@ -987,7 +991,8 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     record(fig, "../data/$(filename).$(lowercase(filetype))", timestamps; framerate = framerate) do t
         time[] = t
         if animate_rotation
-            ax.azimuth[] = rotation_start_angle + 2pi * t / rotation_frames
+            ax.elevation[] = elevation
+            ax.azimuth[] = azimuth + 2pi * t / rotation_frames
         end
     end
     return fig
