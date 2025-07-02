@@ -1,6 +1,7 @@
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F,"square")
+    @test !is_rigid(F)
     D = DeformationPath(F, [1], 200; step_size=0.025)
     animate(D,F,"square_motion"; filetype="mp4")
 end
@@ -9,6 +10,7 @@ end
 @testset "rigid_prestress_stable" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'))
     @test !is_inf_rigid(F)
+    @test is_second_order_rigid(F)
     @test is_rigid(F)
 end
 

@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: evaluate, differentiate, newton, Expression
+import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
 import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
@@ -32,6 +32,7 @@ export  ConstraintSystem,
         FrameworkOnSurface,
         is_rigid,
         is_inf_rigid,
+        is_second_order_rigid,
         BodyHinge,
         compute_nontrivial_inf_flexes
 
@@ -247,22 +248,26 @@ mutable struct DeformationPath
 end
 
 function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14, time_penalty=15)
+    return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
+end
+
+function newton_correct(eqns::Vector{Expression}, vars::Vector{Variable}, jac, point::Vector{Float64}; tol = 1e-14, time_penalty=15)
     q = Base.copy(point)
     global damping = 0.15
     start_time=Base.time()
-    while(norm(evaluate(G.equations, G.variables=>q)) > tol)
-        J = evaluate.(G.jacobian, G.variables=>q)
+    while(norm(evaluate(eqns, vars=>q)) > tol)
+        J = evaluate.(jac, vars=>q)
         stress_dimension = size(nullspace(J'; atol=1e-8))[2]
         if stress_dimension > 0
-            rand_mat = randn(Float64, length(G.equations) - stress_dimension, length(G.equations))
-            equations = rand_mat*G.equations
+            rand_mat = randn(Float64, length(eqns) - stress_dimension, length(eqns))
+            equations = rand_mat*eqns
             J = rand_mat*J
         else
-            equations = G.equations
+            equations = eqns
         end
 
-        qnew = q - damping* (J \ evaluate(equations, G.variables=>q))
-        if norm(evaluate(G.equations, G.variables=>qnew)) < norm(evaluate(G.equations, G.variables=>q))
+        qnew = q - damping* (J \ evaluate(equations, vars=>q))
+        if norm(evaluate(eqns, vars=>qnew)) < norm(evaluate(eqns, vars=>q))
             global damping = damping*1.2
         else
             global damping = damping/2
@@ -278,13 +283,12 @@ function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14
     return q
 end
 
-
-function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=10)
+function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=20)
     if is_inf_rigid(F; tol=tol)
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, Vector{Int}([]), 8; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=true)
+        D = DeformationPath(F, Vector{Int}([]), 10; step_size=tol^(1/2.25), newton_tol=newton_tol, random_flex=true)
         if any(sample->norm(sample-D.motion_samples[1], Inf)>tol, D.motion_samples)
             return false
         end
@@ -316,6 +320,47 @@ function is_inf_rigid(F; tol=1e-8)
     println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
     return length(inf_flexes) == length(trivial_inf_flexes)
 end
+
+function is_second_order_rigid(F; tol=1e-6, newton_tol=1e-13, )
+    if is_inf_rigid(F; tol=tol)
+        return true
+    end
+
+    if typeof(F)==Framework
+        K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+    else
+        throw("Type of F is not yet supported. It is $(typeof(F)).")
+    end
+    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol)
+    J = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
+    stresses = nullspace(J'; atol=1e-8)
+
+    @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]]
+    if typeof(F)==Framework
+        stress_energy = sum([sum([ω[L] .* stresses[M,L]*sum([ (λ[k] .* flexes[F.G.dimension*(edge[1]-1)+1:F.G.dimension*edge[1],k]-flexes[F.G.dimension*(edge[2]-1)+1:F.G.dimension*edge[2],k]).^2 for k in 1:size(flexes)[2]]) for L in 1:size(stresses)[2]]) for (M,edge) in enumerate(F.bars)])
+    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
+        stress_energy = sum([sum([ω[L] .* stresses[M,L]*sum([ (λ[k] .* flexes[F.G.dimension*(edge[1]-1)+1:F.G.dimension*edge[1],k]-flexes[F.G.dimension*(edge[2]-1)+1:F.G.dimension*edge[2],k]).^2 for k in 1:size(flexes)[2]]) for L in 1:size(stresses)[2]]) for (M,edge) in enumerate(F.bars)]) #TODO + something faces
+    end
+    projective_stress_energy = [stress_energy, sum(λ .^ 2) - 1, sum(ω .^ 2) - 1]
+    J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, vcat(λ,ω)) for eq in projective_stress_energy]...)')
+    for _ in 1:size(flexes)[2]*size(stresses)[2]*10
+        rand_flex_parameter = randn(Float64, size(flexes)[2])
+        rand_stress_parameter = randn(Float64, size(stresses)[2])
+        rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
+        rand_stress_parameter = rand_stress_parameter ./ norm(rand_stress_parameter)
+        try
+            q = newton_correct(projective_stress_energy, vcat(λ,ω), J_stress_energy, vcat(rand_flex_parameter, rand_stress_parameter); tol = newton_tol, time_penalty=2)
+            return false
+        catch e
+            @warn e
+            continue
+        end
+    end
+    return true
+end
+
 
 
 function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
