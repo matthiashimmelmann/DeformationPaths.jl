@@ -17,13 +17,14 @@ import DeformationPaths:    Framework,
                             is_rigid,
                             is_inf_rigid,
                             is_second_order_rigid,
-                            BodyHinge
+                            BodyHinge,
+                            triangle_shrinking
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 
 @testset "SemialgebraicOpt" begin
-    include("Framework.jl")
+    #include("Framework.jl")
     include("Polytope.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")

@@ -2,7 +2,7 @@ module GeometricConstraintSystem
 
 import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
 import GLMakie: NoShading, GeometryBasics, Polygon, arrows!, Vec, Rect, Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere, Vec3f, Vec2f
-import LinearAlgebra: det, cross, norm, inv, zeros, I, nullspace, rank, qr
+import LinearAlgebra: det, cross, norm, inv, zeros, I, nullspace, rank, qr, svd
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import Combinatorics: powerset
 import MarchingCubes: MC, march, makemesh
@@ -285,29 +285,44 @@ mutable struct Polytope
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [[f for f in facet] for facet in facets]
-        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
-        normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
-        for j in 1:length(facets)
-            normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
-            normal_realization[:,j] = normal_realization[:,j] ./ norm(normal_realization[:,j])
-            for i in j+1:length(facets)
-                edge = facets[i][findall(q -> q in facets[j], facets[i])]
-                if length(edge) != 2
-                    continue
+        if size(realization)[1]==dimension && size(realization)[2]==length(vertices)
+            normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
+            for j in 1:length(facets)
+                normal_realization[:,j] = cross(realization[:,facets[j][2]] - realization[:,facets[j][1]], realization[:,facets[j][3]] - realization[:,facets[j][2]])
+                normal_realization[:,j] = normal_realization[:,j] ./ (realization[:,facets[j][1]]'*normal_realization[:,j])
+                for i in j+1:length(facets)
+                    edge = facets[i][findall(q -> q in facets[j], facets[i])]
+                    if length(edge) != 2
+                        continue
+                    end
+                    push!(bars, Tuple(edge))
                 end
-                push!(bars, Tuple(edge))
             end
+            _realization = hcat(realization, normal_realization)
+        elseif size(realization)[1]==dimension && size(realization)[2]==length(vertices)+length(facets)
+            _realization, bars = Base.copy(realization), []
+            for j in 1:length(facets)
+                _realization[:, length(vertices)+j] = _realization[:, length(vertices)+j] ./ (_realization[:, length(vertices)+j]'*_realization[:, facets[j][1]])
+                for i in j+1:length(facets)
+                    edge = facets[i][findall(q -> q in facets[j], facets[i])]
+                    if length(edge) != 2
+                        continue
+                    end
+                    push!(bars, Tuple(edge))
+                end
+            end
+        else
+            throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
         end
-        _realization = hcat(realization, normal_realization)
         length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
-        facet_equations = vcat([[n[:,i]'*(x[:,facets[i][j]]-x[:,(facets[i][j%length(facets[i])+1])]) for j in 1:length(facets[i])] for i in 1:length(facets)]...)
-        normal_equations = [n[:,i]'*n[:,i]-1 for i in 1:length(facets)]
+        facet_equations = vcat([[n[:,i]'*x[:,facets[i][j]] - 1 for j in 1:length(facets[i])] for i in 1:length(facets)]...)
         bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
-        equations = filter(eq->eq!=0, vcat(facet_equations, normal_equations, bar_equations))
+        equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
+        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2]))]...)), 0; atol=1e-10), equations) || throw(error("The given realization does not satisfy the constraints."))
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, hcat(x,n))
         new(G, facets, bars, variables, normal_variables)
     end

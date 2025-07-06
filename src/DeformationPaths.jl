@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var
+import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
 import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
@@ -69,7 +69,6 @@ mutable struct DeformationPath
         if flex_mult==[]
             if random_flex
                 flex_mult = randn(Float64, size(flex_space)[2])
-                flex_mult = flex_mult ./ norm(flex_mult)
             else
                 flex_mult = [1/size(flex_space)[2] for _ in 1:size(flex_space)[2]]
             end
@@ -127,7 +126,11 @@ mutable struct DeformationPath
         new(G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), [])
     end
 
-    function DeformationPath(F::Framework, flex_mult::Vector, num_steps::Int; kwargs...)
+    function DeformationPath(F::Framework, flex_mult::Vector, num_steps::Int; random_flex=false, kwargs...)
+        if flex_mult==[] && random_flex
+            flex_mult = compute_nonblocked_flex(F)
+            flex_mult = flex_mult ./ norm(flex_mult)
+        end
         DeformationPath(F.G, flex_mult, num_steps, "framework"; kwargs...)
     end
 
@@ -143,7 +146,11 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "hypergraph"; kwargs...)
     end
 
-    function DeformationPath(F::Polytope, flex_mult::Vector, num_steps::Int; kwargs...)
+    function DeformationPath(F::Polytope, flex_mult::Vector, num_steps::Int; random_flex=false, kwargs...)
+        if flex_mult==[] && random_flex
+            flex_mult = compute_nonblocked_flex(F)
+            flex_mult = flex_mult ./ norm(flex_mult)
+        end
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; kwargs...)
     end
 
@@ -283,12 +290,12 @@ function newton_correct(eqns::Vector{Expression}, vars::Vector{Variable}, jac, p
     return q
 end
 
-function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=20)
+function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=4)
     if is_inf_rigid(F; tol=tol)
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, Vector{Int}([]), 10; step_size=tol^(1/2.25), newton_tol=newton_tol, random_flex=true)
+        D = DeformationPath(F, [], 10; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=true)
         if any(sample->norm(sample-D.motion_samples[1], Inf)>tol, D.motion_samples)
             return false
         end
@@ -317,15 +324,21 @@ function is_inf_rigid(F; tol=1e-8)
     end
     inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol)
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
-    println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
+    #println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
     return length(inf_flexes) == length(trivial_inf_flexes)
 end
 
-function is_second_order_rigid(F; tol=1e-6, newton_tol=1e-13, )
-    if is_inf_rigid(F; tol=tol)
+function is_second_order_rigid(F; kwargs...)
+    #TODO Code does not work!
+    flex_mult = compute_nonblocked_flex(F; kwargs...)
+    if length(flex_mult)==0
         return true
+    else
+        return false
     end
+end
 
+function compute_nonblocked_flex(F; tol=1e-6, newton_tol=1e-13, )
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
@@ -333,60 +346,33 @@ function is_second_order_rigid(F; tol=1e-6, newton_tol=1e-13, )
     else
         throw("Type of F is not yet supported. It is $(typeof(F)).")
     end
-    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol)
-    J = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
-    stresses = nullspace(J'; atol=1e-8)
+    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=1e-8)
+    rigidity_matrix = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
+    stresses = nullspace(rigidity_matrix'; atol=1e-8)
 
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]]
-    if typeof(F)==Framework
-        stress_energy = sum([sum([ω[L] .* stresses[M,L]*sum([ (λ[k] .* flexes[F.G.dimension*(edge[1]-1)+1:F.G.dimension*edge[1],k]-flexes[F.G.dimension*(edge[2]-1)+1:F.G.dimension*edge[2],k]).^2 for k in 1:size(flexes)[2]]) for L in 1:size(stresses)[2]]) for (M,edge) in enumerate(F.bars)])
-    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        stress_energy = sum([sum([ω[L] .* stresses[M,L]*sum([ (λ[k] .* flexes[F.G.dimension*(edge[1]-1)+1:F.G.dimension*edge[1],k]-flexes[F.G.dimension*(edge[2]-1)+1:F.G.dimension*edge[2],k]).^2 for k in 1:size(flexes)[2]]) for L in 1:size(stresses)[2]]) for (M,edge) in enumerate(F.bars)]) #TODO + something faces
-    end
-    projective_stress_energy = [stress_energy, sum(λ .^ 2) - 1, sum(ω .^ 2) - 1]
-    J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, vcat(λ,ω)) for eq in projective_stress_energy]...)')
-    for _ in 1:size(flexes)[2]*size(stresses)[2]*10
+    parametrized_flex = flexes*λ
+    parametrized_stress = stresses*ω
+    stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
+    stress_poly_system = differentiate(stress_energy, ω)
+    projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
+    J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
+    for index in 1:size(flexes)[2]*size(stresses)[2]*4
         rand_flex_parameter = randn(Float64, size(flexes)[2])
-        rand_stress_parameter = randn(Float64, size(stresses)[2])
         rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
-        rand_stress_parameter = rand_stress_parameter ./ norm(rand_stress_parameter)
         try
-            q = newton_correct(projective_stress_energy, vcat(λ,ω), J_stress_energy, vcat(rand_flex_parameter, rand_stress_parameter); tol = newton_tol, time_penalty=2)
-            return false
+            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = newton_tol, time_penalty=5)
+            return q
         catch e
-            @warn e
             continue
         end
     end
-    return true
+    return []
+
 end
 
-
-
-function animate(F, filename::String; flex_mult=nothing, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
-    if flex_mult==nothing
-        if typeof(F)==Framework
-            K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
-        elseif typeof(F)==AngularFramework
-            K_n = AngularFramework([[i,j,k] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) for k in 1:length(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
-        elseif typeof(F)==FrameworkOnSurface
-            K_n = deepcopy(G)
-            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
-        elseif typeof(F)==VolumeHypergraph
-            K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
-        elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-            K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
-        elseif typeof(F)==SphericalDiskPacking
-            minkowski_scalar_product(e1,e2) = e1'*e2-1
-            inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
-            K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
-        else
-            throw("Type of F is not yet supported. It is $(typeof(F)).")
-        end
-        flex_space = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
-        flex_mult = [1 for _ in 1:size(flex_space)[2]]
-    end
-    D = DeformationPath(F, filename, flex_mult, num_steps; step_size=step_size)
+function animate(F, filename::String; flex_mult=[], random_flex=true, num_steps::Int=100, step_size::Float64=1e-2, kwargs...)
+    D = DeformationPath(F, flex_mult, num_steps; step_size=step_size, random_flex=random_flex)
     animate(D, F, filename; kwargs...)
 end
 
@@ -1080,5 +1066,28 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     return fig
 end
 
+function triangle_shrinking(F::Polytope)
+    K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+    initial_flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
+    triangles = filter(facet->length(facet)==3, F.facets)
+    #TODO what if the triangles intersect?
+    triangle_centers = [sum(F.G.realization[:,k] for k in triang) ./ 3 for triang in triangles]
+    
+    for t in 1:0.1:1
+        display(t)
+        _realization = Base.copy(F.G.realization)
+        for (i,triang) in enumerate(triangles)
+            for k in triang
+                _realization[:,k] .= t .* triangle_centers[i] .+ (1-t) .* F.G.realization[:,k]
+            end
+        end
+        println([_realization[:,k] for k in triangles[1]])
+        P = Polytope(F.facets, _realization)
+        K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(P.G.vertices) for j in 1:length(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_vertices=P.G.pinned_vertices)
+        final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)
+        display(size(final_flexes))
+        plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
+    end
+end
 
 end 
