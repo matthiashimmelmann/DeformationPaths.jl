@@ -4,7 +4,7 @@
     plot(F, "truncatedDodecahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_second_order_rigid(F)
-    @test is_rigid(F; tol=1e-6, newton_tol=1e-9)
+    @test is_rigid(F)
 end
 
 

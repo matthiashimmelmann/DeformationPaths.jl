@@ -1073,8 +1073,7 @@ function triangle_shrinking(F::Polytope)
     #TODO what if the triangles intersect?
     triangle_centers = [sum(F.G.realization[:,k] for k in triang) ./ 3 for triang in triangles]
     
-    for t in 1:0.1:1
-        display(t)
+    for t in 0:0.1:1
         _realization = Base.copy(F.G.realization)
         for (i,triang) in enumerate(triangles)
             for k in triang
@@ -1085,7 +1084,6 @@ function triangle_shrinking(F::Polytope)
         P = Polytope(F.facets, _realization)
         K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(P.G.vertices) for j in 1:length(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_vertices=P.G.pinned_vertices)
         final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)
-        display(size(final_flexes))
         plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
     end
 end
