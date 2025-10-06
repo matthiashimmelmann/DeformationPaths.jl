@@ -10,18 +10,32 @@ import Polyhedra
 
 export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge, compute_nontrivial_inf_flexes, fix_antipodals!
 
+"""
+Class for Constructing a general constraint system.
+
+# Attributes
+- `vertices::Vector{Int}`: Vertices describing the geometric constraint system. They are given as a list of integers.
+- `variables::Vector{Variable}`: Coordinate variables representing the positions of the `vertices`.
+- `equations::Vector{Expression}`: Equations corresponding to the constraint system.
+- `realization::Matrix{Number}`: Realization of the geometric constraint system satisfying the `equations`.
+- `jacobian::Matrix{Expression}`: Jacobian matrix for the `equations` and `variables`.
+- `dimension::Int`: Dimension in which the geometric constraint system lives.
+- `xs::Union{Matrix{Variable}, Matrix{Expression}}`: Matrix representing the possible realizations of a geometric constraint system.
+- `system::System`: Polynomial system consisting of the `equations` and `variables` in the form of `HomotopyContinuation`.
+- `pinned_vertices::Vector{Int}`: Pinned vertices of the system. These vertices remain unchanged and are added as constraints. Pinning can, for instance, be used to factor out rigid motions.
+"""
 mutable struct ConstraintSystem
     vertices::Vector{Int}
     variables::Vector{Variable}
     equations::Vector{Expression}
-    realization::Matrix{Float64}
+    realization::Matrix{Number}
     jacobian::Matrix{Expression}
     dimension::Int
     xs::Union{Matrix{Variable},Matrix{Expression}}
     system::System
     pinned_vertices::Vector{Int}
 
-    function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Number}, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))::ConstraintSystem
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
         size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
@@ -30,10 +44,14 @@ mutable struct ConstraintSystem
     end
 end
 
-function Base.show(io::IO, G::ConstraintSystem)
+
+"""
+Display method for the base clase `ConstraintSystem`.
+"""
+function Base.show(io::IO, G::ConstraintSystem)::Nothing
     print(io,"Constraint System:\n")
     print(io,"\t\tVertices:\t$(G.vertices)\n")
-    print(io,"\t\tEquations:\t[$(join(G.equations[1:min(3,length(G.equations))], ", "))$(length(G.equations)<=3 ? "" : " ...")]\n")
+    print(io,"\t\tEquations:\t[$(join(G.equations[1:min(2,length(G.equations))], ", "))$(length(G.equations)<=2 ? "" : ", ...")]\n")
     print(io, "\t\tRealization:\t")
     for i in 1:min(4,size(G.realization)[2])
         if size(G.realization)[1]==1
@@ -49,10 +67,16 @@ function Base.show(io::IO, G::ConstraintSystem)
     if !(isempty(G.pinned_vertices))
         print(io, "\tPinned Vertices: $(G.pinned_vertices)")
     end
+    return nothing
 end
 
 
-function equations!(G::ConstraintSystem, equations::Vector{Expression})
+"""
+    equations!(G, equations)
+
+Set the equations of `G` to `equations`.
+"""
+function equations!(G::ConstraintSystem, equations::Vector{Expression})::Nothing
     Set(System(equations).variables)==Set(G.variables) && length(System(equations).variables)==length(G.variables) || throw("The variables in `equations` do not match the original variables.")
     G.equations = equations
     G.jacobian = hcat([differentiate(eq, G.variables) for eq in equations]...)'
@@ -60,21 +84,38 @@ function equations!(G::ConstraintSystem, equations::Vector{Expression})
     return nothing
 end
 
-function add_equations!(G::ConstraintSystem, equations::Vector{Expression})
+
+"""
+    add_equations!(G, equations)
+
+Add the `equations` to those of `G`.
+"""
+function add_equations!(G::ConstraintSystem, equations::Vector{Expression})::Nothing
     equations!(G, vcat(G.equations, equations))
+    return nothing
 end
 
+"""
+    realization!(G, realization)
 
-function realization!(G::ConstraintSystem, realization::Matrix{<:Number})
-    #size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw("The realization does not have the correct format.")
+Set the realization of `G` to `realization`.
+"""
+function realization!(G::ConstraintSystem, realization::Matrix{<:Number})::Nothing
     point = to_Array(G, realization)
     norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw("The point does not satisfy the constraint system's equations!")
+    size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension+length(G.pinned_vertices)) || size(realization)[2]==size(G.xs)[2] || throw("The given realization does not have the correct format.")
+    size(G.xs)[1]==size(realization)[1] && size(G.xs)[2]==size(realization)[2] || throw("The given realization does not have the correct format.")
     G.realization = realization
     return nothing
 end
 
 
-function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Number}, K_n; tol=1e-8)
+"""
+    compute_nontrivial_inf_flexes(G, point, K_n[; tol])
+
+Compute the nontrivial infinitesimal flexes of a geometric constraint system `G` in `point`.
+"""
+function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Number}, K_n::ConstraintSystem; tol::Number=1e-8)::Matrix{<:Number}
     inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
     s = size(trivial_inf_flexes)[2]+1
@@ -93,6 +134,9 @@ end
 
 #TODO Allow random realizations
 
+"""
+Class for bar-joint frameworks.
+"""
 mutable struct Framework
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
@@ -125,6 +169,9 @@ mutable struct Framework
 end
 
 
+"""
+Class for angular bar-joint frameworks.
+"""
 mutable struct AngularFramework
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
@@ -160,7 +207,9 @@ mutable struct AngularFramework
 end
 
 
-
+"""
+Class for bar-joint frameworks constrained to a surface.
+"""
 mutable struct FrameworkOnSurface
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
@@ -189,7 +238,9 @@ mutable struct FrameworkOnSurface
 end
 
 
-
+"""
+Class for sticky sphere packings.
+"""
 mutable struct SpherePacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
@@ -225,6 +276,9 @@ mutable struct SpherePacking
 end
 
 
+"""
+Class for spherical disk packings in Minkowski space.
+"""
 mutable struct SphericalDiskPacking
     G::ConstraintSystem
     contacts::Vector{Tuple{Int,Int}}
@@ -266,6 +320,9 @@ mutable struct SphericalDiskPacking
 end
 
 
+"""
+Class for volume-constrained hypergraphs.
+"""
 mutable struct VolumeHypergraph
     G::ConstraintSystem
     volumes::Vector{Vector{Int}}
@@ -292,6 +349,9 @@ mutable struct VolumeHypergraph
 end
 
 
+"""
+Class for 3-dimensional polytopes with edge-length and facet planarity constraints.
+"""
 mutable struct Polytope
     G::ConstraintSystem
     facets::Vector{Vector{Int}}
@@ -358,6 +418,12 @@ mutable struct Polytope
     end
 end
 
+
+"""
+    tetrahedral_symmetry!(F)
+
+Entangles the antipodal points in a polytope `F` so that their position is constrained to antipodal points on a sphere. 
+"""
 function fix_antipodals!(F::Polytope)
     vertex_list = [i for i in F.G.vertices]
     while !isempty(vertex_list)
@@ -379,6 +445,89 @@ function fix_antipodals!(F::Polytope)
 end
 
 
+"""
+    tetrahedral_symmetry!(F)
+
+Add constraints to a polytope `F` representing a tetrahedral symmetry. 
+"""
+function tetrahedral_symmetry!(F::Polytope)
+    vertex_list, antipodals = [i for i in F.G.vertices], []
+    symmetry_list = []
+    triang = F.facets[findfirst(facet->length(facet)==3&&(vertex_list[1] in facet), F.facets)]
+    n = cross(F.G.realization[:,triang[3]]-F.G.realization[:,triang[1]], F.G.realization[:,triang[2]]-F.G.realization[:,triang[1]])
+    rotation_axis = n ./ norm(n)
+    angle = 2*pi/3
+    R1 = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+    
+    edge = F.G.realization[:,triang[2]]-F.G.realization[:,triang[1]]
+    mirror_axis = edge ./ norm(edge)
+    R2 = Matrix(I, 3, 3) - 2 .* mirror_axis*mirror_axis'
+    while !isempty(vertex_list)
+        v = pop!(vertex_list)
+        helper = [v]
+        _vertex_list = Base.copy(vertex_list)
+        for w in _vertex_list
+            try
+                if isapprox(norm(F.G.realization[:,w]-R1*F.G.realization[:,v]), 0; atol=1e-4)
+                    push!(helper,w)
+                    index = findfirst(t->w==t, vertex_list)
+                    deleteat!(vertex_list, index)
+                    F.G.vertices = filter(t->t!=w, F.G.vertices)
+                    F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,w])), F.G.variables)
+                    F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,w])=>R1*F.G.xs[:,v])
+                    F.G.xs[:,w] .= R1*F.G.xs[:,v]
+                elseif isapprox(norm(F.G.realization[:,w]-(R1*R1)*F.G.realization[:,v]), 0; atol=1e-4)
+                    push!(helper,w)
+                    index = findfirst(t->w==t, vertex_list)
+                    deleteat!(vertex_list, index)
+                    F.G.vertices = filter(t->t!=w, F.G.vertices)
+                    F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,w])), F.G.variables)
+                    F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,w])=>(R1*R1)*F.G.xs[:,v])
+                    F.G.xs[:,w] .= (R1*R1)*F.G.xs[:,v]
+                end
+            catch e
+                continue
+            end
+        end
+        push!(symmetry_list, helper)
+    end
+    F.G.equations = filter(eq->eq!=0, F.G.equations)
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in F.G.equations]...)'
+end
+
+
+"""
+    triangle_shrinking(F)
+
+Evenly shrink the triangular facets of a given polytope and compute the nontrivial infinitesimal flexes in each step.
+"""
+function triangle_shrinking(F::Polytope)
+    K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+    initial_flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
+    triangles = filter(facet->length(facet)==3, F.facets)
+    triangle_centers = [sum(F.G.realization[:,k] for k in triang) ./ 3 for triang in triangles]
+    
+    for t in 0:0.1:1
+        _realization = Base.copy(F.G.realization)
+        for (i,triang) in enumerate(triangles)
+            for k in triang
+                _realization[:,k] .= t .* triangle_centers[i] .+ (1-t) .* F.G.realization[:,k]
+            end
+        end
+        println([_realization[:,k] for k in triangles[1]])
+        P = Polytope(F.facets, _realization)
+        K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(P.G.vertices) for j in 1:length(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_vertices=P.G.pinned_vertices)
+        final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)
+        plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
+    end
+end
+
+
+"""
+Class for body-hinge frameworks, which are essentially polytopes with rigid facets.
+"""
 mutable struct BodyHinge
     G::ConstraintSystem
     facets::Vector{Vector{Int}}
@@ -417,6 +566,7 @@ end
 
 AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
 
+
 """
 Unifying display method for all types of geometric constraint systems.
 """
@@ -424,12 +574,12 @@ function Base.show(io::IO, F::AllTypes)
     print(io,"$(string(nameof(typeof(F)))):\n")
     print(io,"\t$(F.G)")
     if typeof(F) in [Framework, AngularFramework, FrameworkOnSurface]
-        print(io,"\tBars:\n\t\t$(F.bars)")
+        print(io,"\tBars:\t\t\t$(F.bars)")
         if F isa AngularFramework
-            print(io,"\n\tAngles:\n\t\t$(F.angles)")
+            print(io,"\n\tAngles:\t\t$(F.angles)")
         elseif F isa FrameworkOnSurface
             @var x y z
-            print(io,"\n\tSurface:\n\t\t$(F.surface([x,y,z])) = 0")
+            print(io,"\n\tSurface:\t\t$(F.surface([x,y,z])) = 0")
         end
     end
     if typeof(F) in [Polytope, BodyHinge]
@@ -466,35 +616,73 @@ function equations!(F::AllTypes, equations::Vector{Expression})
     return nothing
 end
 
+
 function add_equations!(F::AllTypes, equations::Vector{Expression})
     equations!(F, vcat(F.G.equations, equations))
 end
 
-function to_Array(G::ConstraintSystem, p::Matrix{<:Number})
+
+"""
+    to_Array(G, p)
+
+Transform a realization `p` to a vector of coordinates.
+"""
+function to_Array(G::ConstraintSystem, p::Matrix{<:Number})::Vector{<:Number}
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge}, p::Matrix{<:Number})
+
+"""
+    to_Array(F, p)
+
+Transform a realization `p` to a vector of coordinates.
+"""
+function to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge}, p::Matrix{<:Number})::Vector{<:Number}
     return to_Array(F.G, p)
 end
 
-function to_Array(F::Polytope, p::Matrix{<:Number})
+
+"""
+    to_Array(F, p)
+
+Transform a realization `p` to a vector of coordinates.
+"""
+function to_Array(F::Polytope, p::Matrix{<:Number})::Vector{<:Number}
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(F.G.realization)[1], vcat(F.G.vertices, size(F.G.realization)[2]-length(F.facets)+1:size(F.G.realization)[2]))) if !(j in F.G.pinned_vertices)]...)
 end
 
 
-function to_Matrix(G::ConstraintSystem, q::Vector{<:Number})
+"""
+    to_Matrix(G, q)
+
+Transform a vector of coordinates `q` to a realization matrix.
+"""
+function to_Matrix(G::ConstraintSystem, q::Vector{<:Number})::Matrix{<:Number}
     point = Matrix{Float64}(Base.copy(G.realization))
     point = evaluate.(G.xs, G.variables=>q)
     return point
 end
 
-function to_Matrix(F::AllTypes, q::Vector{<:Number})
+
+"""
+    to_Matrix(F, q)
+
+Transform a vector of coordinates `q` to a realization matrix.
+"""
+function to_Matrix(F::AllTypes, q::Vector{<:Number})::Matrix{<:Number}
     return to_Matrix(F.G, q)
 end
 
 
-function plot(F, filename::String; kwargs...)
+"""
+    plot(F, filename)
+
+Plot the geometric constraint system `F`.
+
+This is a wrapper method for plotting of the individual geometric constraint systems. 
+It calls one of the following: [`plot_framework`](@ref), [`plot_frameworkonsurface`](@ref), [`plot_hypergraph`](@ref), [`plot_polytope`](@ref), [`plot_spherepacking`](@ref) and [`plot_sphericaldiskpacking`](@ref).
+"""
+function plot(F::AllTypes, filename::String; kwargs...)
     if typeof(F)==Framework || typeof(F)==AngularFramework
         global fig = plot_framework(F, filename; kwargs...)
     elseif typeof(F)==FrameworkOnSurface
@@ -514,7 +702,12 @@ function plot(F, filename::String; kwargs...)
     return fig
 end
 
-function plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arrowsize)
+"""
+    plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arrowsize)
+
+Add infinitesimal flexes to a plot of a geometric constraint system
+"""
+function plot_flexes!(ax, F::AllTypes, flex_number::Int, flex_color, flex_scale, linewidth, arrowsize)
     if F isa Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif F isa AngularFramework
@@ -546,6 +739,11 @@ function plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arr
     end
 end
 
+"""
+    plot_framework(F, filename)
+
+Plot a bar-joint or angular framework.
+"""
 function plot_framework(F::Union{Framework,AngularFramework}, filename::String; padding::Float64=0.15, vertex_size=55, azimuth=π / 10, elevation=pi/10, perspectiveness=0., vertex_labels=true, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
@@ -607,6 +805,12 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::String; 
     return fig
 end
 
+
+"""
+    plot_frameworkonsurface(F, filename)
+
+Plot a bar-joint framework constrained to a surface.
+"""
 function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; padding::Float64=0.15, azimuth=pi/10, alpha=0.45, elevation=pi/8, perspectiveness=0., vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization
@@ -651,6 +855,11 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::String; paddin
 end
 
 
+"""
+    plot_spherepacking(F, filename)
+
+Plot a sphere packing.
+"""
 function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64=0.15, azimuth=pi/10, alpha=0.1, elevation=pi/8, perspectiveness=0., disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
@@ -717,6 +926,11 @@ function plot_spherepacking(F::SpherePacking, filename::String; padding::Float64
 end
 
 
+"""
+    plot_sphericaldiskpacking(F, filename)
+
+Plot a spherical disk packing.
+"""
 function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; azimuth=pi/10, elevation=pi/8, perspectiveness=0., padding=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = F.G.realization    
@@ -763,6 +977,11 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::String; az
 end
     
 
+"""
+    plot_hypergraph(F, filename)
+
+Plot a volume-constrained hypergraph.
+"""
 function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64=0.15, alpha=0.25, azimuth=pi/10, elevation=pi/8, perspectiveness=0., vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
@@ -807,6 +1026,12 @@ function plot_hypergraph(F::VolumeHypergraph, filename::String; padding::Float64
     return fig
 end
 
+
+"""
+    plot_polytope(F, filename)
+
+Plot a polytope.
+"""
 function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0.1, vertex_size=60, alpha=0.55, line_width=12, edge_color=:steelblue, perspectiveness=0., azimuth=π/10, elevation=pi/8, facet_color=:grey98, font_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_number=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
