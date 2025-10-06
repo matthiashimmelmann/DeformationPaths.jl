@@ -247,7 +247,7 @@ mutable struct DeformationPath
                 push!(motion_samples, cur_point)
                 break
             catch err
-                display(stacktrace(catch_backtrace()))
+                display(err)
                 continue
             end
         end
