@@ -1,15 +1,3 @@
-module GeometricConstraintSystem
-
-import HomotopyContinuation: @var, evaluate, newton, Variable, Expression, differentiate, System
-import GLMakie: NoShading, GeometryBasics, Polygon, arrows!, Vec, Rect, Figure, text!, poly!, lines!, save, hidespines!, hidedecorations!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Point3f, Point2f, mesh!, Sphere, Vec3f, Vec2f
-import LinearAlgebra: det, cross, norm, inv, zeros, I, nullspace, rank, qr, svd
-import Colors: distinguishable_colors, red, green, blue, colormap, RGB
-import Combinatorics: powerset
-import MarchingCubes: MC, march, makemesh
-import Polyhedra
-
-export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge, compute_nontrivial_inf_flexes, fix_antipodals!
-
 """
 Class for Constructing a general constraint system.
 
@@ -1074,6 +1062,4 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
     save("../data/$(filename).png", fig)
     return fig
-end
-
 end

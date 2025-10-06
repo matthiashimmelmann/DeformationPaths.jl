@@ -9,10 +9,9 @@ import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 import Polyhedra
 import CDDLib
-import Base:show
+import Base: show
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: BodyHinge, ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework, compute_nontrivial_inf_flexes, fix_antipodals!
 
 export  ConstraintSystem, 
         Framework,
