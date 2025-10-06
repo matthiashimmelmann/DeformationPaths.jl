@@ -44,18 +44,18 @@ Class for constructing approximate deformation paths.
 
 # Attributes
 - `G::ConstraintSystem`: The geometric constraint system for which the deformation is computes.
-- `step_size::Number`: The step size of the deformation path. 
-- `motion_samples::Vector{Vector{Float64}}`: Points in the configuration space representing the approximate motion.
-- `motion_matrices::Vector{Matrix{Float64}}`: The points in `motion_samples` as distributed into realizations given by `dxn` matrices for the dimension `d` and the number of vertices `n`.
-- `flex_mult::Vector{Float64}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
+- `step_size::Real`: The step size of the deformation path. 
+- `motion_samples::Vector{Vector{<:Real}}`: Points in the configuration space representing the approximate motion.
+- `motion_matrices::Vector{Matrix{<:Real}}`: The points in `motion_samples` as distributed into realizations given by `dxn` matrices for the dimension `d` and the number of vertices `n`.
+- `flex_mult::Vector{<:Real}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
 . `_contacts::Vector`: In some cases (such as sphere packings), the contacts can change during the deformation. This is reflected by this attribute.
 """
 mutable struct DeformationPath
     G::ConstraintSystem
-    step_size::Number
-    motion_samples::Vector{Vector{Float64}}
-    motion_matrices::Vector{Matrix{Float64}}
-    flex_mult::Vector{Float64}
+    step_size::Real
+    motion_samples::Vector{Vector{<:Real}}
+    motion_matrices::Vector{Matrix{<:Real}}
+    flex_mult::Vector{<:Real}
     _contacts::Vector
     
     """
@@ -65,8 +65,8 @@ mutable struct DeformationPath
 
     # Arguments
     - `G::ConstraintSystem`: The underlying geometric constraint system.
-    - `motion_samples::Vector{Vector{Float64}}`: List of previously computed realizations in array format.
-    - `tol::Float64` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
+    - `motion_samples::Vector{Vector{<:Real}}`: List of previously computed realizations in array format.
+    - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 
     # Returns
     - `DeformationPath` 
@@ -98,7 +98,7 @@ mutable struct DeformationPath
         new(G, 0., motion_samples, motion_matrices, Vector{Float64}([]), [])
     end
 
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Number=1e-2, newton_tol=1e-14, random_flex=false, symmetric_newton=false, start_point=nothing)::DeformationPath
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Real=1e-2, newton_tol=1e-14, random_flex=false, symmetric_newton=false, start_point=nothing)::DeformationPath
         println("$step_size, $newton_tol, $flex_mult")
         if start_point == nothing
             start_point = to_Array(G, G.realization)
@@ -222,7 +222,7 @@ mutable struct DeformationPath
         DeformationPath(F.G, flex_mult, num_steps, "polytope"; start_point=to_Array(F, F.G.realization), random_flex=random_flex, kwargs...)
     end
 
-    function DeformationPath(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Number; step_size::Number=0.002, tol::Number=1e-10, kwargs...)::DeformationPath
+    function DeformationPath(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; step_size::Real=0.002, tol::Real=1e-10, kwargs...)::DeformationPath
         edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
         length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
         @var c
@@ -246,7 +246,8 @@ mutable struct DeformationPath
                 cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=1)
                 push!(motion_samples, cur_point)
                 break
-            catch e
+            catch err
+                display(stacktrace(catch_backtrace()))
                 continue
             end
         end
@@ -280,7 +281,7 @@ mutable struct DeformationPath
         DeformationPath(F, flex_mult, num_steps[; motion_samples, _contacts, step_size, prev_flex, newton_tol, random_flex])
     Constructor method of an approximate motion for sticky sphere packings.
     """
-    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Number=1e-2, prev_flex::Union{Nothing, Vector}=nothing, newton_tol=1e-14, random_flex=false)::DeformationPath
+    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, newton_tol=1e-14, random_flex=false)::DeformationPath
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
@@ -365,10 +366,10 @@ mutable struct DeformationPath
     Euler step predicting the next point along the approximate motion.
 
     # Returns
-    - `predicted_point::Vector{Number}`: The next point predicted by Euler's method.
-    - `predicted_inf_flex::Vector{Number}`: The tangent vector predicted by Euler's method.
+    - `predicted_point::Vector{<:Real}`: The next point predicted by Euler's method.
+    - `predicted_inf_flex::Vector{<:Real}`: The tangent vector predicted by Euler's method.
     """
-    function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{Number}, point::Vector{Number}, K_n::ConstraintSystem)::Tuple{Vector{Number}, Vector{Number}}
+    function euler_step(G::ConstraintSystem, step_size::Float64, prev_flex::Vector{<:Real}, point::Vector{<:Real}, K_n::ConstraintSystem)::Tuple{Vector{<:Real}, Vector{<:Real}}
         J = evaluate(G.jacobian, G.variables=>point)
         flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=1e-5)
         if size(flex_space)[2]==0
@@ -405,16 +406,16 @@ Apply Newton's method to correct `point` back to the constraints in `G`.
 
 # Arguments
 - `G::ConstraintSystem`: The underlying geometric constraint system.
-- `point::Vector{Number}`: The initial point that Newton's method is applied to.
-- `tol::Number` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Number` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
+- `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
+- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
-- `q::Vector{Number}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
+- `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 
 See also [`newton_correct`](@ref)
 """
-function newton_correct(G::ConstraintSystem, point::Vector{Number}; tol::Number = 1e-13, time_penalty::Number=2)::Vector{Number}
+function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
     return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -427,14 +428,14 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 - `equations::Vector{Expression}`: Equations to correct `point` to.
 - `variables::Vector{Variable}`: Variables from the affine coordinate ring.
 - `jac::Matrix{Expression}`: Jacobian matrix corresponding to `equations` and `variables`.
-- `point::Vector{Number}`: The initial point that Newton's method is applied to.
-- `tol::Number` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Number` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
+- `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
+- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
-- `q::Vector{Number}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
+- `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{Number}; tol::Number = 1e-13, time_penalty::Number=0.25)::Vector{Number}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=0.25)::Vector{<:Real}
     q = Base.copy(point)
     start_time=Base.time()
     global damping = 1
@@ -475,16 +476,16 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 
 # Arguments
 - `G::ConstraintSystem`: The underlying geometric constraint system.
-- `point::Vector{Number}`: The initial point that Newton's method is applied to.
-- `tol::Number` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Number` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
+- `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
+- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
-- `q::Vector{Number}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
+- `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 
 See also [`symmetric_newton_correct`](@ref)
 """
-function symmetric_newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-13, time_penalty=2)::Vector{Number}
+function symmetric_newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-13, time_penalty=2)::Vector{<:Real}
     return symmetric_newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -500,14 +501,14 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 - `equations::Vector{Expression}`: Equations to correct `point` to.
 - `variables::Vector{Variable}`: Variables from the affine coordinate ring.
 - `jac::Matrix{Expression}`: Jacobian matrix corresponding to `equations` and `variables`.
-- `point::Vector{Number}`: The initial point that Newton's method is applied to.
-- `tol::Number` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Number` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
+- `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
+- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
-- `q::Vector{Number}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
+- `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function symmetric_newton_correct(equations, variables, jacobian, p; tol = 1e-13, time_penalty=2)::Vector{Number}
+function symmetric_newton_correct(equations, variables, jacobian, p; tol = 1e-13, time_penalty=2)::Vector{<:Real}
     global _q = Base.copy(p)
     global qnew = _q
     global damping = 0.15
@@ -554,7 +555,7 @@ end
 
 Heuristically checks if a geometric constraint system `F` is (continuously) rigid. 
 """
-function is_rigid(F::AllTypes; tol::Number=1e-5, newton_tol::Number=1e-13, tested_random_flexes::Int=4, symmetric_newton::Bool=false)::Bool
+function is_rigid(F::AllTypes; tol::Real=1e-5, newton_tol::Real=1e-13, tested_random_flexes::Int=4, symmetric_newton::Bool=false)::Bool
     if is_inf_rigid(F; tol=tol)
         return true
     end
@@ -572,7 +573,7 @@ end
 
 Checks if a geometric constraint system `F` is infinitesimally rigid.
 """
-function is_inf_rigid(F::AllTypes; tol::Number=1e-8)::Bool
+function is_inf_rigid(F::AllTypes; tol::Real=1e-8)::Bool
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==AngularFramework
@@ -618,7 +619,7 @@ end
 
 Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stress.
 """
-function compute_nonblocked_flex(F::AllTypes; tol::Number=1e-6, newton_tol::Number=1e-13)::Vector
+function compute_nonblocked_flex(F::AllTypes; tol::Real=1e-6, newton_tol::Real=1e-13)::Vector
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
@@ -705,7 +706,7 @@ end
 
 Compute an animation for a 2-dimensional bar-joint framework.
 """
-function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{Number}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Union{Float64,Int}=55, line_width::Union{Float64,Int}=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Float64,Int}=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Union{Float64,Int}=55, line_width::Union{Float64,Int}=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
@@ -1409,7 +1410,7 @@ Compute a random projection of deformation paths.
 This method can either take a single deformation path or a vector of deformation paths and projects it to curves in 2D or 3D.
 This makes it possible to visualize high-dimensional deformation spaces. 
 """
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int; line_width::Number=8, edge_colors=[:green3], markersize::Number=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int; line_width::Real=8, edge_colors=[:green3], markersize::Real=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
