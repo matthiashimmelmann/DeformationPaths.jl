@@ -30,27 +30,26 @@ mutable struct ConstraintSystem
     end
 end
 
-    function Base.show(io::IO, _G::ConstraintSystem)
-        print(io,"Constraint System:\n")
-        print(io,"Vertices: $(_G.vertices)")
-        print(io,"Equations:\t$(_G.equations[1:maximum([3,length(_G.equations)])])...")
-        print(io, "Realization:\t")
-        for i in maximum([4,size(_G.realization)[2]])
-            if size(_G.realization)[1]==1
-                print(io, "$(_G.realization[1,i])\n")
-            elseif size(_G.realization)[1]==2
-                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i])\n")
-            elseif size(_G.realization)[1]==3
-                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i]) $(_G.realization[3,i])\n")
-            else
-                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i]) $(_G.realization[3,i]) ...\n")
-            end
-        end
-        end
-        if !(isempty(_G.pinned_vertices))
-            print(io, "Pinned Vertices: $(_G.pinned_vertices)")
+function Base.show(io::IO, G::ConstraintSystem)
+    print(io,"Constraint System:\n")
+    print(io,"\t\tVertices:\t$(G.vertices)\n")
+    print(io,"\t\tEquations:\t[$(join(G.equations[1:min(3,length(G.equations))], ", "))$(length(G.equations)<=3 ? "" : " ...")]\n")
+    print(io, "\t\tRealization:\t")
+    for i in 1:min(4,size(G.realization)[2])
+        if size(G.realization)[1]==1
+            print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\n")
+        elseif size(G.realization)[1]==2
+            print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\t$(G.realization[2,i])\n")
+        elseif size(G.realization)[1]==3
+            print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\t$(G.realization[2,i])\t$(G.realization[3,i])\n")
+        else
+            print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\t$(G.realization[2,i])\t$(G.realization[3,i]) ...\n")
         end
     end
+    if !(isempty(G.pinned_vertices))
+        print(io, "\tPinned Vertices: $(G.pinned_vertices)")
+    end
+end
 
 
 function equations!(G::ConstraintSystem, equations::Vector{Expression})
@@ -417,6 +416,32 @@ end
 
 
 AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
+
+function Base.show(io::IO, F::AllTypes)
+    print(io,"$(string(nameof(typeof(F)))):\n")
+    print(io,"\t$(F.G)")
+    if typeof(F) in [Framework, AngularFramework, FrameworkOnSurface]
+        print(io,"\tBars:\n\t\t$(F.bars)")
+        if F isa AngularFramework
+            print(io,"\n\tAngles:\n\t\t$(F.angles)")
+        elseif F isa FrameworkOnSurface
+            @var x y z
+            print(io,"\n\tSurface:\n\t\t$(F.surface([x,y,z])) = 0")
+        end
+    end
+    if typeof(F) in [Polytope, BodyHinge]
+        print(io,"\tFacets:\n\t\t$(F.facets[1])")
+        for i in 2:min(3,length(F.facets))
+            print(io,", $(F.facets[i])")
+        end
+        print(io,", ...")
+        print(io,"\n\tEdges:\n\t\t$(F.edges[1])")
+        for i in 2:min(5,length(F.edges))
+            print(io,", $(F.edges[i])")
+        end
+        print(io,", ...")
+    end
+end
 
 
 function equations!(F::AllTypes, equations::Vector{Expression})

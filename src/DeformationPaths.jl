@@ -69,8 +69,21 @@ mutable struct DeformationPath
     julia> F = Framework([(1,2)], [0 0; 1 0;])
     julia> motion_samples = [[0,0,cos(θ),sin(θ)] for θ in 0:0.025:pi/2]
     julia> DeformationPath(F.G, motion_samples)
-    ```
+    Deformation Path:
+        Constraint System:
+                Vertices:       [1, 2]
+                Equations:      [-1.0 + (x₁₋₁ - x₁₋₂)^2 + (x₂₋₁ - x₂₋₂)^2]
+                Realization:    0.0     1.0
+                                0.0     0.0
+        Motion:         [
+                                [0.0, 0.0, 1.0, 0.0, ...],
+                                [0.0, 0.0, 0.9996875162757026, 0.024997395914712332, ...],
+                                [0.0, 0.0, 0.9987502603949663, 0.04997916927067833, ...],
+                                [0.0, 0.0, 0.9971888181122075, 0.07492970727274235, ...],
 
+                        ...]
+
+    ```
     """
     function DeformationPath(G::ConstraintSystem, motion_samples::Vector{Vector{Float64}}; tol::Float64=1e-8)::DeformationPath
         all(sample->norm(evaluate(G.equations, G.variables=>sample), Inf) < tol, motion_samples) || throw(error("The `motion_samples` do not satisfy the underlying constraints in the Constraint System `G`!"))
@@ -347,19 +360,21 @@ mutable struct DeformationPath
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
         return point+step_size*predicted_inf_flex, predicted_inf_flex
     end
+end
 
-    function Base.show(io::IO, D::DeformationPath)
-        print(io, "Deformation Path:\n")
-        print(io, "$(D.G)")
-        print(io, "Step Size:\t\t $(D.step_size)\n")
-        print(io, "Motion:\t\t\t[\n")
-        for sample in D.motion_samples[1:3]
-            print(io,"\t\t\t\t[$(sample[1]), $(sample[2]), $(sample[3]), $(sample[4]), ...],\n")
-        end
-        print(io,"\t\t\t\t[$(D.motion_samples[4][1]), $(D.motion_samples[4][2]), $(D.motion_samples[4][3]), $(D.motion_samples[4][4]), ...]\n\t\t\t...]")        
-        if !(isempty(D.flex_mult))
-            print(io,"Flex Selector:\t\t$(D.flex_mult)\n")
-        end
+function Base.show(io::IO, D::DeformationPath)
+    print(io, "Deformation Path:\n")
+    print(io, "\t$(D.G)")
+    if D.step_size > 0.0
+        print(io, "\tStep Size:\t\t$(D.step_size)\n")
+    end
+    print(io, "\tMotion:\t\t[\n")
+    for sample in D.motion_samples[1:4]
+        print(io,"\t\t\t\t[$(sample[1]), $(sample[2]), $(sample[3]), $(sample[4]), ...],\n")
+    end
+    print(io,"\n\t\t\t...]")
+    if !(isempty(D.flex_mult))
+        print(io,"\n\tFlex Selector:\t\t$(D.flex_mult)")
     end
 end
 
