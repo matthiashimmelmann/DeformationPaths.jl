@@ -5,6 +5,14 @@
     animate(D,F,"bodyhinge_motion"; filetype="mp4")
 end
 
+@testset "bodyhinge_pyramid" begin
+    F = BodyHinge([[1,2,3],[1,3,4],[1,4,5],[1,5,6],[1,6,2]], Matrix([0 0 1; cos(2*pi/5) sin(2*pi/5) 0; cos(4*pi/5) sin(4*pi/5) 0; cos(6*pi/5) sin(6*pi/5) 0; cos(8*pi/5) sin(8*pi/5) 0; cos(10*pi/5) sin(10*pi/5) 0;]'))
+    plot(F,"bodyhinge_pyramid")
+    D = DeformationPath(F, [], 200; step_size=0.025)
+    animate(D,F,"bodyhinge_pyramid_motion"; filetype="mp4")
+end
+
+
 
 @testset "thales" begin
     F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])

@@ -18,7 +18,12 @@ import DeformationPaths:    Framework,
                             is_inf_rigid,
                             is_second_order_rigid,
                             BodyHinge,
-                            triangle_shrinking
+                            triangle_shrinking,
+                            fix_antipodals!,
+                            tetrahedral_symmetry!,
+                            add_equations!,
+                            compute_nontrivial_inf_flexes,
+                            ConstraintSystem
 using Test
 using HomotopyContinuation
 using LinearAlgebra

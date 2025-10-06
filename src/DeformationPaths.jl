@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve
+import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
 import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
 import ProgressMeter: @showprogress
@@ -8,9 +8,11 @@ import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 import Polyhedra
+import CDDLib
+import Base:show
 
 include("GeometricConstraintSystem.jl")
-using .GeometricConstraintSystem: BodyHinge, ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework, compute_nontrivial_inf_flexes
+using .GeometricConstraintSystem: BodyHinge, ConstraintSystem, Framework, equations!, realization!, to_Array, to_Matrix, VolumeHypergraph, plot, Polytope, SpherePacking, SphericalDiskPacking, FrameworkOnSurface, add_equations!, AngularFramework, compute_nontrivial_inf_flexes, fix_antipodals!
 
 export  ConstraintSystem, 
         Framework,
@@ -34,18 +36,53 @@ export  ConstraintSystem,
         is_inf_rigid,
         is_second_order_rigid,
         BodyHinge,
-        compute_nontrivial_inf_flexes
+        compute_nontrivial_inf_flexes,
+        fix_antipodals!,
+        tetrahedral_symmetry!
 
+"""
+Class for constructing approximate deformation paths.
+
+
+"""
 mutable struct DeformationPath
     G::ConstraintSystem
-    step_size::Float64
+    step_size::Number
     motion_samples::Vector{Vector{Float64}}
     motion_matrices::Vector{Matrix{Float64}}
     flex_mult::Vector{Float64}
     _contacts::Vector
+    
+    """
+    Constructor for deformation paths when a deformation is already known.
 
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Float64=1e-2, newton_tol=1e-14, random_flex=false)
-        start_point = to_Array(G, G.realization)
+    #Arguments
+    - `G::ConstraintSystem`: The underlying geometric constraint system.
+    - `motion_samples::Vector{Vector{Float64}}`: List of previously computed realizations in array format.
+    - `tol::Float64` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
+
+    #Returns
+    - `DeformationPath` 
+
+    # Examples
+    ```julia-repl
+    julia> F = Framework([(1,2)], [0 0; 1 0;])
+    julia> motion_samples = [[0,0,cos(θ),sin(θ)] for θ in 0:0.025:pi/2]
+    julia> DeformationPath(F.G, motion_samples)
+    ```
+
+    """
+    function DeformationPath(G::ConstraintSystem, motion_samples::Vector{Vector{Float64}}; tol::Float64=1e-8)::DeformationPath
+        all(sample->norm(evaluate(G.equations, G.variables=>sample), Inf) < tol, motion_samples) || throw(error("The `motion_samples` do not satisfy the underlying constraints in the Constraint System `G`!"))
+        motion_matrices = [to_Matrix(G, Float64.(sample)) for sample in motion_samples]
+        new(G, 0., motion_samples, motion_matrices, Vector{Float64}([]), [])
+    end
+
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::String; step_size::Number=1e-2, newton_tol=1e-14, random_flex=false, symmetric_newton=false, start_point=nothing)
+        println("$step_size, $newton_tol, $flex_mult")
+        if start_point == nothing
+            start_point = to_Array(G, G.realization)
+        end
         if type=="framework"
             K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices)
         elseif type=="angularframework"
@@ -69,6 +106,7 @@ mutable struct DeformationPath
         if flex_mult==[]
             if random_flex
                 flex_mult = randn(Float64, size(flex_space)[2])
+                flex_mult = flex_mult ./ norm(flex_mult, 1)
             else
                 flex_mult = [1/size(flex_space)[2] for _ in 1:size(flex_space)[2]]
             end
@@ -79,22 +117,25 @@ mutable struct DeformationPath
         prev_flex = length(flex_mult)==0 ? [0 for _ in 1:size(flex_space)[1]] : sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
-        
         failure_to_converge = 0
         @showprogress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
-                q = newton_correct(G, q; tol=newton_tol)
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=newton_tol)
+                else
+                    q = newton_correct(G, q; tol=newton_tol)
+                end
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
                     throw("Slow Progress detected.")
                 end
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
                 i = i - 1
-                @warn e
-                if failure_to_converge == 3 || e == "The space of nontrivial infinitesimal motions is empty."
+                @warn exception=(e, catch_backtrace())
+                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -102,8 +143,12 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/3, prev_flex, motion_samples[end], K_n)
-                            q = newton_correct(G, q; tol=newton_tol)
+                            q, prev_flex = euler_step(G, step_size/4, prev_flex, motion_samples[end], K_n)
+                            if symmetric_newton
+                                q = symmetric_newton_correct(G, q; tol=newton_tol)
+                            else
+                                q = newton_correct(G, q; tol=newton_tol)
+                            end
                             push!(motion_samples, q)
                             push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
                         catch
@@ -148,11 +193,61 @@ mutable struct DeformationPath
 
     function DeformationPath(F::Polytope, flex_mult::Vector, num_steps::Int; random_flex=false, kwargs...)
         if flex_mult==[] && random_flex
-            flex_mult = compute_nonblocked_flex(F)
-            flex_mult = flex_mult ./ norm(flex_mult)
+            try
+                flex_mult = compute_nonblocked_flex(F)
+            catch e
+                @warn e
+                flex_mult = []
+            end
+            flex_mult = isempty(flex_mult) ? [] : flex_mult ./ norm(flex_mult)
         end
-        DeformationPath(F.G, flex_mult, num_steps, "polytope"; kwargs...)
+        DeformationPath(F.G, flex_mult, num_steps, "polytope"; start_point=to_Array(F, F.G.realization), random_flex=random_flex, kwargs...)
     end
+
+    function DeformationPath(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Float64; step_size::Float64=0.002, tol::Float64=1e-10, kwargs...)
+        edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
+        length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
+        @var c
+        edge_equation = sum( (F.G.xs[:,edge_for_contraction[1]]-F.G.xs[:,edge_for_contraction[2]]) .^2) - sum( (F.G.realization[:,edge_for_contraction[1]]-F.G.realization[:,edge_for_contraction[2]]) .^2)
+        edge_variables = variables(edge_equation)
+        generic_point = randn(ComplexF64, size(F.G.xs)[1]*2)
+        evaluated_edge_equation = evaluate(edge_equation, edge_variables=>generic_point)
+        corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
+        _G = deepcopy(F.G)
+        _G.equations[corresponding_equation_index] = sum( (_G.xs[:,edge_for_contraction[1]]-_G.xs[:,edge_for_contraction[2]]) .^2) - c^2
+        start_c_value = sqrt( sum( (_G.realization[:,edge_for_contraction[1]]-_G.realization[:,edge_for_contraction[2]]) .^2) )
+        
+        motion_samples = [to_Array(_G, _G.realization)]
+        while true
+            println("Trial")
+            try
+                cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in 1:length(motion_samples[end])])
+                local_equations = evaluate(_G.equations, c => start_c_value - step_size)
+                cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=1)
+                push!(motion_samples, cur_point)
+                break
+            catch e
+                println(e)
+                continue
+            end
+        end
+
+        for step in step_size:step_size:(start_c_value*(1-contraction_target))
+            println("Current step: $step")
+            local_equations = evaluate(_G.equations, c=>start_c_value-step)
+            local_jacobian = _G.jacobian
+            try
+                cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(step_size/2)*(motion_samples[end]-motion_samples[end-1])/norm(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=1)
+                push!(motion_samples, cur_point)
+            catch e
+                println(e)
+                break
+            end
+        end
+        _G.equations = _G.equations[filter(i->i!=corresponding_equation_index, 1:length(_G.equations))]
+        DeformationPath(_G, motion_samples)
+    end
+
 
     function DeformationPath(F::BodyHinge, flex_mult::Vector, num_steps::Int; kwargs...)
         DeformationPath(F.G, flex_mult, num_steps, "bodyhinge"; kwargs...)
@@ -252,50 +347,191 @@ mutable struct DeformationPath
         predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
         return point+step_size*predicted_inf_flex, predicted_inf_flex
     end
+
+    function Base.show(io::IO, D::DeformationPath)
+        print(io, "Deformation Path:\n")
+        print(io, "$(D.G)")
+        print(io, "Step Size:\t\t $(D.step_size)\n")
+        print(io, "Motion:\t\t\t[\n")
+        for sample in D.motion_samples[1:3]
+            print(io,"\t\t\t\t[$(sample[1]), $(sample[2]), $(sample[3]), $(sample[4]), ...],\n")
+        end
+        print(io,"\t\t\t\t[$(D.motion_samples[4][1]), $(D.motion_samples[4][2]), $(D.motion_samples[4][3]), $(D.motion_samples[4][4]), ...]\n\t\t\t...]")        
+        if !(isempty(D.flex_mult))
+            print(io,"Flex Selector:\t\t$(D.flex_mult)\n")
+        end
+    end
 end
 
-function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-14, time_penalty=15)
+function tetrahedral_symmetry!(F::Polytope)
+    vertex_list, antipodals = [i for i in F.G.vertices], []
+    symmetry_list = []
+    triang = F.facets[findfirst(facet->length(facet)==3&&(vertex_list[1] in facet), F.facets)]
+    n = cross(F.G.realization[:,triang[3]]-F.G.realization[:,triang[1]], F.G.realization[:,triang[2]]-F.G.realization[:,triang[1]])
+    rotation_axis = n ./ norm(n)
+    angle = 2*pi/3
+    R1 = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
+    
+    edge = F.G.realization[:,triang[2]]-F.G.realization[:,triang[1]]
+    mirror_axis = edge ./ norm(edge)
+    R2 = Matrix(I, 3, 3) - 2 .* mirror_axis*mirror_axis'
+    while !isempty(vertex_list)
+        v = pop!(vertex_list)
+        helper = [v]
+        _vertex_list = Base.copy(vertex_list)
+        for w in _vertex_list
+            try
+                if isapprox(norm(F.G.realization[:,w]-R1*F.G.realization[:,v]), 0; atol=1e-4)
+                    push!(helper,w)
+                    index = findfirst(t->w==t, vertex_list)
+                    deleteat!(vertex_list, index)
+                    F.G.vertices = filter(t->t!=w, F.G.vertices)
+                    F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,w])), F.G.variables)
+                    F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,w])=>R1*F.G.xs[:,v])
+                    F.G.xs[:,w] .= R1*F.G.xs[:,v]
+                elseif isapprox(norm(F.G.realization[:,w]-(R1*R1)*F.G.realization[:,v]), 0; atol=1e-4)
+                    push!(helper,w)
+                    index = findfirst(t->w==t, vertex_list)
+                    deleteat!(vertex_list, index)
+                    F.G.vertices = filter(t->t!=w, F.G.vertices)
+                    F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,w])), F.G.variables)
+                    F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,w])=>(R1*R1)*F.G.xs[:,v])
+                    F.G.xs[:,w] .= (R1*R1)*F.G.xs[:,v]
+                #=elseif isapprox(norm(F.G.realization[:,w]-R2*F.G.realization[:,v]), 0; atol=1e-4)
+                    display("R2")
+                    push!(helper,w)
+                    index = findfirst(t->w==t, vertex_list)
+                    deleteat!(vertex_list, index)
+                    F.G.vertices = filter(t->t!=w, F.G.vertices)
+                    F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,w])), F.G.variables)
+                    F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,w])=>R2*F.G.xs[:,v])
+                    F.G.xs[:,w] .= R2*F.G.xs[:,v]=#
+                end
+            catch e
+                continue
+            end
+        end
+        push!(symmetry_list, helper)
+    end
+    F.G.equations = filter(eq->eq!=0, F.G.equations)
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in F.G.equations]...)'
+end
+
+function newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-13, time_penalty=2)
     return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
-function newton_correct(eqns::Vector{Expression}, vars::Vector{Variable}, jac, point::Vector{Float64}; tol = 1e-14, time_penalty=15)
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac, point::Vector{Float64}; tol = 1e-13, time_penalty=0.25)
     q = Base.copy(point)
-    global damping = 0.15
     start_time=Base.time()
-    while(norm(evaluate(eqns, vars=>q)) > tol)
-        J = evaluate.(jac, vars=>q)
+    global damping = 1
+    while(norm(evaluate(equations, variables=>q)) > tol)
+        #println("trad: $damping\t $(norm(evaluate(equations, variables=>q)))")
+        J = evaluate.(jac, variables=>q)
         stress_dimension = size(nullspace(J'; atol=1e-8))[2]
         if stress_dimension > 0
-            rand_mat = randn(Float64, length(eqns) - stress_dimension, length(eqns))
-            equations = rand_mat*eqns
+            rand_mat = randn(Float64, length(equations) - stress_dimension, length(equations))
+            new_equations = rand_mat*equations
             J = rand_mat*J
         else
-            equations = eqns
+            new_equations = equations
         end
 
-        qnew = q - damping* (J \ evaluate(equations, vars=>q))
-        if norm(evaluate(eqns, vars=>qnew)) < norm(evaluate(eqns, vars=>q))
-            global damping = damping*1.2
+        #Armijo Line Search
+        r_val = evaluate(new_equations, variables=>q)
+        v = -(J \ r_val)
+        global damping = 1
+        qnew = q + damping*v
+        while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
+            global damping = damping*0.6
+            qnew = q + damping*v
+            if damping < 1e-11 || Base.time()-start_time > length(point)/time_penalty
+                throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+            end
+        end
+        #=
+        if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
+            global damping = damping*1.15
         else
             global damping = damping/2
-        end
-        if damping < 1e-14 || Base.time()-start_time > length(point)/time_penalty
-            throw("Newton's method did not converge in time.")
-        end
+        end=#
         q = qnew
-        if damping > 1
-            global damping = 1
-        end
+        #=
+        if damping > 0.75
+            global damping = 0.75
+        end=#
     end
     return q
 end
 
-function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=4)
+
+function symmetric_newton_correct(G::ConstraintSystem, point::Vector{Float64}; tol = 1e-13, time_penalty=2)
+    return symmetric_newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
+end
+
+function symmetric_newton_correct(equations, variables, jacobian, p; tol = 1e-13, time_penalty=2)
+    global _q = Base.copy(p)
+    global qnew = _q
+    global damping = 0.15
+    J = Matrix{Float64}(evaluate.(jacobian, variables=>_q))
+    new_equations, J_new = Base.copy(equations), Base.copy(J)
+    index = 0
+    # Randomize the linear system of equations
+    while length(equations)>0 && norm(evaluate.(equations, variables=>_q), Inf) > tol
+        #println("sym: $damping\t $(norm(evaluate(eqns, vars=>q)))")
+        if index%6 == 0
+            stress_dimension = size(nullspace(J'; atol=1e-8))[2]
+            if stress_dimension > 0
+                rand_mat = randn(Float64, length(equations) - stress_dimension, length(equations))
+                new_equations = rand_mat*equations
+                J_new = rand_mat*J
+            else
+                new_equations = equations
+                J_new = J
+            end
+        end
+        #println("$damping\t $(norm(evaluate(equations, variables=>_q)))")
+        #qnew = _q - damping * (J_new \ evaluate(new_equations, variables=>_q))
+        r_val = evaluate(new_equations, variables=>_q)
+        v = -(J_new \ r_val)
+        global damping = 1
+        qnew = _q + damping*v
+        while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>_q)) - 0.25 * damping * v'*v
+            global damping = damping*0.6
+            qnew = _q + damping*v
+            if damping < 1e-10# || Base.time()-start_time > length(point)/time_penalty
+                throw("Newton's method did not converge in time.")
+            end
+        end
+
+        #=
+        if norm(evaluate(equations, variables=>qnew), Inf) < norm(evaluate(equations, variables=>_q), Inf)
+            global damping = damping*1.15
+        else
+            global damping = damping/2
+        end
+        if damping < 1e-14 ||  Base.time()-start_time > length(point)/time_penalty
+            throw("Newton's method did not converge in time.")
+        end
+        if damping > 0.75
+            global damping = 0.75
+        end
+        =#
+        _q = qnew
+        index=index+1
+    end
+    return _q
+end
+
+
+function is_rigid(F; tol=1e-5, newton_tol=1e-13, tested_random_flexes=4, symmetric_newton=false)
     if is_inf_rigid(F; tol=tol)
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, [], 10; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=true)
+        D = DeformationPath(F, [], 5; step_size=sqrt(tol), newton_tol=newton_tol, random_flex=true, symmetric_newton=symmetric_newton)
         if any(sample->norm(sample-D.motion_samples[1], Inf)>tol, D.motion_samples)
             return false
         end
@@ -314,7 +550,7 @@ function is_inf_rigid(F; tol=1e-8)
     elseif typeof(F)==VolumeHypergraph
         K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     elseif typeof(F)==SphericalDiskPacking
         minkowski_scalar_product(e1,e2) = e1'*e2-1
         inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
@@ -342,7 +578,7 @@ function compute_nonblocked_flex(F; tol=1e-6, newton_tol=1e-13, )
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     else
         throw("Type of F is not yet supported. It is $(typeof(F)).")
     end
@@ -357,11 +593,11 @@ function compute_nonblocked_flex(F; tol=1e-6, newton_tol=1e-13, )
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
     J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-    for index in 1:size(flexes)[2]*size(stresses)[2]*4
+    for index in 1:size(flexes)[2]*size(stresses)[2]*2
         rand_flex_parameter = randn(Float64, size(flexes)[2])
         rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
         try
-            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = newton_tol, time_penalty=5)
+            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = newton_tol, time_penalty=10)
             return q
         catch e
             continue
@@ -503,7 +739,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     
     if isapprox(norm(fixed_direction),0;atol=1e-6)
         @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0,0]"
-        fixed_direction = [1.,0]
+        fixed_direction = [1.,0,0]
     end
     fixed_direction = fixed_direction ./ norm(fixed_direction)
 
@@ -515,7 +751,11 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
         edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
         rotation_axis = cross(fixed_direction, edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-6)
-            rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            if fixed_direction'*edge_vector<0
+                rotation_matrix = [-1 0 0; 0 -1 0; 0 0 1;]
+            else
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            end
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
             angle = acos(fixed_direction'* edge_vector)
@@ -745,11 +985,14 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     end
 end
 
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_size::Union{Float64,Int}=42, line_width::Union{Float64,Int}=6, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; renderEntirePolytope::Bool=true, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Float64,Int}=0.1, vertex_size::Union{Float64,Int}=45, line_width::Union{Float64,Int}=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:black, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
+    fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets))) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
+
+    isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
+
     for i in 1:length(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in 1:size(matrix_coords[i])[2]
@@ -758,7 +1001,11 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
         rotation_axis = cross([1,0,0], edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-4)
-            rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            if [1,0,0]'*edge_vector<0
+                rotation_matrix = [-1 0 0; 0 -1 0; 0 0 1;]
+            else
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+            end
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
             angle = acos([1,0,0]' * edge_vector)
@@ -796,6 +1043,13 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
     end
 
+    centroid = sum([matrix_coords[1][:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets))
+    for i in 1:length(matrix_coords)
+        for j in 1:(size(F.G.realization)[2]-length(F.facets))
+            matrix_coords[i][:,j] = matrix_coords[i][:,j] - centroid
+        end
+    end
+
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
     zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
@@ -808,17 +1062,34 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     time=Observable(1)
 
     allVertices=@lift begin
-        pointys = matrix_coords[$time][:,1:length(F.G.vertices)]
+        pointys = matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))]
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
 
-    foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(F.edges[i][1])], ($allVertices)[Int64(F.edges[i][2])]]); linewidth=line_width, color=edge_color), 1:length(F.edges))
-    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if typeof(F) <: Polytope
-        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in 1:length(F.G.vertices)])))); color=(facet_color,alpha), shading=NoShading, transparency=true)
+    allVertices_asLists = @lift begin
+        pointys = matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))]
+        [pointys[:,j] for j in 1:size(pointys)[2]]
+    end
+
+    if isnothing(special_edge)
+        foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(F.edges[i][1])], ($allVertices)[Int64(F.edges[i][2])]]); linewidth=line_width, color=edge_color), 1:length(F.edges))
     else
-        foreach(face->mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(matrix_coords[$time])[:,j] for j in face])))); color=(facet_color,alpha), shading=NoShading, transparency=true), F.facets)
+        edges_here = filter(edge->!([special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]]), F.edges)
+        foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(edges_here[i][1])], ($allVertices)[Int64(edges_here[i][2])]]); linewidth=line_width, color=edge_color), 1:length(edges_here))
+        linesegments!(ax, @lift([($allVertices)[Int64(special_edge[1])], ($allVertices)[Int64(special_edge[2])]]); linewidth=line_width+2.5, color=special_edge_color)
+    end
+    vertex_labels && foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(size(F.G.realization)[2]-length(F.facets)))
+    vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
+    if typeof(F) <: Polytope && renderEntirePolytope
+        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep(($allVertices_asLists)), CDDLib.Library(:exact)))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+    elseif typeof(F) <: BodyHinge || !renderEntirePolytope
+        for face in F.facets
+            try
+                mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([($allVertices_asLists)[j] for j in face]), CDDLib.Library(:exact)))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+            catch e
+                continue
+            end
+        end
     end
     timestamps = range(1, length(D.motion_samples), step=step)
     if !(lowercase(filetype) in ["gif","mp4"])
@@ -908,6 +1179,7 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
         pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
+
     for index in 1:length(F.G.vertices)
         mesh!(ax, @lift(Sphere(($allVertices)[index], F.radii[index]));  transparency=true, color = (sphere_color,alpha))
     end
@@ -996,8 +1268,8 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
         for i in 1:length(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-6)
-                    angle = acos([0, 0, 1]'* ($spherePoints)[i])
-                    rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
+                angle = acos([0, 0, 1]'* ($spherePoints)[i])
+                rotation_matrix = [1 0 0; 0 1 0; 0 0 cos(angle);]
             else
                 rotation_axis = rotation_axis ./ norm(rotation_axis)
                 angle = acos([0, 0, 1]'* Vector(($spherePoints)[i]))

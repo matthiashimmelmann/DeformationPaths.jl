@@ -8,7 +8,7 @@ import Combinatorics: powerset
 import MarchingCubes: MC, march, makemesh
 import Polyhedra
 
-export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge, compute_nontrivial_inf_flexes
+export GeometricConstraintSystem, Framework, AngularFramework, FrameworkOnSurface, VolumeHypergraph, Polytope, to_Matrix, to_Array, SpherePacking, SphericalDiskPacking, equations!, realization!, plot, add_equations!, BodyHinge, compute_nontrivial_inf_flexes, fix_antipodals!
 
 mutable struct ConstraintSystem
     vertices::Vector{Int}
@@ -24,11 +24,34 @@ mutable struct ConstraintSystem
     function ConstraintSystem(vertices,variables, equations, realization, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))
         jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
         dimension = size(realization)[1]
-        size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension) || throw("The realization does not have the correct format.")
+        size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
         size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
         new(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_vertices)
     end
 end
+
+    function Base.show(io::IO, _G::ConstraintSystem)
+        print(io,"Constraint System:\n")
+        print(io,"Vertices: $(_G.vertices)")
+        print(io,"Equations:\t$(_G.equations[1:maximum([3,length(_G.equations)])])...")
+        print(io, "Realization:\t")
+        for i in maximum([4,size(_G.realization)[2]])
+            if size(_G.realization)[1]==1
+                print(io, "$(_G.realization[1,i])\n")
+            elseif size(_G.realization)[1]==2
+                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i])\n")
+            elseif size(_G.realization)[1]==3
+                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i]) $(_G.realization[3,i])\n")
+            else
+                print(io, "$(_G.realization[1,i]) $(_G.realization[2,i]) $(_G.realization[3,i]) ...\n")
+            end
+        end
+        end
+        if !(isempty(_G.pinned_vertices))
+            print(io, "Pinned Vertices: $(_G.pinned_vertices)")
+        end
+    end
+
 
 function equations!(G::ConstraintSystem, equations::Vector{Expression})
     Set(System(equations).variables)==Set(G.variables) && length(System(equations).variables)==length(G.variables) || throw("The variables in `equations` do not match the original variables.")
@@ -44,9 +67,8 @@ end
 
 
 function realization!(G::ConstraintSystem, realization::Matrix{<:Number})
-    size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw("The realization does not have the correct format.")
+    #size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension) || throw("The realization does not have the correct format.")
     point = to_Array(G, realization)
-    re_matrix = to_Matrix(G, point)
     norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw("The point does not satisfy the constraint system's equations!")
     G.realization = realization
     return nothing
@@ -99,7 +121,6 @@ mutable struct Framework
 
     function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
-        dimension = size(realization)[1]
         Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
     end
 end
@@ -279,12 +300,13 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number})
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [[f for f in facet] for facet in facets]
+        all(v->v in vertices, pinned_vertices) || throw("pinned_vertices does not have the correct format.")
         if size(realization)[1]==dimension && size(realization)[2]==length(vertices)
             normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
             for j in 1:length(facets)
@@ -317,21 +339,46 @@ mutable struct Polytope
         length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
-        facet_equations = vcat([[n[:,i]'*x[:,facets[i][j]] - 1 for j in 1:length(facets[i])] for i in 1:length(facets)]...)
-        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
+        xs = Expression.(hcat(x,n))
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+        facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in 1:length(facets[i])] for i in 1:length(facets)]...)
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
-        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2]))]...)), 0; atol=1e-10), equations) || throw(error("The given realization does not satisfy the constraints."))
-        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, hcat(x,n))
+        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-10), equations) || throw(error("The given realization does not satisfy the constraints."))
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
     end
 
-    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number})
+    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Number}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        Polytope(vertices, facets, realization)
+        Polytope(vertices, facets, realization; pinned_vertices=pinned_vertices)
     end
 end
+
+function fix_antipodals!(F::Polytope)
+    vertex_list = [i for i in F.G.vertices]
+    while !isempty(vertex_list)
+        v = pop!(vertex_list)
+        for w in vertex_list
+            if isapprox(norm(F.G.realization[:,v]+F.G.realization[:,w]), 0)
+                index = findfirst(t->w==t, vertex_list)
+                deleteat!(vertex_list, index)
+                F.G.vertices = filter(t->t!=v, F.G.vertices)
+                F.G.variables = filter(t->!(t in Variable.(F.G.xs[:,v])), F.G.variables)
+                F.G.equations = evaluate(F.G.equations, Variable.(F.G.xs[:,v])=>-F.G.xs[:,w])
+                F.G.xs[:,v] .= -F.G.xs[:,w]
+                break
+            end
+        end
+    end
+    F.G.equations = filter(eq->eq!=0, F.G.equations)
+    F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in F.G.equations]...)'
+end
+
 
 mutable struct BodyHinge
     G::ConstraintSystem
@@ -388,29 +435,20 @@ function to_Array(G::ConstraintSystem, p::Matrix{<:Number})
     return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(G.realization)[1], 1:size(G.realization)[2])) if !(j in G.pinned_vertices)]...)
 end
 
-function to_Array(F::AllTypes, p::Matrix{<:Number})
+function to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge}, p::Matrix{<:Number})
     return to_Array(F.G, p)
 end
 
+function to_Array(F::Polytope, p::Matrix{<:Number})
+    return vcat([p[i,j] for (i,j) in collect(Iterators.product(1:size(F.G.realization)[1], vcat(F.G.vertices, size(F.G.realization)[2]-length(F.facets)+1:size(F.G.realization)[2]))) if !(j in F.G.pinned_vertices)]...)
+end
 
 
 function to_Matrix(G::ConstraintSystem, q::Vector{<:Number})
-    counts = 1
     point = Matrix{Float64}(Base.copy(G.realization))
-
-    for (i, v) in enumerate(G.vertices)
-        if v in G.pinned_vertices
-            point[:,i] = G.realization[:,i]
-            continue
-        end
-        for j in 1:size(point)[1]
-            point[j,i] = q[counts]
-            counts += 1
-        end
-    end
+    point = evaluate.(G.xs, G.variables=>q)
     return point
 end
-
 
 function to_Matrix(F::AllTypes, q::Vector{<:Number})
     return to_Matrix(F.G, q)
@@ -460,7 +498,7 @@ function plot_flexes!(ax, F, flex_number, flex_color, flex_scale, linewidth, arr
     flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_number])
     if F.G.dimension==2
         pts = [Point2f(F.G.realization[:,i]) for i in 1:length(F.G.vertices)]
-        dirs = [Vec2f(flex[:,i]) for i in 1:length(F.G:vertices)]
+        dirs = [Vec2f(flex[:,i]) for i in 1:length(F.G.vertices)]
         arrows!(ax, pts, dirs; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, linewidth=linewidth, arrowsize=arrowsize)
     else
         pts = [Point3f(F.G.realization[:,i]) for i in 1:length(F.G.vertices)]
@@ -734,9 +772,9 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
 
-    matrix_coords = Base.copy(F.G.realization)[:,1:length(F.G.vertices)]
-    centroid = sum([matrix_coords[:,i] for i in 1:length(F.G.vertices)]) ./ length(F.G.vertices)
-    for i in 1:length(F.G.vertices)
+    matrix_coords = Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))]
+    centroid = sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets))
+    for i in 1:(size(F.G.realization)[2]-length(F.facets))
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
     end
 
@@ -749,10 +787,10 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:length(F.G.vertices)]
+    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2]-length(F.facets))]
 
     if typeof(F) <: Polytope
-        P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in 1:length(F.G.vertices)]))
+        P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]))
         m = Polyhedra.Mesh(P)
         mesh!(ax, m; color=(facet_color,alpha), shading=NoShading, transparency=true)
     else
@@ -768,8 +806,8 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::String; padding=0
     end
 
     foreach(i->linesegments!(ax, [(allVertices)[Int64(F.edges[i][1])], (allVertices)[Int64(F.edges[i][2])]]; linewidth=line_width, color=edge_color), 1:length(F.edges))
-    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
-    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
+    vertex_labels && foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:(size(F.G.realization)[2]-length(F.facets)))
+    vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
     save("../data/$(filename).png", fig)
     return fig
 end
