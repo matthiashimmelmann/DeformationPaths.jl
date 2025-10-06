@@ -154,7 +154,6 @@ mutable struct DeformationPath
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
                 i = i - 1
-                @warn exception=(e, catch_backtrace())
                 if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
@@ -216,7 +215,6 @@ mutable struct DeformationPath
             try
                 flex_mult = compute_nonblocked_flex(F)
             catch e
-                @warn e
                 flex_mult = []
             end
             flex_mult = isempty(flex_mult) ? [] : flex_mult ./ norm(flex_mult)
@@ -238,16 +236,17 @@ mutable struct DeformationPath
         start_c_value = sqrt( sum( (_G.realization[:,edge_for_contraction[1]]-_G.realization[:,edge_for_contraction[2]]) .^2) )
         
         motion_samples = [to_Array(_G, _G.realization)]
+        index = 1
         while true
-            println("Trial")
+            println("Trial $index")
+            index = index+1
             try
-                cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in 1:length(motion_samples[end])])
+                cur_point = motion_samples[end] + 0.015*(rand(Float64,length(motion_samples[end]))-[0.5 for i in 1:length(motion_samples[end])])
                 local_equations = evaluate(_G.equations, c => start_c_value - step_size)
                 cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=1)
                 push!(motion_samples, cur_point)
                 break
             catch e
-                println(e)
                 continue
             end
         end
