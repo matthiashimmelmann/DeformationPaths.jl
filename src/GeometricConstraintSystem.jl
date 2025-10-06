@@ -417,6 +417,9 @@ end
 
 AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
 
+"""
+Unifying display method for all types of geometric constraint systems.
+"""
 function Base.show(io::IO, F::AllTypes)
     print(io,"$(string(nameof(typeof(F)))):\n")
     print(io,"\t$(F.G)")
@@ -430,16 +433,27 @@ function Base.show(io::IO, F::AllTypes)
         end
     end
     if typeof(F) in [Polytope, BodyHinge]
-        print(io,"\tFacets:\n\t\t$(F.facets[1])")
+        print(io,"\tFacets:\t\t$(F.facets[1])")
         for i in 2:min(3,length(F.facets))
             print(io,", $(F.facets[i])")
         end
         print(io,", ...")
-        print(io,"\n\tEdges:\n\t\t$(F.edges[1])")
+        print(io,"\n\tEdges:\t\t$(F.edges[1])")
         for i in 2:min(5,length(F.edges))
             print(io,", $(F.edges[i])")
         end
         print(io,", ...")
+    end
+    if typeof(F) in [SpherePacking, SphericalDiskPacking]
+        print(io,"\tContacts:\t\t$(F.contacts)\n")
+        if F isa SpherePacking
+            print(io,"\tRadii:\t\t$(F.radii)")
+        else
+            print(io,"\tInversive Distances:\t$(F.inversive_distances)")
+        end
+    end
+    if F isa VolumeHypergraph
+        print(io,"\tVolumes:\t\t$(F.volumes)")
     end
 end
 
