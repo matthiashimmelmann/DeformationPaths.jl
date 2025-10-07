@@ -13,3 +13,6 @@
 *.rar
 *.tar
 *.zip
+
+**/.build
+**/build
