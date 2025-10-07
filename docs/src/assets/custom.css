@@ -1,0 +1,18 @@
+body {
+    text-align: justify;
+    text-justify: inter-word;
+}
+
+img {
+    max-height: none !important;
+    max-width: none !important;
+    width: 70% !important;   /* change to the size you want */
+    height: auto !important;   /* keep proportions */
+    object-fit: contain; 
+}
+
+@media (max-width: 800px) {
+    img {
+        height: 70%;
+    }
+}
