@@ -1,5 +1,5 @@
 using Pkg
-Pkg.develop(PackageSpec(path=pwd()));
+#Pkg.develop(PackageSpec(path=pwd()));
 Pkg.instantiate()
 using Documenter
 include("../src/DeformationPaths.jl")
@@ -18,10 +18,9 @@ makedocs(
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = true, assets = ["assets/custom.css"]),
     authors = "Matthias Himmelmann",
-    modules = [DeformationPaths.DeformationPaths]
+    modules = [DeformationPaths.DeformationPaths],
 )
 
-cp("src/assets", joinpath(@__DIR__, "build/assets"); force=true, recursive=true)
 
 deploydocs(
     repo = "github.com/matthiashimmelmann/DeformationPaths.jl",
