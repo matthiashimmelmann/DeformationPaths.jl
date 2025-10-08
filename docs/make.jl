@@ -24,5 +24,6 @@ makedocs(
 deploydocs(
     repo = "github.com/matthiashimmelmann/DeformationPaths.jl",
     push_preview = false,
-    devbranch="master"
+    devbranch="master",
+    versions = nothing
 )
