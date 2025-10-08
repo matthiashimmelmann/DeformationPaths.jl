@@ -45,4 +45,4 @@ jobs:
           run: >
               cd docs;
               DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-              julia --color=yes --project=./docs ./docs/make.jl
+              julia --color=yes --project=./docs make.jl
