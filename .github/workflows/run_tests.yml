@@ -25,13 +25,15 @@ jobs:
             julia-arch: x86
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
+      - uses: actions/checkout@v5
+      - uses: julia-actions/setup-julia@latest
         with:
-          version: ${{ matrix.julia-version }}
-          arch: ${{ matrix.julia-arch }}
-      - uses: julia-actions/cache@v2
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        # with:
-        #   annotate: true
+          version: "1.10"
+      - name: Install dependencies
+        run: >
+            DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
+            julia --project=. -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+      - name: Run Tests
+        run: >
+            DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
+            julia --project=. -e 'using Pkg; Pkg.test()'
