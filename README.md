@@ -1,5 +1,7 @@
 # DeformationPaths.jl
 
+[![][docs-stable-img]][docs-stable-url]
+
 This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. To accomplish this, we iteratively apply a combination of Euler predictor steps and Gauss-Newton corrector steps to take a local stpe on the constraint set. This approach is known as homotopy continuation. 
 
 ## Installation
