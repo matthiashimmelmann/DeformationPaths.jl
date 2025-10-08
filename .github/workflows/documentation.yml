@@ -11,32 +11,30 @@ jobs:
   docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: julia-actions/setup-julia@latest
-        with:
-          version: "1.10"
-      - name: Cache Julia packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-artifacts-${{ hashFiles('**/Manifest.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-artifacts-
-      - name: Install dependencies
-        run: |
-          julia --project=./docs -e '
-            using Pkg;
-            ENV["JULIA_PKG_SERVER"] = "";  # disable mirrors that may cause issues
-            Pkg.Registry.update();
-            Pkg.instantiate();
-            Pkg.precompile()'
-      - name: Build documentation
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-        run: |
-          julia --project=./docs -e '
-            using Pkg
-            Pkg.instantiate()
-            include("./docs/make.jl")
-          '
+        - name: Install python
+          uses: actions/setup-python@v6
+          with:
+            python-version: '3.8'
+        - name: Install binary dependencies
+          run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+        - name: Install Julia
+          uses: julia-actions/setup-julia@latest
+          with:
+            version: '1.10'
+        - uses: julia-actions/cache@v4
+        - name: Install dependencies
+          run: |
+            julia --project=./docs -e '
+              using Pkg;
+              ENV["JULIA_PKG_SERVER"] = "";  # disable mirrors that may cause issues
+              Pkg.Registry.update();
+              Pkg.instantiate();
+              Pkg.precompile()'
+
+        - name: Build and deploy docs
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: >
+              cd docs;
+              DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
+              julia --color=yes make.jl

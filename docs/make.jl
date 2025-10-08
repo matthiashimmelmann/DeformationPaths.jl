@@ -1,7 +1,10 @@
 using Pkg
+cd(@__DIR__)
+Pkg.activate(".")
 Pkg.instantiate()
-Pkg.add("DeformationPaths")
-using Documenter, DeformationPaths
+Pkg.precompile()
+using Documenter
+include("../src/DeformationPaths.jl")
 
 makedocs(
     sitename = "DeformationPaths.jl",
@@ -17,10 +20,12 @@ makedocs(
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = true, assets = ["assets/custom.css"]),
     authors = "Matthias Himmelmann",
-    modules = [DeformationPaths.DeformationPaths]
+    modules = [DeformationPaths.DeformationPaths],
+    remotes=nothing
 )
 
 deploydocs(
     repo = "github.com/matthiashimmelmann/DeformationPaths.jl",
     push_preview = false,
+    devbranch="master"
 )
