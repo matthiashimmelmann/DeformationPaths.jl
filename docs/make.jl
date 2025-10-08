@@ -1,8 +1,6 @@
 using Pkg
 Pkg.instantiate()
-using Documenter
-include("../src/DeformationPaths.jl")
-
+using Documenter, DeformationPaths
 
 makedocs(
     sitename = "DeformationPaths.jl",
