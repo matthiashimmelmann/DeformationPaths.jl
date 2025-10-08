@@ -17,6 +17,7 @@ makedocs(
         ]    
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = true, assets = ["assets/custom.css"]),
+    assets = "assets",
     authors = "Matthias Himmelmann",
     modules = [DeformationPaths.DeformationPaths]
 )
