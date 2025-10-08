@@ -14,9 +14,23 @@ jobs:
       - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@latest
         with:
-          version: "^1.10"
+          version: "1.10"
+      - name: Cache Julia packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-artifacts-${{ hashFiles('**/Manifest.toml') }}
+    restore-keys: |
+      ${{ runner.os }}-artifacts-
+
       - name: Install dependencies
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
+        run: |
+          julia --project=. -e '
+            using Pkg;
+            ENV["JULIA_PKG_SERVER"] = "";  # disable mirrors that may cause issues
+            Pkg.Registry.update();
+            Pkg.instantiate();
+            Pkg.precompile()'
       - name: Build and deploy
         env:
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
