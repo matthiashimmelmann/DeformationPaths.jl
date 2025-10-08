@@ -22,12 +22,6 @@ jobs:
           key: ${{ runner.os }}-artifacts-${{ hashFiles('**/Manifest.toml') }}
           restore-keys: |
             ${{ runner.os }}-artifacts-
-      - name: Set up virtual display
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-          Xvfb :99 &
-          export DISPLAY=:99
       - name: Install dependencies
         run: |
           julia --project=. -e '
@@ -36,9 +30,13 @@ jobs:
             Pkg.Registry.update();
             Pkg.instantiate();
             Pkg.precompile()'
+      - name: Build documentation
         env:
-          DISPLAY: :99
-      - name: Build and deploy
-        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); include("docs/make.jl");'
+        run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.instantiate()
+            include("docs/make.jl")
+          '

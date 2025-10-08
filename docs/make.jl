@@ -3,6 +3,10 @@ Pkg.instantiate()
 using Documenter
 include("../src/DeformationPaths.jl")
 
+if get(ENV, "CI", "false") == "true"
+    @info "Running on CI — skipping plotting setup"
+end
+
 makedocs(
     sitename = "DeformationPaths.jl",
     pages = [
