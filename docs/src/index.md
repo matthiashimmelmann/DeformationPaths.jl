@@ -4,6 +4,15 @@ A package for approximating continuous motions of geometric constraint systems u
 
 ## Contents
 
+#### Usage Guide
+
+```@contents
+Pages = [
+    "usage.md"
+]
+Depth = 2
+```
+
 #### API Reference
 
 ```@contents
@@ -13,14 +22,6 @@ Pages = [
     "ConstraintSystem.md", 
     "Visualization.md", 
     "Auxiliary.md"
-]
-Depth = 2
-```
-#### Usage Guide
-
-```@contents
-Pages = [
-    "usage.md"
 ]
 Depth = 2
 ```
