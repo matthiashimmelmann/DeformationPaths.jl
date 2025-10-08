@@ -20,9 +20,8 @@ jobs:
         with:
           path: ~/.julia/artifacts
           key: ${{ runner.os }}-artifacts-${{ hashFiles('**/Manifest.toml') }}
-    restore-keys: |
-      ${{ runner.os }}-artifacts-
-
+          restore-keys: |
+            ${{ runner.os }}-artifacts-
       - name: Install dependencies
         run: |
           julia --project=. -e '
