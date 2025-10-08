@@ -24,7 +24,7 @@ jobs:
             ${{ runner.os }}-artifacts-
       - name: Install dependencies
         run: |
-          julia --project=. -e '
+          julia --project=./docs -e '
             using Pkg;
             ENV["JULIA_PKG_SERVER"] = "";  # disable mirrors that may cause issues
             Pkg.Registry.update();
@@ -35,8 +35,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: |
-          julia --project=docs -e '
+          julia --project=./docs -e '
             using Pkg
             Pkg.instantiate()
-            include("docs/make.jl")
+            include("./docs/make.jl")
           '
