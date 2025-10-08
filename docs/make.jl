@@ -1,5 +1,6 @@
 using Pkg
 Pkg.instantiate()
+Pkg.add("DeformationPaths")
 using Documenter, DeformationPaths
 
 makedocs(
