@@ -21,7 +21,15 @@ jobs:
           uses: julia-actions/setup-julia@latest
           with:
             version: '1.10'
-        - uses: julia-actions/cache@v4
+      
+        - name: Cache Julia registries
+          uses: actions/cache@v4
+          with:
+            path: ~/.julia/artifacts
+            key: ${{ runner.os }}-artifacts-${{ hashFiles('**/Manifest.toml') }}
+            restore-keys: |
+              ${{ runner.os }}-artifacts-
+
         - name: Install dependencies
           run: |
             julia --project=./docs -e '
@@ -37,4 +45,4 @@ jobs:
           run: >
               cd docs;
               DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-              julia --color=yes make.jl
+              julia --color=yes --project=./docs ./docs/make.jl
