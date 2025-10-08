@@ -1,8 +1,21 @@
 @testset "dodecahedron_EdgeContraction" begin
     println("dodecahedron_EdgeContraction")
     F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'))
-    D1 = DeformationPath_EdgeContraction(F, [9, 10], 0.6)
-    animate(D1,F,"dodecahedron_EdgeContraction_motion"; filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, animate_rotation=true, rotation_frames=450)
+    D1 = DeformationPath_EdgeContraction(F, [9, 10], 0.5)
+    animate(D1,F,"dodecahedron_EdgeContraction_motion"; filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, animate_rotation=true, rotation_frames=450, padding=0.01)
+end
+
+
+@testset "cuboctahedron" begin
+    println("cuboctahedron")
+    F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
+    #F = Polytope([[4,5,6], [3,6,7], [2,7,6,5], [4,6,3,8], [2,9,1,10], [2,9,5], [1,9,11], [9,11,4,5], [4,11,8], [1,11,8,12], [8,12,3], [1,10,12], [2,10,6], [6,10,12,3]], Matrix([1 1 1; 1 0 0; 0 1 0; 0 0 1; 1/2 0 1/2; 0 1/2 1/2; 1/2 1/2 0; 0 1/2 1/2; 1 1/2 1/2; 1 1/2 1/2; 1/2 1/2 1; 1/2 1 1/2; ]'))
+    plot(F,"cuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi, alpha=0.65)
+    @test !is_inf_rigid(F)
+    @test !is_second_order_rigid(F)
+    @test !is_rigid(F) # "generic" Minkowski sum of two simplices
+    D = DeformationPath(F, [], 250; step_size=0.005, tol=1e-6)
+    animate(D,F,"cuboctahedron_motion"; filetype="mp4", renderEntirePolytope=true, animate_rotation=true, rotation_frames=450, padding=0.01)
 end
 
 
@@ -39,24 +52,10 @@ end
         end
         println("Trial $(i) produced the point $(q)")
     end=#
-    #D = DeformationPath(F, [], 50; step_size=3e-2, newton_tol=1e-6, random_flex=true, symmetric_newton=false)
+    #D = DeformationPath(F, [], 50; step_size=3e-2, tol=1e-6, random_flex=true, symmetric_newton=false)
     #display(norm(D.motion_samples[1]-D.motion_samples[end]))
     #plot(F, "truncatedDodecahedron_end"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65, plot_flexes=true)
     #animate(D,F,"truncatedDodecahedron_motion"; filetype="mp4")
-end
-
-
-
-@testset "cuboctahedron" begin
-    println("cuboctahedron")
-    F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
-    #F = Polytope([[4,5,6], [3,6,7], [2,7,6,5], [4,6,3,8], [2,9,1,10], [2,9,5], [1,9,11], [9,11,4,5], [4,11,8], [1,11,8,12], [8,12,3], [1,10,12], [2,10,6], [6,10,12,3]], Matrix([1 1 1; 1 0 0; 0 1 0; 0 0 1; 1/2 0 1/2; 0 1/2 1/2; 1/2 1/2 0; 0 1/2 1/2; 1 1/2 1/2; 1 1/2 1/2; 1/2 1/2 1; 1/2 1 1/2; ]'))
-    plot(F,"cuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi, alpha=0.65)
-    @test !is_inf_rigid(F)
-    @test !is_second_order_rigid(F)
-    @test !is_rigid(F) # "generic" Minkowski sum of two simplices
-    D = DeformationPath(F, [], 250; step_size=0.005, newton_tol=1e-6)
-    animate(D,F,"cuboctahedron_motion"; filetype="mp4", renderEntirePolytope=true, animate_rotation=true, rotation_frames=450)
 end
 
 
@@ -80,7 +79,7 @@ end
     @test !is_inf_rigid(F)
     @test !is_second_order_rigid(F)
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
-    D = DeformationPath(F, [], 500; step_size=0.01, newton_tol=1e-6)
+    D = DeformationPath(F, [], 500; step_size=0.01, tol=1e-6)
     animate(D,F,"cuboctahedron_motion"; filetype="mp4", renderEntirePolytope=true, animate_rotation=true, rotation_frames=450)
 end
 
@@ -90,7 +89,7 @@ end
     plot(F,"SmallRhombiCuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0.075*pi, elevation=0.05*pi, alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # "generic" Minkowski sum of cube and octahedron
-    D = DeformationPath(F, [], 500; step_size=0.005, newton_tol=1e-6)
+    D = DeformationPath(F, [], 500; step_size=0.005, tol=1e-6)
     animate(D,F,"smallRhombiCuboctahedron_motion"; filetype="mp4", renderEntirePolytope=true, animate_rotation=true, rotation_frames=450)
 end
 
@@ -100,7 +99,7 @@ end
     plot(F,"truncatedOctahedron"; vertex_labels=false, vertex_size=16, padding=0.01, vertex_color=:steelblue, elevation=pi/10, azimuth=0.)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # zonotope
-    D = DeformationPath(F, [], 150; step_size=0.0175, newton_tol=1e-6)
+    D = DeformationPath(F, [], 150; step_size=0.0175, tol=1e-6)
     animate(D,F,"truncatedOctahedron_motion"; filetype="gif")
 end
 
@@ -114,7 +113,7 @@ end
     plot(F,"greatRhombiCuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, elevation=0.075*pi, alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # Zontope
-    D = DeformationPath(F, [], 150; step_size=0.0125, newton_tol=1e-4)
+    D = DeformationPath(F, [], 150; step_size=0.0125, tol=1e-4)
     animate(D,F,"greatRhombiCuboctahedron_motion"; filetype="gif")
 end
 
@@ -126,7 +125,7 @@ end
     plot(F, "SmallRhombiIcosidodecahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, elevation=0.05*pi, azimuth=0., alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
-    D = DeformationPath(F, [], 150; step_size=0.0065, newton_tol=1e-4)
+    D = DeformationPath(F, [], 150; step_size=0.0065, tol=1e-4)
     animate(D,F,"smallRhombiIcosidodecahedron_motion"; filetype="gif")
 end
 
@@ -137,7 +136,7 @@ end
     plot(F,  "RhombicDodecahedron"; vertex_labels=false,  vertex_size=16,  vertex_color=:steelblue, padding=0.01, alpha=0.65, azimuth=0.025*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F)
-    D = DeformationPath(F, [], 150; step_size=0.01, newton_tol=1e-4)
+    D = DeformationPath(F, [], 150; step_size=0.01, tol=1e-4)
     animate(D,F,"RhombicDodecahedron_motion"; filetype="gif")
 end
 
@@ -148,7 +147,7 @@ end
     plot(F, "RhombicTriacontahedron"; vertex_labels=false, vertex_size=16,  vertex_color=:steelblue, padding=0.01, alpha=0.7, azimuth=0.075*pi, elevation=0.15*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F)
-    D = DeformationPath(F, [], 150; step_size=0.01, newton_tol=1e-4)
+    D = DeformationPath(F, [], 150; step_size=0.01, tol=1e-4)
     animate(D,F,"RhombicTriacontahedron_motion"; filetype="gif")
 end
 
@@ -160,7 +159,7 @@ end
     plot(F, "greatRhombiIcosidodecahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, alpha=0.65, azimuth=0.15*pi, elevation=0.075*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # Zonotope
-    D = DeformationPath(F, [], 150; step_size=0.0135, newton_tol=1e-4)
+    D = DeformationPath(F, [], 150; step_size=0.0135, tol=1e-4)
     animate(D,F,"greatRhombiIcosidodecahedron_motion"; filetype="gif")
 end
 
@@ -177,7 +176,7 @@ end
     plot(F, "truncatedDodecahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65, plot_flexes=true)
     @test !is_inf_rigid(F)
     @test !is_second_order_rigid(F)
-    #D = DeformationPath(F, [], 50; step_size=3e-2, newton_tol=1e-6, random_flex=true, symmetric_newton=false)
+    #D = DeformationPath(F, [], 50; step_size=3e-2, tol=1e-6, random_flex=true, symmetric_newton=false)
     #display(norm(D.motion_samples[1]-D.motion_samples[end]))
     #plot(F, "truncatedDodecahedron_end"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65, plot_flexes=true)
     #animate(D,F,"truncatedDodecahedron_motion"; filetype="mp4")
@@ -333,7 +332,7 @@ end
     plot(F,"cuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi, alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
-    #D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
+    #D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-2)
     #animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 end
 
@@ -401,7 +400,7 @@ end
     plot(F,"cuboctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, elevation=0.1*pi, azimuth=0.05*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
-    #D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-2)
+    #D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-2)
     #animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 end
 
@@ -421,7 +420,7 @@ end
     plot(F,"truncatedOctahedron"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.075*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # zonotope
-    #D = DeformationPath(F, [], 200; step_size=0.01, newton_tol=1e-4)
+    #D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-4)
     #animate(D,F,"truncatedOctahedron_motion"; filetype="mp4")
 end
 

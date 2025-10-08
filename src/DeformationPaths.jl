@@ -2,13 +2,14 @@ module DeformationPaths
 
 import HomotopyContinuation: evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
-import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh
+import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 import Polyhedra
 import CDDLib
 import Base: show
+import ProgressMeter: @showprogress
 
 include("GeometricConstraintSystem.jl")
 include("InfinitessimalFlexes.jl")
@@ -59,7 +60,7 @@ Class for constructing approximate deformation paths.
 # Arguments
 - `G::ConstraintSystem`: The underlying geometric constraint system.
 - `motion_samples::Vector{<:Vector{<:Real}}`: List of previously computed realizations in array format.
-- `flex_mult::Vector{Any}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
+- `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
 - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
 - `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"` and `"sphericaldiskpacking"`.
 - `step_size::Real`: Step size of the deformation path. 
@@ -188,7 +189,7 @@ mutable struct DeformationPath
 
     # Arguments
     - `G::ConstraintSystem`: The underlying geometric constraint system.
-    - `flex_mult::Vector{Any}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
+    - `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
     - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
     - `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"` and `"sphericaldiskpacking"`.
     - `step_size::Real`: Step size of the deformation path. 
@@ -223,7 +224,7 @@ mutable struct DeformationPath
 
     ```
     """
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector{Any}, num_steps::Int, type::DataType; step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing)::DeformationPath
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::DataType; step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing)::DeformationPath
         num_steps>=0 && step_size>=0 && tol>0 || throw(error("The `num_steps`, the `step_size` and `tol` needs to be a nonnegative, but are  $((num_steps, step_size, tol))."))
         if isnothing(start_point)
             start_point = to_Array(G, G.realization)
@@ -267,7 +268,7 @@ mutable struct DeformationPath
         
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
         failure_to_converge = 0
-        for i in 1:num_steps
+        @showprogress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
                 if symmetric_newton
@@ -326,13 +327,13 @@ mutable struct DeformationPath
 
     # Arguments
     - `F::AllTypesWithoutSpherePacking`: The underlying geometric constraint system.
-    - `flex_mult::Vector{Any}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
+    - `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
     - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
     - `random_flex::Bool` (optional): If `flex_mult` is not provided (e.g. as `[]`), we can instead provide a random linear combination (`true`) or it is uniformly chosen as `[1,...,1]` (`false`). Default value: `false`.
 
     For further arguments, see the base method [`DeformationPath(G::DeformationPaths.ConstraintSystem, motion_samples::Vector{<:Vector{<:Real}})`](@ref).
     """
-    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector{Any}, num_steps::Int; random_flex=false, kwargs...)::DeformationPath
+    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector, num_steps::Int; random_flex=false, kwargs...)::DeformationPath
         if flex_mult==[] && random_flex
             try
                 flex_mult = compute_nonblocked_flex(F)
@@ -351,7 +352,7 @@ mutable struct DeformationPath
 
     # Arguments
     - `F::SpherePacking`: The underlying sticky sphere packing.
-    - `flex_mult::Vector{Any}`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
+    - `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
     - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
     - `motion_samples::Vector` (optional): Already computed motion samples. Default value: `[]`.
     - `_contacts::Vector` (optional): Current contacts between spheres. Default value: `[]`.
@@ -363,7 +364,7 @@ mutable struct DeformationPath
     # Returns
     - `DeformationPath` 
     """
-    function DeformationPath(F::SpherePacking, flex_mult::Vector{Any}, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false)::DeformationPath
+    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false)::DeformationPath
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if prev_flex == nothing
@@ -387,7 +388,7 @@ mutable struct DeformationPath
         end
 
         failure_to_converge = 0
-        for i in 1:num_steps
+        @showprogress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
                 q = newton_correct(F.G, q; tol=tol)

@@ -25,7 +25,7 @@ newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::
 
 symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real})
 
-symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real})
+symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real})
 ```
 
 ## Infinitessimal Flexes

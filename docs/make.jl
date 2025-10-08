@@ -8,15 +8,19 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "API Reference" => [
-            "DeformationPath" => "API/DeformationPath.md", 
-            "ConstraintSystem" => "API/ConstraintSystems.md", 
-            "Visualization" => "API/Visualization.md",
-            "Auxiliary Methods" => "API/Auxiliary.md",
+            "DeformationPath" => "DeformationPath.md", 
+            "ConstraintSystem" => "ConstraintSystems.md", 
+            "Visualization" => "Visualization.md",
+            "Auxiliary Methods" => "Auxiliary.md",
         ],
         "Usage Guide" => "usage.md"
     ],
-    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = false, assets = ["assets/custom.css"]),
+    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = true, assets = ["assets/custom.css"]),
     authors = "Matthias Himmelmann",
-    modules = [DeformationPaths.DeformationPaths],
-    remotes = nothing
+    modules = [DeformationPaths.DeformationPaths]
+)
+
+deploydocs(
+    repo = "github.com/matthiashimmelmann/DeformationPaths.jl",
+    push_preview = false,
 )

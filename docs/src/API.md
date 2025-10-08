@@ -2,12 +2,12 @@
 
 Welcome to the API documentation.
 
-You can find more details in the subpages:
+You can find details in the subpages:
 
-[DeformationPath Constructors](./API/DeformationPath.md)
+[DeformationPath Constructors](./DeformationPath.md)
 
-[ConstraintSystem Constructors](./API/ConstraintSystems.md)
+[ConstraintSystem Constructors](./ConstraintSystems.md)
 
-[Visualization Methods](./API/Visualization.md)
+[Visualization Methods](./Visualization.md)
 
-[Auxiliary Methods](./API/Auxiliary.md)
+[Auxiliary Methods](./Auxiliary.md)

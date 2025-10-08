@@ -4,10 +4,23 @@ A package for approximating continuous motions of geometric constraint systems u
 
 ## Contents
 
+#### API Reference
+
 ```@contents
 Pages = [
-    "API.md", 
+    "API.md",
+    "DeformationPath.md", 
+    "ConstraintSystem.md", 
+    "Visualization.md", 
+    "Auxiliary.md"
+]
+Depth = 2
+```
+#### Usage Guide
+
+```@contents
+Pages = [
     "usage.md"
 ]
-Depth = 3
+Depth = 2
 ```

@@ -370,8 +370,8 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String, Not
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
 
-    matrix_coords = Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))]
-    centroid = sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets))
+    matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
+    centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(size(F.G.realization)[2]-length(F.facets))
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
     end
@@ -385,7 +385,7 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String, Not
     zlims!(ax, limits[1]-padding, limits[2]+padding)
     hidespines!(ax)
     hidedecorations!(ax)
-    allVertices = [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2]-length(F.facets))]
+    allVertices = F isa Polytope ? [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2]-length(F.facets))] : [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2])]
 
     if typeof(F) <: Polytope
         P = Polyhedra.polyhedron(Polyhedra.vrep([matrix_coords[:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]))
@@ -834,7 +834,7 @@ Compute an animation for a 3-dimensional polytope.
 function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::String; renderEntirePolytope::Bool=true, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Real=0.1, vertex_size::Real=45, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:black, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets))) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
+    F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
@@ -908,12 +908,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     time=Observable(1)
 
     allVertices=@lift begin
-        pointys = matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))]
+        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
 
     allVertices_asLists = @lift begin
-        pointys = matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))]
+        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
         [pointys[:,j] for j in 1:size(pointys)[2]]
     end
 

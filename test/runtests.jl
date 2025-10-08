@@ -1,6 +1,7 @@
 import DeformationPaths:    Framework,
                             AngularFramework,
                             DeformationPath,
+                            DeformationPath_EdgeContraction,
                             Polytope,
                             animate, 
                             VolumeHypergraph,
@@ -29,9 +30,9 @@ using HomotopyContinuation
 using LinearAlgebra
 
 @testset "SemialgebraicOpt" begin
-    #include("Framework.jl")
+    include("various.jl")
+    include("Framework.jl")
     include("Polytope.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
-    include("various.jl")
 end
