@@ -17,10 +17,11 @@ makedocs(
         ]    
     ],
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true", sidebar_sitename = true, assets = ["assets/custom.css"]),
-    assets = "assets",
     authors = "Matthias Himmelmann",
     modules = [DeformationPaths.DeformationPaths]
 )
+
+cp("src/assets", joinpath(@__DIR__, "build/assets"); force=true, recursive=true)
 
 deploydocs(
     repo = "github.com/matthiashimmelmann/DeformationPaths.jl",
