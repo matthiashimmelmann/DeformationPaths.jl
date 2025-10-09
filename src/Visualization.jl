@@ -432,7 +432,7 @@ Create an animation of a geometric constraint system `F` given a previously comp
 This is a wrapper method for animations for the individual geometric constraint systems. 
 It calls one of the following: [`animate2D_framework`](@ref), [`animate3D_framework`](@ref), [`animate3D_frameworkonsurface`](@ref), [`animate2D_hypergraph`](@ref), [`animate3D_polytope`](@ref), [`animate2D_diskpacking`](@ref), [`animate3D_spherepacking`](@ref) and [`animate3D_sphericaldiskpacking`](@ref).
 """
-function animate(D::DeformationPath, F, filename::Union{String,Nothing}=nothing; kwargs...)
+function animate(D::DeformationPath, F::AllTypes, filename::Union{String,Nothing}=nothing; kwargs...)
     if typeof(F)==Framework || typeof(F)==AngularFramework
         if F.G.dimension==2
             animate2D_framework(D, F, filename; kwargs...)
@@ -468,7 +468,7 @@ end
 
 Compute an animation for a 2-dimensional bar-joint framework.
 """
-function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{Nothing,String}; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Real=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Real=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
