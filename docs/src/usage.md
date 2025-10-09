@@ -26,7 +26,7 @@ animate(D,F,"completebipartite_motion")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/completebipartite_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -43,7 +43,7 @@ animate(D,F,"double_watt_motion"; padding=0.35, fixed_pair=(1,6), fixed_directio
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/double_watt_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -64,7 +64,7 @@ animate(D,F,"squareonhyperboloid_motion"; animate_rotation=true, filetype="mp4")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/squareonhyperboloid_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -81,7 +81,7 @@ animate(D,F,"thales_motion"; padding=0.075, pin_point_offset=0.075, filetype="mp
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/thales_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -98,7 +98,7 @@ animate(D,F,"diskpacking_motion")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/diskpacking_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -113,7 +113,7 @@ animate(D,F,"spherepacking_motion"; filetype="mp4")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/spherepacking_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -130,7 +130,7 @@ animate(D,F,"bodyhinge_pyramid_motion"; filetype="mp4", animate_rotation=true, r
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/bodyhinge_pyramid_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -147,7 +147,7 @@ animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/cuboctahedron_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -164,7 +164,7 @@ animate(D1,F,"dodecahedron_EdgeContraction_motion"; filetype="mp4")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/dodecahedron_EdgeContraction_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -182,7 +182,7 @@ animate(D, F,"octahedral_decomposition_motion"; fixed_triangle=(6,4,5), skip_str
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/octahedral_decomposition_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
@@ -201,7 +201,7 @@ animate(D,F,"sphericaldiskpacking_motion")
 ```
 
 ```@raw html
-<video controls="controls" width="100%" height="auto" style="max-width: 800px;">
+<video controls="controls" width="100%" height="auto" style="max-width: 850px;">
   <source src="/DeformationPaths.jl/assets/sphericaldiskpacking_motion.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>

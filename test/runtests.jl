@@ -30,9 +30,9 @@ using HomotopyContinuation
 using LinearAlgebra
 
 @testset "SemialgebraicOpt" begin
-    include("various.jl")
     include("Framework.jl")
     include("Polytope.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
+    include("various.jl")
 end

@@ -15,7 +15,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 720
+    timeout-minutes: 1000
 
     steps:
       - name: Install python

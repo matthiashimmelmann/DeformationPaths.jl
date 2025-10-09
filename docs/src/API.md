@@ -4,10 +4,13 @@ Welcome to the API documentation.
 
 You can find details in the subpages:
 
-[DeformationPath Constructors](./DeformationPath.md)
+```@contents
+Pages = [
+    "DeformationPath.md", 
+    "ConstraintSystem.md", 
+    "Visualization.md", 
+    "Auxiliary.md"
+]
+Depth = 2
+```
 
-[ConstraintSystem Constructors](./ConstraintSystems.md)
-
-[Visualization Methods](./Visualization.md)
-
-[Auxiliary Methods](./Auxiliary.md)
