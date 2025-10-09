@@ -1,9 +1,9 @@
 # DeformationPaths.jl
 
 [![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://matthiashimmelmann.github.io/DeformationPaths.jl/)
-[![Tests](https://img.shields.io/badge/docs-stable-green.svg)](https://github.com/matthiashimmelmann/DeformationPaths.jl/actions/workflows/run_tests.yml)
+[![Run tests](https://github.com/matthiashimmelmann.github.io/DeformationPaths.jl/actions/workflows/run_tests.yml/badge.svg)](https://github.com/matthiashimmelmann.github.io/DeformationPaths.jl/actions/workflows/run_tests.yml)
 
-This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. To accomplish this, we iteratively apply a combination of Euler predictor steps and Gauss-Newton corrector steps to take a local stpe on the constraint set. This approach is known as homotopy continuation. 
+This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. By combining techniques from Riemannian optimization and homotopy continuation, we can locally find the closest point on the constraint set and thus traverse it. 
 
 ## Installation
 
