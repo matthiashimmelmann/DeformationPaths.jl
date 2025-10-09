@@ -4,7 +4,7 @@
 
 Heuristically checks if a geometric constraint system `F` is (continuously) rigid. 
 """
-function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-5, tol::Real=1e-13, tested_random_flexes::Int=4, symmetric_newton::Bool=false)::Bool
+function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-7, tol::Real=1e-13, tested_random_flexes::Int=8, symmetric_newton::Bool=false)::Bool
     if is_inf_rigid(F; tol_rank_drop=tol_rank_drop)
         return true
     end

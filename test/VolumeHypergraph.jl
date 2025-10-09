@@ -41,7 +41,7 @@ end
     equations!(F, area_equations)
     point = newton_correct(F.G, to_Array(F, F.G.realization))
     realization!(F.G, to_Matrix(F, point))
-    D = DeformationPath(F, [1], 500; step_size=0.01, newton_tol=1e-15)
+    D = DeformationPath(F, [1], 500; step_size=0.01, tol=1e-13)
     animate(D,F; padding=0.05, fixed_vertices=(1,2,3), animate_rotation=false, rotation_frames=1500, fixed_direction=[1,0,0], filetype="mp4")
     project_deformation_random(D, 3)
 end

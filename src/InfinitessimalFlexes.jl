@@ -44,7 +44,7 @@ function compute_nonblocked_flex(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Rea
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
     J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-    for index in 1:size(flexes)[2]*size(stresses)[2]*2
+    for _ in 1:size(flexes)[2]*size(stresses)[2]*5
         rand_flex_parameter = randn(Float64, size(flexes)[2])
         rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
         try
