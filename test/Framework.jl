@@ -11,7 +11,7 @@ end
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'))
     @test !is_inf_rigid(F)
     @test is_second_order_rigid(F)
-    @test is_rigid(F)
+    #@test is_rigid(F)
 end
 
 

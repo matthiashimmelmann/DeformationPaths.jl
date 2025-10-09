@@ -7,7 +7,7 @@ You can find details in the subpages:
 ```@contents
 Pages = [
     "DeformationPath.md", 
-    "ConstraintSystem.md", 
+    "ConstraintSystems.md", 
     "Visualization.md", 
     "Auxiliary.md"
 ]

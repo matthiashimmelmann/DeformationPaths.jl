@@ -19,7 +19,7 @@ Depth = 2
 Pages = [
     "API.md",
     "DeformationPath.md", 
-    "ConstraintSystem.md", 
+    "ConstraintSystems.md", 
     "Visualization.md", 
     "Auxiliary.md"
 ]

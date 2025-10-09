@@ -547,7 +547,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=25, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 
     timestamps = range(1, length(D.motion_samples), step=step)
-    if !(isnothing(filetype))
+    if !(isnothing(filename))
         if !(lowercase(filetype) in ["gif","mp4"])
             throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
         end
@@ -676,7 +676,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=25, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 
     timestamps = range(1, length(D.motion_samples), step=step)
-    if !isnothing(filename) && !(lowercase(filetype) in ["gif","mp4"])
+    if !(lowercase(filetype) in ["gif","mp4"])
         throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
@@ -743,7 +743,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=25, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
-    if !isnothing(filename) && !(lowercase(filetype) in ["gif","mp4"])
+    if !(lowercase(filetype) in ["gif","mp4"])
         throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
@@ -973,7 +973,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         end
     end
     timestamps = range(1, length(D.motion_samples), step=step)
-    if !isnothing(filename) && !(lowercase(filetype) in ["gif","mp4"])
+    if !(lowercase(filetype) in ["gif","mp4"])
         throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
 
@@ -1206,7 +1206,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     vertex_labels && foreach(i->text!(ax, @lift([($rotatedPoints)[i]]), text=["$(F.G.vertices[i])"], fontsize=32, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     
     timestamps = range(1, length(D.motion_samples), step=step)
-    if !isnothing(filename) && !(lowercase(filetype) in ["gif","mp4"])
+    if !(lowercase(filetype) in ["gif","mp4"])
         throw("The chosen filetype needs to be either gif or mp4, but is $(filetype)")
     end
     
@@ -1274,7 +1274,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
         draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=markersize, color=markercolor, marker=:pentagon)
     end
-    if !isnothing(filetype)
+    if !isnothing(filename)
         save("$(filename).png", fig)
     end
     return fig
