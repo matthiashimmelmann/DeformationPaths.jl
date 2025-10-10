@@ -56,7 +56,7 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=1)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()

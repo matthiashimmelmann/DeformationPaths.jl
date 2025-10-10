@@ -874,22 +874,23 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
 
+    fixed_direction = [1.,0,0]
     for i in eachindex(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
         for j in axes(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
         edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
-        rotation_axis = cross([1,0,0], edge_vector)
+        rotation_axis = cross(fixed_direction, edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-4)
-            if [1,0,0]'*edge_vector<0
+            if fixed_direction'*edge_vector<0
                 rotation_matrix = [-1 0 0; 0 -1 0; 0 0 1;]
             else
                 rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
             end
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
-            angle = acos([1,0,0]' * edge_vector)
+            angle = acos(fixed_direction' * edge_vector)
             rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
@@ -924,12 +925,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
     end
 
-    #=centroid = F isa Polytope ? sum([matrix_coords[1][:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[1][:,j] for j in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in eachindex(matrix_coords)
+        centroid = F isa Polytope ? sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
         for j in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - centroid
         end
-    end=#
+    end
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]

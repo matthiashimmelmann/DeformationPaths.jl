@@ -53,7 +53,7 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
             rand_flex_parameter = randn(Float64, size(flexes)[2])
             rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
             try
-                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=2)
+                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=1)
                 return q
             catch e
                 display(e)

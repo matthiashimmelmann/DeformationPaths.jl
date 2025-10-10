@@ -318,6 +318,7 @@ mutable struct Polytope
             normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
             for j in eachindex(facets)
                 normal_realization[:,j] = cross(centered_realization[:,facets[j][2]] - centered_realization[:,facets[j][1]], centered_realization[:,facets[j][3]] - centered_realization[:,facets[j][2]])
+                normal_realization[:,j] = normal_realization[:,j] ./ norm(normal_realization[:,j])
                 normal_realization[:,j] = normal_realization[:,j] ./ (centered_realization[:,facets[j][1]]'*normal_realization[:,j])
                 for i in j+1:length(facets)
                     edge = facets[i][findall(q -> q in facets[j], facets[i])]
@@ -329,7 +330,7 @@ mutable struct Polytope
             end
             _realization = hcat(centered_realization, normal_realization)
         elseif size(centered_realization)[1]==dimension && size(centered_realization)[2]==length(vertices)+length(facets)
-            _realization, bars = Base.copy(realization), []
+            _realization, bars = Base.copy(centered_realization), []
             for j in eachindex(facets)
                 _realization[:, length(vertices)+j] = _realization[:, length(vertices)+j] ./ (_realization[:, length(vertices)+j]'*_realization[:, facets[j][1]])
                 for i in j+1:length(facets)
@@ -356,7 +357,7 @@ mutable struct Polytope
         facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
-        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-10), equations) || throw(error("The given realization does not satisfy the constraints."))
+        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-8), equations) || throw(error("The given realization does not satisfy the constraints."))
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
     end
