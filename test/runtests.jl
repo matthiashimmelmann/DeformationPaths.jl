@@ -30,6 +30,7 @@ using Test
 using HomotopyContinuation
 using LinearAlgebra
 
+is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 @testset "DeformationPaths.jl" begin
     include("Polytope.jl")
     include("Framework.jl")

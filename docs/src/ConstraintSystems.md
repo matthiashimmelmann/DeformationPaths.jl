@@ -26,9 +26,12 @@ AngularFramework
 ## Transformations
 
 ```@docs
-equations!
+equations!(G::ConstraintSystem, equations::Vector{Expression})
+equations!(F::AllTypes, equations::Vector{Expression})
 
-add_equations!
+add_equations!(G::ConstraintSystem, equations::Vector{Expression})
+add_equations!(F::AllTypes, equations::Vector{Expression})
 
-realization!
+realization!(G::ConstraintSystem, realization::Matrix{<:Real})
+realization!(F::AllTypes, realization::Matrix{<:Real})
 ```

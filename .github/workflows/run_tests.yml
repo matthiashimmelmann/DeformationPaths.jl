@@ -34,7 +34,7 @@ jobs:
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
             julia --project=. -e 'using Pkg; Pkg.instantiate();'
       
-      - name: RUn Tests
+      - name: Run Tests
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
             julia --project=. -e 'using Pkg; Pkg.test()'

@@ -14,7 +14,7 @@ function euler_step(G::ConstraintSystem, step_size::Real, prev_flex::Vector{<:Re
         throw("The space of nontrivial infinitesimal motions is empty.")
     end
     flex_coefficients = pinv(flex_space) * prev_flex
-    predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
+    predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in eachindex(flex_coefficients))
     predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
     return point+step_size*predicted_inf_flex, predicted_inf_flex
 end

@@ -234,16 +234,16 @@ mutable struct DeformationPath
         end
 
         if type==Framework
-            K_n = Framework([[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices).G    
+            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices).G    
         elseif type==AngularFramework
-            K_n = AngularFramework([[i,j,k] for i in 1:length(G.vertices) for j in 1:length(G.vertices) for k in 1:length(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_vertices=G.pinned_vertices).G
+            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_vertices=G.pinned_vertices).G
         elseif type==FrameworkOnSurface
             K_n = deepcopy(G)
-            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]])
+            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
         elseif type==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization).G
         elseif type==Polytope || type==SpherePacking || type==BodyHinge
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
         elseif  type==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
@@ -258,13 +258,13 @@ mutable struct DeformationPath
                 flex_mult = randn(Float64, size(flex_space)[2])
                 flex_mult = flex_mult ./ norm(flex_mult, 1)
             else
-                flex_mult = [1/size(flex_space)[2] for _ in 1:size(flex_space)[2]]
+                flex_mult = [1/size(flex_space)[2] for _ in 1:axes(flex_space,2)]
             end
         else
             flex_mult = Float64.(flex_mult)
         end
         size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
-        prev_flex = length(flex_mult)==0 ? [0 for _ in 1:size(flex_space)[1]] : sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
+        prev_flex = length(flex_mult)==0 ? [0 for _ in 1:axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
@@ -367,18 +367,18 @@ mutable struct DeformationPath
     """
     function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false)::DeformationPath
         start_point = to_Array(F, F.G.realization)
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             if flex_mult==[]
                 if random_flex
                     flex_mult = randn(Float64, size(flex_space)[2])
                 else
-                    flex_mult = [1 for _ in 1:size(flex_space)[2]]
+                    flex_mult = [1 for _ in 1:axes(flex_space,2)]
                 end
             end
             size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' must match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
-            prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in 1:length(flex_mult))
+            prev_flex = sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
             prev_flex = prev_flex ./ norm(prev_flex)
         end
         if length(motion_samples)==0
@@ -483,7 +483,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in 1:length(motion_samples[end])])
+            cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value - local_step_size)
             cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=10)
             push!(motion_samples, cur_point)
@@ -505,7 +505,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
             break
         end
     end
-    _G.equations = _G.equations[filter(i->i!=corresponding_equation_index, 1:length(_G.equations))]
+    _G.equations = _G.equations[filter(i->i!=corresponding_equation_index, eachindex(_G.equations))]
     DeformationPath(_G, motion_samples)
 end
 
