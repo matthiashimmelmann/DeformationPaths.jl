@@ -27,9 +27,9 @@ Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stres
 """
 function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
     if typeof(F)==Framework
-        K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
+        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     else
         throw("Type of F is not yet supported. It is $(typeof(F)).")
     end
@@ -70,7 +70,7 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
 
         N = size(flexes)[2]*size(stresses)[2]*3 # ambient dimension
         #TODO add Paul's test
-        for i in 1:length(λ)
+        for i in eachindex(λ)
             try
                 L₀ = rand_subspace(length(λ); codim = length(λ)-i)
                 R_L₀ = solve(projective_stress_system; target_subspace = L₀)
