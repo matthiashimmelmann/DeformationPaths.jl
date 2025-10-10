@@ -44,12 +44,12 @@ function compute_nonblocked_flex(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Rea
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
     J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-    for _ in 1:size(flexes)[2]*size(stresses)[2]*5
+    for _ in 1:size(flexes)[2]*size(stresses)[2]*4
         #TODO implement method based on HC.jl with sphere
         rand_flex_parameter = randn(Float64, size(flexes)[2])
         rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
         try
-            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=10)
+            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=3)
             return q
         catch e
             continue
