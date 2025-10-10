@@ -10,7 +10,7 @@ function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-13, tested
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, [], 5; show_progress=true, step_size=sqrt(tol_rank_drop), tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
+        D = DeformationPath(F, [], 5; show_progress=false, step_size=sqrt(tol_rank_drop), tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
         if any(sample->norm(sample-D.motion_samples[1], Inf)>tol_rank_drop, D.motion_samples)
             return false
         end
