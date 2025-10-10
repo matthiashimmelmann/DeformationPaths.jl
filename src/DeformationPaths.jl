@@ -409,7 +409,6 @@ mutable struct DeformationPath
                 push!(_contacts, F.contacts)    
             catch e
                 i = i - 1
-                @warn e
                 if failure_to_converge == 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
