@@ -10,7 +10,7 @@ function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-13, tested
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, [], 5; step_size=sqrt(tol_rank_drop), tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
+        D = DeformationPath(F, [], 5; show_progress=true, step_size=sqrt(tol_rank_drop), tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
         if any(sample->norm(sample-D.motion_samples[1], Inf)>tol_rank_drop, D.motion_samples)
             return false
         end
@@ -54,12 +54,11 @@ end
 
 Checks if a geometric constraint system `F` is second-order rigid.
 
-See also [`compute_nonblocked_flex`](@ref)
+See also [`compute_nonblocked_flex`](@ref) for the possible keywords.
 """
 function is_second_order_rigid(F::AllTypes; kwargs...)::Bool
-    #TODO needs work
-    flex_mult = compute_nonblocked_flex(F; kwargs...)
-    if length(flex_mult)==0
+    flex_mult = compute_nonblocked_flex(F; fast_check=false, kwargs...)
+    if isempty(flex_mult)
         return true
     else
         return false
