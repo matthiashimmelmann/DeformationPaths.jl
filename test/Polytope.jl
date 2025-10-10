@@ -6,7 +6,7 @@
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 250; step_size=0.0085, tol=1e-6)
-        animate(D,F,"../animations/RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.025*pi, animate_rotation=true, rotation_frames=1000, padding=0.01)
+        animate(D,F,"../animations/RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, animate_rotation=true, rotation_frames=1000, padding=-0.35)
     end
 end
 
