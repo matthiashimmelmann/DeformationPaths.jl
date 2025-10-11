@@ -61,13 +61,13 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
         end
     else
         try 
-            res = solve(projective_stress_system; show_progress = true)
+            res = solve(projective_stress_system; show_progress = false)
             return real_solutions(res)[1]
         catch
             nothing
         end
 
-        N = size(flexes)[2]*size(stresses)[2]*3 # ambient dimension
+        N = size(flexes)[2]*size(stresses)[2]*2 # ambient dimension
         #TODO add Paul's test
         for i in eachindex(λ)
             try
@@ -79,7 +79,8 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
                     start_subspace = L₀,
                     target_subspaces = [rand_subspace(N; codim = length(λ)-i, real = true) for _ in 1:N],
                     transform_result = (R,p) -> real_solutions(R),
-                    flatten = true
+                    flatten = true,
+                    show_progress = false
                 )
                 return Ω[1]
             catch e
