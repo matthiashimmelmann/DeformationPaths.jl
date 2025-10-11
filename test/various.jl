@@ -24,7 +24,7 @@ end
 @testset "squareonhyperboloid" begin
     F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([-sqrt(1/2) -sqrt(1/2) -1; -1 0 0; 0 1 0; sqrt(1/2) sqrt(1/2) 1]'), x->x[1]^2+x[2]^2-x[3]^2-1)
     plot(F)
-    D = DeformationPath(F, [1,1], 100; step_size=0.035)
+    D = DeformationPath(F, [1,1], 100; step_size=0.035, show_progress=false)
     animate(D,F; animate_rotation=true, filetype="mp4")
 end
 
@@ -32,6 +32,6 @@ end
 @testset "sphericaldiskpacking" begin
     F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
     plot(F)
-    D = DeformationPath(F, [1], 100; step_size=0.01)
+    D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
     animate(D,F; filetype="mp4")
 end

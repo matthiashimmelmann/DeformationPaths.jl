@@ -1,7 +1,7 @@
 @testset "two_triangles" begin
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F)
-    D = DeformationPath(F, [1], 100; step_size=0.01)
+    D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
     animate(D, F; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
 end
 
@@ -9,7 +9,7 @@ end
 @testset "two_triangles" begin
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F)
-    D = DeformationPath(F, [1], 100; step_size=0.01)
+    D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
     animate(D, F; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
 end
 
@@ -17,7 +17,7 @@ end
 @testset "octehedral_decomposition" begin
     F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
     plot(F)
-    D = DeformationPath(F, [0.333, 1], 350; step_size=0.002)
+    D = DeformationPath(F, [0.333, 1], 350; step_size=0.002, show_progress=false)
     animate(D, F; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5, filetype="mp4")
 end
 
@@ -41,7 +41,7 @@ end
     equations!(F, area_equations)
     point = newton_correct(F.G, to_Array(F, F.G.realization))
     realization!(F.G, to_Matrix(F, point))
-    D = DeformationPath(F, [1], 500; step_size=0.01, tol=1e-13)
+    D = DeformationPath(F, [1], 500; step_size=0.01, tol=1e-13, show_progress=false)
     animate(D,F; padding=0.05, fixed_vertices=(1,2,3), animate_rotation=false, rotation_frames=1500, fixed_direction=[1,0,0], filetype="mp4")
     project_deformation_random(D, 3)
 end

@@ -25,34 +25,67 @@ end
 
 Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stress.
 """
-function compute_nonblocked_flex(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-13)::Vector
+function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
     if typeof(F)==Framework
-        K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
+        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     else
         throw("Type of F is not yet supported. It is $(typeof(F)).")
     end
     flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol_rank_drop)
+    if size(flexes)[2]==0
+        return []
+    end
     rigidity_matrix = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
     stresses = nullspace(rigidity_matrix'; atol=tol_rank_drop)
-
+        
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]]
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
-    J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-    for _ in 1:size(flexes)[2]*size(stresses)[2]*5
-        #TODO implement method based on HC.jl with sphere
-        rand_flex_parameter = randn(Float64, size(flexes)[2])
-        rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
-        try
-            q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=10)
-            return q
-        catch e
-            continue
+
+    if fast_search
+        J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
+        for _ in 1:size(flexes)[2]*size(stresses)[2]*2
+            rand_flex_parameter = randn(Float64, size(flexes)[2])
+            rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
+            try
+                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=2)
+                return q
+            catch e
+                continue
+            end
+        end
+    else
+        try 
+            res = solve(projective_stress_system; show_progress = false)
+            return real_solutions(res)[1]
+        catch
+            nothing
+        end
+
+        N = size(flexes)[2]*size(stresses)[2]*2 # ambient dimension
+        #TODO add Paul's test
+        for i in eachindex(λ)
+            try
+                L₀ = rand_subspace(length(λ); codim = length(λ)-i)
+                R_L₀ = solve(projective_stress_system; target_subspace = L₀)
+                Ω = solve(
+                    f,
+                    solutions(R_L₀);
+                    start_subspace = L₀,
+                    target_subspaces = [rand_subspace(N; codim = length(λ)-i, real = true) for _ in 1:N],
+                    transform_result = (R,p) -> real_solutions(R),
+                    flatten = true,
+                    show_progress = false
+                )
+                return Ω[1]
+            catch e
+                continue
+            end
         end
     end
     return []

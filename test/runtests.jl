@@ -24,14 +24,16 @@ import DeformationPaths:    Framework,
                             tetrahedral_symmetry!,
                             add_equations!,
                             compute_nontrivial_inf_flexes,
-                            ConstraintSystem
+                            ConstraintSystem,
+                            compute_nonblocked_flex
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 
-@testset "SemialgebraicOpt" begin
-    include("Framework.jl")
+is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
+@testset "DeformationPaths.jl" begin
     include("Polytope.jl")
+    include("Framework.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
     include("various.jl")
