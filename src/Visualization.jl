@@ -1064,7 +1064,7 @@ end
 
 Compute an animation for a 3-dimensional sticky sphere packing.
 """
-function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, step::Int=1, padding::Real=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, markercolor=:red3, dualgraph_color=:grey50, n_circle_segments::Int=50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, step::Int=1, padding::Real=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
