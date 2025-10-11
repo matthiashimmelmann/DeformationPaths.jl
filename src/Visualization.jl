@@ -171,7 +171,7 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::Union{String, 
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
     end
 
-    allVertices = [Point3f(matrix_coords[:,j]) for j in size(matrix_coords,2)]
+    allVertices = [Point3f(matrix_coords[:,j]) for j in size(matrix_coords)[2]]
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
     foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))

@@ -4,14 +4,14 @@
 
 Heuristically checks if a geometric constraint system `F` is (continuously) rigid. 
 """
-function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-11, tested_random_flexes::Int=5, symmetric_newton::Bool=false)::Bool
+function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-3, tol::Real=1e-11, tested_random_flexes::Int=5, symmetric_newton::Bool=false)::Bool
     #TODO needs work
     if is_inf_rigid(F; tol_rank_drop=tol_rank_drop)
         return true
     end
     for _ in 1:tested_random_flexes
-        D = DeformationPath(F, [], 5; show_progress=false, step_size=sqrt(tol_rank_drop), tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
-        if any(sample->norm(sample-D.motion_samples[1], Inf)>tol_rank_drop, D.motion_samples)
+        D = DeformationPath(F, [], 6; show_progress=false, step_size=tol_rank_drop, tol=tol, random_flex=true, symmetric_newton=symmetric_newton)
+        if any(sample->norm(sample-D.motion_samples[1], Inf)>tol_rank_drop*0.1, D.motion_samples)
             return false
         end
     end
