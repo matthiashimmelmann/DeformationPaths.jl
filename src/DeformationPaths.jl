@@ -333,10 +333,10 @@ mutable struct DeformationPath
 
     For further arguments, see the base method [`DeformationPath(G::DeformationPaths.ConstraintSystem, motion_samples::Vector{<:Vector{<:Real}})`](@ref).
     """
-    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, random_flex=false, kwargs...)::DeformationPath
+    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector, num_steps::Int; fast_search::Bool=false, show_progress::Bool=true, random_flex=false, kwargs...)::DeformationPath
         if flex_mult==[] && random_flex
             try
-                flex_mult = compute_nonblocked_flex(F)
+                flex_mult = compute_nonblocked_flex(F; fast_search=fast_search)
             catch e
                 flex_mult = []
             end

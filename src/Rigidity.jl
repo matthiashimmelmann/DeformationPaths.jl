@@ -4,7 +4,7 @@
 
 Heuristically checks if a geometric constraint system `F` is (continuously) rigid. 
 """
-function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-13, tested_random_flexes::Int=4, symmetric_newton::Bool=false)::Bool
+function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-11, tested_random_flexes::Int=5, symmetric_newton::Bool=false)::Bool
     #TODO needs work
     if is_inf_rigid(F; tol_rank_drop=tol_rank_drop)
         return true
@@ -57,8 +57,8 @@ Checks if a geometric constraint system `F` is second-order rigid.
 See also [`compute_nonblocked_flex`](@ref) for the possible keywords.
 """
 function is_second_order_rigid(F::AllTypes; kwargs...)::Bool
-    flex_mult = compute_nonblocked_flex(F; fast_search=false, kwargs...)
-    if isempty(flex_mult)
+    nonblocked_flex = compute_nonblocked_flex(F; fast_search=false, kwargs...)
+    if isempty(nonblocked_flex)
         return true
     else
         return false

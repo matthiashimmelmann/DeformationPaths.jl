@@ -49,14 +49,13 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
 
     if fast_search
         J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-        for _ in 1:size(flexes)[2]*size(stresses)[2]*3
+        for _ in 1:size(flexes)[2]*size(stresses)[2]*2
             rand_flex_parameter = randn(Float64, size(flexes)[2])
             rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
             try
-                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=1)
+                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=2)
                 return q
             catch e
-                display(e)
                 continue
             end
         end

@@ -74,28 +74,24 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
         #Armijo Line Search
         r_val = evaluate(new_equations, variables=>q)
         v = -(J \ r_val)
-        global damping = 0.9
+        global damping, damping_too_small = 0.9, 0
         qnew = q + damping*v
         while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
             global damping = damping*0.7
             qnew = q + damping*v
-            if damping < 1e-11 || Base.time()-start_time > length(point)/time_penalty
+            if damping < 1e-10
+                global damping_too_small += 1
+                qnew = q + 0.1*v
+                break
+            end
+            if damping_too_small >= 3 || Base.time()-start_time > length(point)/time_penalty
                 throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
             end
         end
-        #=
-        if norm(evaluate(equations, variables=>qnew), Inf) < norm(evaluate(equations, variables=>q), Inf)
-			global damping = damping*1.2
-		else
-			global damping = damping/2
-		end
-		if damping > 1
-			global damping = 1
-        elseif damping < 1e-10  || Base.time()-start_time > length(point)/time_penalty
-            throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+        if damping >= 1e-4
+            global damping_too_small -= 1
+            q = qnew
         end
-        =#
-        q = qnew
     end
     return q
 end
