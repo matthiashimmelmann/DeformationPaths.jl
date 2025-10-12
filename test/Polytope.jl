@@ -32,6 +32,7 @@ end
     plot(F; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=-0.01, alpha=0.65, azimuth=0.15*pi, elevation=0.075*pi)
     @test !is_inf_rigid(F)
     @test !is_rigid(F) # Zonotope
+    println("Rigity Determined!")
     if is_no_ci
         D = DeformationPath(F, [], 250; step_size=0.0075, tol=1e-5)
         animate(D,F,"../animations/greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=true,  rotation_frames=800, padding=-0.01)

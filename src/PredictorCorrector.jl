@@ -36,7 +36,7 @@ Apply Newton's method to correct `point` back to the constraints in `G`.
 
 See also [`newton_correct`](@ref)
 """
-function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -56,7 +56,7 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=1)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
@@ -114,7 +114,7 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 
 See also [`symmetric_newton_correct`](@ref)
 """
-function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     return symmetric_newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -137,7 +137,7 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     global _q = Base.copy(p)
     global qnew = _q
     global damping = 0.25
