@@ -14,7 +14,7 @@ function euler_step(G::ConstraintSystem, step_size::Real, prev_flex::Vector{<:Re
         throw("The space of nontrivial infinitesimal motions is empty.")
     end
     flex_coefficients = pinv(flex_space) * prev_flex
-    predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in 1:length(flex_coefficients))
+    predicted_inf_flex = sum(flex_space[:,i] .* flex_coefficients[i] for i in eachindex(flex_coefficients))
     predicted_inf_flex = predicted_inf_flex ./ norm(predicted_inf_flex)
     return point+step_size*predicted_inf_flex, predicted_inf_flex
 end
@@ -36,7 +36,7 @@ Apply Newton's method to correct `point` back to the constraints in `G`.
 
 See also [`newton_correct`](@ref)
 """
-function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -56,10 +56,10 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=0.25)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+    #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
-    global damping = 1
     while(norm(evaluate(equations, variables=>q)) > tol)
         J = evaluate.(jac, variables=>q)
         stress_dimension = size(nullspace(J'; atol=1e-8))[2]
@@ -74,16 +74,24 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
         #Armijo Line Search
         r_val = evaluate(new_equations, variables=>q)
         v = -(J \ r_val)
-        global damping = 1
+        global damping, damping_too_small = 0.9, 0
         qnew = q + damping*v
         while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
-            global damping = damping*0.6
+            global damping = damping*0.7
             qnew = q + damping*v
-            if damping < 1e-11 || Base.time()-start_time > length(point)/time_penalty
+            if damping < 1e-10
+                global damping_too_small += 1
+                qnew = q + 0.1*v
+                break
+            end
+            if damping_too_small >= 3 || Base.time()-start_time > length(point)/time_penalty
                 throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
             end
         end
-        q = qnew
+        if damping >= 1e-4
+            global damping_too_small -= 1
+            q = qnew
+        end
     end
     return q
 end
@@ -106,7 +114,7 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 
 See also [`symmetric_newton_correct`](@ref)
 """
-function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     return symmetric_newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -129,10 +137,10 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=2)::Vector{<:Real}
+function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
     global _q = Base.copy(p)
     global qnew = _q
-    global damping = 0.15
+    global damping = 0.25
     J = Matrix{Float64}(evaluate.(jacobian, variables=>_q))
     new_equations, J_new = Base.copy(equations), Base.copy(J)
     index = 0
@@ -154,14 +162,16 @@ function symmetric_newton_correct(equations::Vector{Expression}, variables::Vect
         #qnew = _q - damping * (J_new \ evaluate(new_equations, variables=>_q))
         r_val = evaluate(new_equations, variables=>_q)
         v = -(J_new \ r_val)
-        global damping = 1
         qnew = _q + damping*v
-        while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>_q)) - 0.25 * damping * v'*v
-            global damping = damping*0.6
-            qnew = _q + damping*v
-            if damping < 1e-10# || Base.time()-start_time > length(point)/time_penalty
-                throw("Newton's method did not converge in time.")
-            end
+        if norm(evaluate(equations, variables=>qnew), Inf) < norm(evaluate(equations, variables=>_q), Inf)
+			global damping = damping*1.2
+		else
+			global damping = damping/2
+		end
+		if damping > 1
+			global damping = 1
+        elseif damping < 1e-12  || Base.time()-start_time > length(point)/time_penalty
+            throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
         end
 
         _q = qnew

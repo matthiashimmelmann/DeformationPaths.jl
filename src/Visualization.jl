@@ -34,16 +34,16 @@ Add infinitesimal flexes to a plot of a geometric constraint system
 """
 function plot_flexes!(ax, F::AllTypes, flex_Real::Int, flex_color, flex_scale, linewidth, arrowsize)
     if F isa Framework
-        K_n = Framework([[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif F isa AngularFramework
-        K_n = AngularFramework([[i,j,k] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) for k in 1:length(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        K_n = AngularFramework([[i,j,k] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) for k in eachindex(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
     elseif F isa FrameworkOnSurface
         K_n = deepcopy(G)
-        add_equations!(K_n, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(G.vertices) for j in 1:length(F.G.vertices) if i<j]])
+        add_equations!(K_n, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(F.G.vertices) if i<j]])
     elseif F isa VolumeHypergraph
         K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
     elseif F isa Polytope || F isa SpherePacking || F isa BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in 1:length(F.G.vertices) for j in 1:length(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     elseif  F isa SphericalDiskPacking
         minkowski_scalar_product(e1,e2) = e1'*e2-1
         inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
@@ -54,12 +54,12 @@ function plot_flexes!(ax, F::AllTypes, flex_Real::Int, flex_color, flex_scale, l
 
     flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real])
     if F.G.dimension==2
-        pts = [Point2f(F.G.realization[:,i]) for i in 1:length(F.G.vertices)]
-        dirs = [Vec2f(flex[:,i]) for i in 1:length(F.G.vertices)]
+        pts = [Point2f(F.G.realization[:,i]) for i in eachindex(F.G.vertices)]
+        dirs = [Vec2f(flex[:,i]) for i in eachindex(F.G.vertices)]
         arrows!(ax, pts, dirs; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, linewidth=linewidth, arrowsize=arrowsize)
     else
-        pts = [Point3f(F.G.realization[:,i]) for i in 1:length(F.G.vertices)]
-        dirs = [Vec3f(flex[:,i]) for i in 1:length(F.G.vertices)]
+        pts = [Point3f(F.G.realization[:,i]) for i in eachindex(F.G.vertices)]
+        dirs = [Vec3f(flex[:,i]) for i in eachindex(F.G.vertices)]
         arrows!(ax, pts, dirs; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, arrowsize=0.135)
     end
 end
@@ -72,8 +72,8 @@ Plot a bar-joint or angular framework.
 function plot_framework(F::Union{Framework,AngularFramework}, filename::Union{String, Nothing}; padding::Real=0.15, vertex_size=55, azimuth=π / 10, elevation=pi/10, perspectiveness=0., vertex_labels=true, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
-    for i in 1:size(matrix_coords)[2]
+    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
+    for i in axes(matrix_coords)[2]
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
     end
 
@@ -100,7 +100,7 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::Union{St
     hidespines!(ax)
     hidedecorations!(ax)
 
-    allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     if typeof(F)==AngularFramework
         L = angle_size*maximum([minimum([norm(matrix_coords[:,bar[1]]-matrix_coords[:,bar[2]]) for bar in F.bars]),0])
         for angle in F.angles
@@ -191,12 +191,12 @@ Plot a sphere packing.
 function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; padding::Real=0.15, azimuth=pi/10, alpha=0.1, elevation=pi/8, perspectiveness=0., disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
-    for i in 1:size(matrix_coords)[2]
+    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
+    for i in axes(matrix_coords,2)
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
     end
 
-    allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     limit_vertices = allVertices
 
     if F.G.dimension==2
@@ -212,7 +212,7 @@ function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; 
     end
 
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    for index in 1:length(F.G.vertices)
+    for index in eachindex(F.G.vertices)
         if F.G.dimension==2
             disk_vertices = [Vector(allVertices[index])+F.radii[index]*Point2f([cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments]
             limit_vertices = vcat(limit_vertices, disk_vertices)
@@ -224,10 +224,10 @@ function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; 
         end
     end
 
-    xlims = [minimum([limit_vertices[i][1] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][1] for i in 1:length(limit_vertices)])]
-    ylims = [minimum([limit_vertices[i][2] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][2] for i in 1:length(limit_vertices)])]
+    xlims = [minimum([limit_vertices[i][1] for i in eachindex(limit_vertices)]), maximum([limit_vertices[i][1] for i in eachindex(limit_vertices)])]
+    ylims = [minimum([limit_vertices[i][2] for i in eachindex(limit_vertices)]), maximum([limit_vertices[i][2] for i in eachindex(limit_vertices)])]
     if F.G.dimension==3
-        zlims = [minimum([limit_vertices[i][3] for i in 1:length(limit_vertices)]), maximum([limit_vertices[i][3] for i in 1:length(limit_vertices)])]
+        zlims = [minimum([limit_vertices[i][3] for i in eachindex(limit_vertices)]), maximum([limit_vertices[i][3] for i in eachindex(limit_vertices)])]
     end
     limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
 
@@ -277,12 +277,12 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{Stri
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
     end
 
-    planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in 1:size(matrix_coords)[2]]
+    planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in axes(matrix_coords,2)]
     koebePoints =[]
-    spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in 1:size(matrix_coords)[2]]
+    spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in axes(matrix_coords,2)]
     rotatedPoints=[]
     #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
-    for i in 1:length(F.G.vertices)
+    for i in eachindex(F.G.vertices)
         rotation_axis = cross([0, 0, 1], spherePoints[i])
         if isapprox(norm(rotation_axis), 0, atol=1e-5)
             angle = acos([0, 0, 1]'* spherePoints[i])
@@ -317,8 +317,8 @@ Plot a volume-constrained hypergraph.
 function plot_hypergraph(F::VolumeHypergraph, filename::Union{String, Nothing}; padding::Real=0.15, alpha=0.25, azimuth=pi/10, elevation=pi/8, perspectiveness=0., vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in 1:size(matrix_coords)[2]) ./ size(matrix_coords)[2]
-    for i in 1:size(matrix_coords)[2]
+    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
+    for i in axes(matrix_coords,2)
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
     end
 
@@ -349,7 +349,7 @@ function plot_hypergraph(F::VolumeHypergraph, filename::Union{String, Nothing}; 
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
     end
 
-    allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]] : [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
+    allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     foreach(i->poly!(ax, [(allVertices)[Int64(v)] for v in F.volumes[i]]; color=(facet_colors[i], alpha)), 1:length(F.volumes))
     foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
@@ -471,11 +471,11 @@ Compute an animation for a 2-dimensional bar-joint framework.
 function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Real=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     length(fixed_vertices)==2 && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices || throw("fixed_vertices is not a vertex of the underlying graph.")
-    for i in 1:length(matrix_coords)
+    for i in eachindex(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
     end
@@ -485,23 +485,23 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
         fixed_direction = [1.,0]
     end
     fixed_direction = fixed_direction ./ norm(fixed_direction)
-    for i in 1:length(matrix_coords)
+    for i in eachindex(matrix_coords)
         theta = atan(matrix_coords[i][:,fixed_vertices[2]][2] , matrix_coords[i][:,fixed_vertices[2]][1])
         base_theta = atan(fixed_direction[2], fixed_direction[1])
         theta = theta-base_theta
         rotation_matrix = [cos(theta) sin(theta); -sin(theta) cos(theta)]
         # Rotate the realization to the `fixed_direction`.
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
         end
     end
 
     if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
     end
 
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
     limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
     translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
     xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
@@ -513,7 +513,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     time=Observable(1)
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point2f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
     if typeof(F)==AngularFramework
@@ -571,7 +571,7 @@ Compute an animation for a 3-dimensional bar-joint framework.
 function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Real=0.15, vertex_size::Real=55, vertex_labels=false, font_color=:lightgrey, line_width::Real=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     
     if isapprox(norm(fixed_direction),0;atol=1e-6)
@@ -580,9 +580,9 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
     fixed_direction = fixed_direction ./ norm(fixed_direction)
 
-    for i in 1:length(matrix_coords)
+    for i in eachindex(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
         edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
@@ -600,7 +600,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
                                 rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
         end
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
         end
 
@@ -619,19 +619,19 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
             if edge_vector_new[3]<0
                 rotation_matrix_new = inv(rotation_matrix_new)
             end                
-            for j in 1:size(matrix_coords[i])[2]
+            for j in axes(matrix_coords[i],2)
                 matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
             end
         end
     end
 
     if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
     end
 
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
-    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...))]
     limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
     xlims!(ax, limits[1]-padding, limits[2]+padding)
     ylims!(ax, limits[1]-padding, limits[2]+padding)
@@ -642,7 +642,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     time=Observable(1)
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
     if typeof(F)==AngularFramework
@@ -712,11 +712,11 @@ Compute an animation for a 3-dimensional bar-joint framework constrained to a su
 function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::Union{String,Nothing}; alpha=0.45, framerate::Int=25, animate_rotation=false, azimuth = pi/4, elevation=pi/8, perspectiveness=0., rotation_frames = 480, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Real=0.15, vertex_size::Real=55, line_width::Real=10, edge_color=:steelblue, vertex_labels=true, font_color=:lightgrey, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
 
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
-    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...))]
     limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
     xlims!(ax, limits[1]-padding, limits[2]+padding)
     ylims!(ax, limits[1]-padding, limits[2]+padding)
@@ -736,7 +736,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     time=Observable(1)
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]) for j in size(pointys,2)]
     end
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
     foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
@@ -780,7 +780,7 @@ Compute an animation for a 2-dimensional volume hypergraph.
 function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::Union{String,Nothing}; alpha=0.2, recompute_deformation_samples::Bool=true, target_stretch::Real=1., fixed_triangle::Union{Tuple{Int,Int,Int},Vector{Int},Nothing}=nothing, font_color=:black, skip_stretch::Bool=true, tip_value::Real=0.5, framerate::Int=25, step::Int=1, padding::Real=0.15, vertex_size::Real=42, line_width::Real=6, facet_colors=nothing, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     if facet_colors==nothing
         facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.volumes), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
@@ -791,17 +791,17 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     else
         all(i->fixed_triangle[i] in D.G.vertices, 1:3) && (Tuple(fixed_triangle) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[2],fixed_triangle[3],fixed_triangle[1]]) in [Tuple(facet) for facet in F.volumes]) || (Tuple([fixed_triangle[3],fixed_triangle[1],fixed_triangle[2]]) in [Tuple(facet) for facet in F.volumes]) || throw("fixed_triangle is not a vertex of the underlying graph.")
     end
-    for i in 1:length(matrix_coords)
+    for i in eachindex(matrix_coords)
         p0 = matrix_coords[i][:,fixed_triangle[1]]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
     end
-    for i in 1:length(matrix_coords)
+    for i in eachindex(matrix_coords)
         theta = atan(matrix_coords[i][:,fixed_triangle[2]][2], matrix_coords[i][:,fixed_triangle[2]][1])
         rotation_matrix = [cos(theta) sin(theta); -sin(theta) cos(theta)]
         # Rotate the realization to the `fixed_direction`.
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = rotation_matrix*matrix_coords[i][:,j]
         end
         # Scale to (1,0)
@@ -810,22 +810,22 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
         end
         x_val = matrix_coords[i][1,fixed_triangle[2]]
         scaling_matrix = [target_stretch/x_val 0; 0 x_val/target_stretch]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = scaling_matrix*matrix_coords[i][:,j]
         end
         y_val = matrix_coords[i][:,fixed_triangle[3]]
         shear_matrix = [1 (tip_value-y_val[1])/y_val[2]; 0 1]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = shear_matrix*matrix_coords[i][:,j]
         end
     end
 
     if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
     end
 
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
     limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
     translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
     xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
@@ -837,7 +837,7 @@ function animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename:
     time=Observable(1)
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point2f(pointys[:,j]) for j in axes(pointys,2)]
     end
     foreach(i->poly!(ax, @lift([($allVertices)[Int64(v)] for v in F.volumes[i]]); color=(facet_colors[i], alpha)), 1:length(F.volumes))
     foreach(i->lines!(ax, @lift([($allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]); linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
@@ -866,36 +866,37 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Real=0.1, vertex_size::Real=45, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:black, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Real=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
-    F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
+    (F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
 
-    for i in 1:length(matrix_coords)
+    fixed_direction = [1.,0,0]
+    for i in eachindex(matrix_coords)
         p0 = matrix_coords[i][:,fixed_vertices[1]]
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i])[2]
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
         end
         edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
-        rotation_axis = cross([1,0,0], edge_vector)
+        rotation_axis = cross(fixed_direction, edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-4)
-            if [1,0,0]'*edge_vector<0
+            if fixed_direction'*edge_vector<0
                 rotation_matrix = [-1 0 0; 0 -1 0; 0 0 1;]
             else
                 rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
             end
         else
             rotation_axis = rotation_axis ./ norm(rotation_axis)
-            angle = acos([1,0,0]' * edge_vector)
+            angle = acos(fixed_direction' * edge_vector)
             rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
                                 rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
         end
 
-        for j in 1:size(matrix_coords[i])[2]
+        for j in axes(matrix_coords[i],2)
             matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
         end
 
@@ -914,26 +915,26 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
             if edge_vector_new[3]<0
                 rotation_matrix_new = inv(rotation_matrix_new)
             end                
-            for j in 1:size(matrix_coords[i])[2]
+            for j in axes(matrix_coords[i],2)
                 matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
             end
         end
     end
 
     if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in 1:length(matrix_coords)]
+        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
     end
 
-    centroid = sum([matrix_coords[1][:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets))
-    for i in 1:length(matrix_coords)
-        for j in 1:(size(F.G.realization)[2]-length(F.facets))
+    for i in eachindex(matrix_coords)
+        centroid = F isa Polytope ? sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
+        for j in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - centroid
         end
     end
 
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
-    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...))]
     limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
     xlims!(ax, limits[1]-padding, limits[2]+padding)
     ylims!(ax, limits[1]-padding, limits[2]+padding)
@@ -944,12 +945,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
 
     allVertices=@lift begin
         pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
-        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
     allVertices_asLists = @lift begin
         pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
-        [pointys[:,j] for j in 1:size(pointys)[2]]
+        [F isa Polytope ? pointys[:,j] .* scaling_factor : pointys[:,j] for j in axes(pointys,2)]
     end
 
     if isnothing(special_edge)
@@ -959,7 +960,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(edges_here[i][1])], ($allVertices)[Int64(edges_here[i][2])]]); linewidth=line_width, color=edge_color), 1:length(edges_here))
         linesegments!(ax, @lift([($allVertices)[Int64(special_edge[1])], ($allVertices)[Int64(special_edge[2])]]); linewidth=line_width+2.5, color=special_edge_color)
     end
-    vertex_labels && foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(size(F.G.realization)[2]-length(F.facets)))
+    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=28, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
     if typeof(F) <: Polytope && renderEntirePolytope
         mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep(($allVertices_asLists)), CDDLib.Library(:exact)))); shading=NoShading, color=(facet_color,alpha), transparency=true)
@@ -1009,12 +1010,12 @@ Compute an animation for a 2-dimensional sticky disk packing.
 function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.08, framerate::Int=25, step::Int=1, padding::Real=0.15, vertex_labels=true, disk_strokewidth::Real=8.5, line_width::Real=7, font_color=:black, sphere_color=:steelblue, markersize::Real=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     if F.G.dimension!=2
         throw("The dimension must be 2, but is $(F.G.dimension)!")
     end
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
     limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
     translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
     xlims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
@@ -1027,10 +1028,10 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::U
     contacts=Observable(D._contacts[1])
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point2f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point2f(pointys[:,j]) for j in axes(pointys,2)]
     end
     linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
-    for index in 1:length(F.G.vertices)
+    for index in eachindex(F.G.vertices)
         disk_vertices = @lift([Point2f(Vector($allVertices[index])+F.radii[index]*[cos(2*i*pi/n_circle_segments), sin(2*i*pi/n_circle_segments)]) for i in 1:n_circle_segments])
         diskedges = [(i,i%n_circle_segments+1) for i in 1:n_circle_segments]
         poly!(ax, @lift([($disk_vertices)[i] for i in 1:n_circle_segments]); color=(sphere_color, alpha))
@@ -1063,16 +1064,16 @@ end
 
 Compute an animation for a 3-dimensional sticky sphere packing.
 """
-function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, step::Int=1, padding::Real=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, markercolor=:red3, dualgraph_color=:grey50, n_circle_segments::Int=50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, step::Int=1, padding::Real=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1))
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     if F.G.dimension!=3
         throw("The dimension must be 3, but is $(F.G.dimension)!")
     end
-    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in 1:length(matrix_coords)]...))]
-    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in 1:length(matrix_coords)]...))]
-    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in 1:length(matrix_coords)]...))]
+    xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
+    ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
+    zlims = [minimum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][3,:] for i in eachindex(matrix_coords)]...))]
     limits= [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
     translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
     xlims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
@@ -1087,10 +1088,10 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
     contacts=Observable(D._contacts[1])
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
-    for index in 1:length(F.G.vertices)
+    for index in eachindex(F.G.vertices)
         mesh!(ax, @lift(Sphere(($allVertices)[index], F.radii[index]));  transparency=true, color = (sphere_color,alpha))
     end
     linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
@@ -1123,7 +1124,7 @@ Compute an animation for a disk packing on the 2-sphere in the Minkowski metric.
 """
 function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::Union{String,Nothing}; alpha=0.15, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., font_color=:black, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in 1:length(D.motion_samples)]
+    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
 
     ax = Axis3(fig[1,1], aspect=(1,1,1), perspectiveness=perspectiveness)
     xlims!(ax,-1.5-padding, 1.5+padding)
@@ -1136,19 +1137,19 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     time=Observable(1)
     planePoints=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]./norm(pointys[:,j])^2) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]./norm(pointys[:,j])^2) for j in axes(pointys,2)]
     end
 
     spherePoints=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]./norm(pointys[:,j])) for j in 1:size(pointys)[2]]
+        [Point3f(pointys[:,j]./norm(pointys[:,j])) for j in axes(pointys,2)]
     end
 
     koebePoints=@lift begin
         pointys = matrix_coords[$time]
-        pointys = [Point3f(-pointys[:,j]) for j in 1:size(pointys)[2]]
+        pointys = [Point3f(-pointys[:,j]) for j in axes(pointys,2)]
         output = []
-        for i in 1:length(F.G.vertices)
+        for i in eachindex(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-6)
                 angle = acos([0, 0, 1]'* ($spherePoints)[i])
@@ -1167,7 +1168,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     foreach(edge->linesegments!(ax, @lift([($koebePoints)[Int64(edge[1])], ($koebePoints)[Int64(edge[2])]]); linewidth = line_width, color=dualgraph_color), F.contacts)
     disk_vertices = @lift begin
         output = []
-        for i in 1:length(F.G.vertices)
+        for i in eachindex(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-6)
                 angle = acos([0, 0, 1]'* ($spherePoints)[i])
@@ -1187,7 +1188,7 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
     foreach(i->lines!(ax, @lift([($disk_vertices)[i][v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=disk_color), 1:length(F.G.vertices))
     rotatedPoints = @lift begin
         output=[]
-        for i in 1:length(F.G.vertices)
+        for i in eachindex(F.G.vertices)
             rotation_axis = cross([0, 0, 1], Vector(($spherePoints)[i]))
             if isapprox(norm(rotation_axis), 0, atol=1e-6)
                 angle = acos([0, 0, 1]'* ($spherePoints)[i])
@@ -1257,7 +1258,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         @warn "The length of `line_colors` is $(length(edge_colors)) but needs to be at least $(length(D)). Choosing distinguishable colors instead."
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
-    randmats = [hcat([rand(Float64,projected_dimension) for _ in 1:length(D[i].G.variables)]...) for i in 1:length(D)]
+    randmats = [hcat([rand(Float64,projected_dimension) for _ in eachindex(D[i].G.variables)]...) for i in eachindex(D)]
     proj_curve = [[(pinv(randmats[i]'*randmats[i])*randmats[i]')'*entry for entry in Defo.motion_samples] for (i,Defo) in enumerate(D)]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
