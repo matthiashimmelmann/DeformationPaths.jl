@@ -57,7 +57,7 @@ Checks if a geometric constraint system `F` is second-order rigid.
 See also [`compute_nonblocked_flex`](@ref) for the possible keywords.
 """
 function is_second_order_rigid(F::AllTypes; kwargs...)::Bool
-    nonblocked_flex = compute_nonblocked_flex(F; fast_search=true, kwargs...)
+    nonblocked_flex = compute_nonblocked_flex(F; fast_search=false, kwargs...)
     if isempty(nonblocked_flex)
         return true
     else
