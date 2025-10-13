@@ -1271,13 +1271,11 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
 
-    for _D in D
-        _D.motion_samples = [sample for sample in _D.motion_samples]
-    end
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
     Q, _ = qr(randn(Float64, length(D[1].G.variables), projected_dimension))
     randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in Defo.motion_samples] for Defo in D]
+    display(proj_curve)
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
         ax = Axis3(fig[1,1], aspect = (1, 1, 1))
