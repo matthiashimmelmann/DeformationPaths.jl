@@ -1273,7 +1273,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
 
     high_dim_curves = [[!(F isa Polytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
-    Q, _ = qr(randn(Float64, length(D[1].G.variables), projected_dimension))
+    Q, _ = qr(randn(Float64, !(F isa Polytope) ? length(D[1].G.variables) : length(F.x_variables), projected_dimension))
     randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in curve] for curve in high_dim_curves]
     fig = Figure(size=(1000,1000))
