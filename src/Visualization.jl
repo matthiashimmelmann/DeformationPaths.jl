@@ -923,6 +923,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
 
     if recompute_deformation_samples
         D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
+        D.motion_matrices = [to_Matrix(F, sample) for sample in D.motion_samples]
     end
 
     for i in eachindex(matrix_coords)
@@ -1258,8 +1259,12 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         @warn "The length of `line_colors` is $(length(edge_colors)) but needs to be at least $(length(D)). Choosing distinguishable colors instead."
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
-    randmats = [hcat([rand(Float64,projected_dimension) for _ in eachindex(D[i].G.variables)]...) for i in eachindex(D)]
-    proj_curve = [[(pinv(randmats[i]'*randmats[i])*randmats[i]')'*entry for entry in Defo.motion_samples] for (i,Defo) in enumerate(D)]
+
+    for _D in D
+        _D.motion_samples = [sample for sample in _D.motion_samples]
+    end
+    randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
+    proj_curve = [[(pinv(randmat'*randmat)*randmat')'*entry for entry in Defo.motion_samples] for Defo in D]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
         ax = Axis3(fig[1,1], aspect = (1, 1, 1))

@@ -482,7 +482,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
+            cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value - local_step_size)
             cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=6)
             push!(motion_samples, cur_point)
