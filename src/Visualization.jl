@@ -411,7 +411,6 @@ function plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String, Not
         foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), F.edges)
     else
         edges_here = filter(edge->!([special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]]), F.edges)
-        display(edges_here)
         foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), edges_here)
         linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color)
     end
