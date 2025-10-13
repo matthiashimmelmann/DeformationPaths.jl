@@ -366,7 +366,7 @@ end
 
 Plot a polytope.
 """
-function plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String, Nothing}; special_edge=nothing, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding=0.1, vertex_size=60, alpha=0.55, line_width=12, edge_color=:steelblue, perspectiveness=0., azimuth=π/10, elevation=pi/8, facet_color=:grey98, font_color=:lightgrey, vertex_color=:black, vertex_labels::Bool=true, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String, Nothing}; vertex_size::Real=12, special_edge=nothing, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, perspectiveness=0., azimuth=π/10, elevation=π/8, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
 
@@ -878,7 +878,7 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Real=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Real=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     (F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
