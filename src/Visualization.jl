@@ -1134,7 +1134,7 @@ end
 
 Compute an animation for a disk packing on the 2-sphere in the Minkowski metric.
 """
-function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::Union{String,Nothing}; alpha=0.15, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/8, perspectiveness=0., font_color=:black, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
+function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPacking, filename::Union{String,Nothing}; alpha=0.15, framerate::Int=25, animate_rotation=false, azimuth = π / 10, elevation=pi/10, perspectiveness=0., font_color=:black, rotation_frames = 240, step::Int=1, padding=0.015, sphere_color=:lightgrey, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=45, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
 
