@@ -736,7 +736,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
     time=Observable(1)
     allVertices=@lift begin
         pointys = matrix_coords[$time]
-        [Point3f(pointys[:,j]) for j in size(pointys,2)]
+        [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
     foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)

@@ -333,7 +333,7 @@ mutable struct DeformationPath
 
     For further arguments, see the base method [`DeformationPath(G::DeformationPaths.ConstraintSystem, motion_samples::Vector{<:Vector{<:Real}})`](@ref).
     """
-    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector, num_steps::Int; fast_search::Bool=true, show_progress::Bool=true, random_flex=false, kwargs...)::DeformationPath
+    function DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult::Vector, num_steps::Int; fast_search::Bool=false, show_progress::Bool=true, random_flex=false, kwargs...)::DeformationPath
         if flex_mult==[] && random_flex
             try
                 flex_mult = compute_nonblocked_flex(F; fast_search=fast_search)
@@ -484,7 +484,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         try
             cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value - local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=10)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=6)
             push!(motion_samples, cur_point)
             break
         catch err
