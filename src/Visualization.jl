@@ -1284,6 +1284,10 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
     hidespines!(ax)
     hidedecorations!(ax)
+    xlims!(ax,proj_curve[1][1][1]-0.15, proj_curve[1][1][1]+0.15)
+    ylims!(ax,proj_curve[1][1][2]-0.15, proj_curve[1][1][2]+0.15)
+    zlims!(ax,proj_curve[1][1][3]-0.15, proj_curve[1][1][3]+0.15)
+    
     if projected_dimension==3
         foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
         draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=markersize, color=markercolor, marker=:pentagon)
