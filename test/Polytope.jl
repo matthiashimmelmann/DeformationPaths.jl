@@ -10,7 +10,7 @@
             _F = Polytope(F.facets, _D.motion_matrices[end];)
             plot(_F, "../animations/dodecahedron_EdgeContraction_NO$(i)";  azimuth = π/10 + 2pi * 125 / 205, special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
-            project_deformation_random(Defs, 2, "../animations/Dodec_projection")
+            project_deformation_random(Defs, F, 2, "../animations/Dodec_projection")
         end
         for i in 21:30
             _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
@@ -18,7 +18,7 @@
             _F = Polytope(F.facets, _D.motion_matrices[end])
             plot(_F, "../animations/dodecahedron_EdgeContraction_NO$(i)"; azimuth = π/10 + 2pi * 125 / 205, special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
-            project_deformation_random(Defs, 2, "../animations/Dodec_projection")
+            project_deformation_random(Defs, F, 2, "../animations/Dodec_projection")
         end
     end
 end

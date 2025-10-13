@@ -1255,7 +1255,7 @@ Compute a random projection of deformation paths.
 This method can either take a single deformation path or a vector of deformation paths and projects it to curves in 2D or 3D.
 This makes it possible to visualize high-dimensional deformation spaces. 
 """
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Real=0.15, line_width::Real=8, edge_colors=[:green3], markersize::Real=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Real=0.15, line_width::Real=8, edge_colors=[:green3], markersize::Real=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
@@ -1271,11 +1271,11 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
 
+    high_dim_curves = [[!(F isa Polytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
     Q, _ = qr(randn(Float64, length(D[1].G.variables), projected_dimension))
     randmat = Matrix(Q)
-    proj_curve = [[randmat'*entry for entry in Defo.motion_samples] for Defo in D]
-    display(proj_curve)
+    proj_curve = [[randmat'*entry for entry in curve] for curve in high_dim_curves]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
         ax = Axis3(fig[1,1], aspect = (1, 1, 1))
