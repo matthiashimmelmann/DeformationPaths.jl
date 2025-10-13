@@ -1275,7 +1275,8 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         _D.motion_samples = [sample for sample in _D.motion_samples]
     end
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
-    randmat = Matrix(qr(randn(Float64, length(D[1].G.variables), projected_dimension))[1])
+    Q, _ = qr(randn(Float64, length(D[1].G.variables), projected_dimension))
+    randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in Defo.motion_samples] for Defo in D]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
