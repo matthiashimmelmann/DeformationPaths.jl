@@ -8,8 +8,8 @@
             _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
             animate(_D,F,"../animations/dodecahedron_EdgeContraction_NO$(i)"; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
+            project_deformation_random(Defs, 3, "Dodec_projection")
         end
-        project_deformation_random(Defs, 3, "Dodec_projection")
     end
 end
 
