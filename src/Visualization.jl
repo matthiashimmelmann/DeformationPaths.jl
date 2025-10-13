@@ -1274,10 +1274,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     for _D in D
         _D.motion_samples = [sample for sample in _D.motion_samples]
     end
-    randmat = hcat([randn(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
-    for i in eachindex(D[1].G.variables)
-        randmat[:,i] = randmat[:,i] ./ norm(randmat[:,i])
-    end
+    randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
     proj_curve = [[(pinv(randmat'*randmat)*randmat')'*entry for entry in Defo.motion_samples] for Defo in D]
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
@@ -1287,9 +1284,9 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
     hidespines!(ax)
     hidedecorations!(ax)
-    xlims!(ax,proj_curve[1][1][1]-0.2, proj_curve[1][1][1]+0.2)
-    ylims!(ax,proj_curve[1][1][2]-0.2, proj_curve[1][1][2]+0.2)
-    zlims!(ax,proj_curve[1][1][3]-0.2, proj_curve[1][1][3]+0.2)
+    xlims!(ax,proj_curve[1][1][1]-0.15, proj_curve[1][1][1]+0.15)
+    ylims!(ax,proj_curve[1][1][2]-0.15, proj_curve[1][1][2]+0.15)
+    zlims!(ax,proj_curve[1][1][3]-0.15, proj_curve[1][1][3]+0.15)
 
     if projected_dimension==3
         foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
