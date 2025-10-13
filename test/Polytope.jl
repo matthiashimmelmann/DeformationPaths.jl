@@ -7,22 +7,18 @@
         for i in 1:20
             _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
             animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
-            local_realization = Base.copy(F.realization)
-            realization!(F, _D.motion_matrices[end])
+            _F = Polytope(F.facets, _D.motion_matrices[end])
             plot(F, "../animations/dodecahedron_EdgeContraction_NO$(i)"; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
             project_deformation_random(Defs, 3, "../animations/Dodec_projection")
-            realization!(F, local_realization)
         end
         for i in 21:30
-            _D = DeformationPath_EdgeContraction(F, [9, 10], 1.5)
+            _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
             animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
-            local_realization = Base.copy(F.realization)
-            realization!(F, _D.motion_matrices[end])
+            _F = Polytope(F.facets, _D.motion_matrices[end])
             plot(F, "../animations/dodecahedron_EdgeContraction_NO$(i)"; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
             project_deformation_random(Defs, 3, "../animations/Dodec_projection")
-            realization!(F, local_realization)
         end
     end
 end
