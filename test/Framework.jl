@@ -70,7 +70,7 @@ end
     if is_no_ci
         animate(D,F; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2, filetype="mp4")
         for i in 1:15
-            project_deformation_random(D, F, 2, "../animations/Double_Watt$i"; padding=0.75)
+            project_deformation_random(D, F, 2, "../animations/Double_Watt$i"; padding=nothing)
         end
     end
 end

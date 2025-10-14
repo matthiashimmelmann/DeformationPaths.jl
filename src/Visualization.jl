@@ -1257,7 +1257,7 @@ Compute a random projection of deformation paths.
 This method can either take a single deformation path or a vector of deformation paths and projects it to curves in 2D or 3D.
 This makes it possible to visualize high-dimensional deformation spaces. 
 """
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Real=0.1, line_width::Real=8, edge_colors=[:green3], markersize::Real=45, markercolor=:steelblue, draw_start::Bool=true)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Union{Real,Nothing}=0.1, line_width::Real=8, edge_colors=[:green3], markersize::Real=45, markercolor=:steelblue, draw_start::Bool=true)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
@@ -1288,11 +1288,13 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
     hidespines!(ax)
     hidedecorations!(ax)
-    xlims!(ax,proj_curve[1][1][1]-padding, proj_curve[1][1][1]+padding)
-    ylims!(ax,proj_curve[1][1][2]-padding, proj_curve[1][1][2]+padding)
-
+    if !isnothing(padding)
+        xlims!(ax,proj_curve[1][1][1]-padding, proj_curve[1][1][1]+padding)
+        ylims!(ax,proj_curve[1][1][2]-padding, proj_curve[1][1][2]+padding)
+        projected_dimension==3 && zlims!(ax,proj_curve[1][1][3]-padding, proj_curve[1][1][3]+padding)
+    end
+    
     if projected_dimension==3
-        zlims!(ax,proj_curve[1][1][3]-padding, proj_curve[1][1][3]+padding)
         foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
         draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=markersize, color=markercolor, marker=:pentagon)
     else
