@@ -284,7 +284,8 @@ mutable struct DeformationPath
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
                 i = i - 1
-                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
+                if failure_to_converge >= 4 || e == "The space of nontrivial infinitesimal motions is empty."
+                    @warn "The approximation of a deformation path ended prematurely."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -292,7 +293,7 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/4, prev_flex, motion_samples[end], K_n)
+                            q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n)
                             if symmetric_newton
                                 q = symmetric_newton_correct(G, q; tol=tol)
                             else
