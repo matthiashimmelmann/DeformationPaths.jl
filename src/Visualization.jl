@@ -895,7 +895,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         rotation_axis = cross(fixed_direction, edge_vector)
         if isapprox(norm(rotation_axis), 0, atol=1e-4)
             if fixed_direction'*edge_vector<0
-                rotation_matrix = [-1 0 0; 0 -1 0; 0 0 1;]
+                rotation_matrix = [1 0 0; 0 -1 0; 0 0 -1;]
             else
                 rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
             end
@@ -916,7 +916,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
             target_vector = [0,edge_vector_new[2],edge_vector_new[3]]
             target_vector = target_vector ./ norm(target_vector)
             if isapprox(edge_vector_new[3],0; atol=1e-10)
-                angle = 0
+                angle = pi
             else
                 angle = acos(target_vector'* [0,1,0])
             end
@@ -925,7 +925,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
                                 fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
             if edge_vector_new[3]<0
                 rotation_matrix_new = inv(rotation_matrix_new)
-            end                
+            end 
             for j in axes(matrix_coords[i],2)
                 matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
             end
@@ -937,12 +937,14 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         D.motion_matrices = [to_Matrix(F, sample) for sample in D.motion_samples]
     end
 
+    #=
     for i in eachindex(matrix_coords)
         centroid = F isa Polytope ? sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[i][:,j] for j in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
         for j in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
             matrix_coords[i][:,j] = matrix_coords[i][:,j] - centroid
         end
     end
+    =#
 
     xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
     ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
@@ -1271,8 +1273,10 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
 
+
     high_dim_curves = [[!(F isa Polytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
-    #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(D[1].G.variables)]...)
+    #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(!(F isa Polytope) ? D[1].G.variables : F.x_variables)]...)
+    #proj_curve = [[(pinv(randmat'*randmat)'*randmat')'*entry for entry in curve] for curve in high_dim_curves]
     Q, _ = qr(randn(Float64, !(F isa Polytope) ? length(D[1].G.variables) : length(F.x_variables), projected_dimension))
     randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in curve] for curve in high_dim_curves]
