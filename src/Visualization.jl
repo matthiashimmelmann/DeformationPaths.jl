@@ -1248,7 +1248,7 @@ end
 
 
 """
-    project_deformation_random(D, F[, filename])
+    project_deformation_random(D, F, projected_dimension[, filename])
 
 Compute a random projection of deformation paths.
 
