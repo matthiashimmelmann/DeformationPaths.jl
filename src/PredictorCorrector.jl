@@ -29,14 +29,14 @@ Apply Newton's method to correct `point` back to the constraints in `G`.
 - `G::ConstraintSystem`: The underlying geometric constraint system.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
 - `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 
 See also [`newton_correct`](@ref)
 """
-function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=3)::Vector{<:Real}
     return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -51,12 +51,12 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 - `jac::Matrix{Expression}`: Jacobian matrix corresponding to `equations` and `variables`.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
 - `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
@@ -84,7 +84,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
                 qnew = q + 0.1*v
                 break
             end
-            if damping_too_small >= 3 || Base.time()-start_time > length(point)/time_penalty
+            if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
                 throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
             end
         end
@@ -107,14 +107,14 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 - `G::ConstraintSystem`: The underlying geometric constraint system.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
 - `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 
 See also [`symmetric_newton_correct`](@ref)
 """
-function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+function symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     return symmetric_newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
 end
 
@@ -132,15 +132,15 @@ The symmetric Newton corrector evaluates the Jacobian matrix less often.
 - `jac::Matrix{Expression}`: Jacobian matrix corresponding to `equations` and `variables`.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
 - `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Real` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Real=3)::Vector{<:Real}
+function symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jacobian::Matrix{Expression}, p::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     global _q = Base.copy(p)
     global qnew = _q
-    global damping = 0.25
+    global damping = 0.2
     J = Matrix{Float64}(evaluate.(jacobian, variables=>_q))
     new_equations, J_new = Base.copy(equations), Base.copy(J)
     index = 0
@@ -170,7 +170,7 @@ function symmetric_newton_correct(equations::Vector{Expression}, variables::Vect
 		end
 		if damping > 1
 			global damping = 1
-        elseif damping < 1e-12  || Base.time()-start_time > length(point)/time_penalty
+        elseif damping < 1e-12  || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
             throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
         end
 

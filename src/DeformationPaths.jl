@@ -225,7 +225,7 @@ mutable struct DeformationPath
 
     ```
     """
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::DataType; show_progress::Bool=true, step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing)::DeformationPath
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, type::DataType; show_progress::Bool=true, step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         num_steps>=0 && step_size>=0 && tol>0 || throw(error("The `num_steps`, the `step_size` and `tol` needs to be a nonnegative, but are  $((num_steps, step_size, tol))."))
         if isnothing(start_point)
             start_point = to_Array(G, G.realization)
@@ -272,9 +272,9 @@ mutable struct DeformationPath
             try
                 q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
                 if symmetric_newton
-                    q = symmetric_newton_correct(G, q; tol=tol)
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 else
-                    q = newton_correct(G, q; tol=tol)
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 end
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
@@ -295,9 +295,9 @@ mutable struct DeformationPath
                         try
                             q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n)
                             if symmetric_newton
-                                q = symmetric_newton_correct(G, q; tol=tol)
+                                q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                             else
-                                q = newton_correct(G, q; tol=tol)
+                                q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                             end
                             push!(motion_samples, q)
                             push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
@@ -365,7 +365,7 @@ mutable struct DeformationPath
     # Returns
     - `DeformationPath` 
     """
-    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false)::DeformationPath
+    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
@@ -392,7 +392,7 @@ mutable struct DeformationPath
         @showprogress enabled=show_progress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
-                q = newton_correct(F.G, q; tol=tol)
+                q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
                 failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-12)
                     throw("Slow Progress detected.")
@@ -418,7 +418,7 @@ mutable struct DeformationPath
                     if failure_to_converge==1
                         try
                             q, prev_flex = euler_step(F.G, step_size/3, prev_flex, motion_samples[end], K_n)
-                            q = newton_correct(F.G, q; tol=tol)
+                            q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
                             push!(motion_samples, q)
                             push!(motion_matrices, to_Matrix(F, Float64.(q)))                    
                         catch
@@ -457,7 +457,7 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real`: Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-12)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
     @var c
@@ -485,7 +485,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         try
             cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value - local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=5)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty)
             push!(motion_samples, cur_point)
             break
         catch err
@@ -498,7 +498,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>start_c_value-step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(step_size/2)*(motion_samples[end]-motion_samples[end-1])/norm(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=3)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(step_size/2)*(motion_samples[end]-motion_samples[end-1])/norm(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty)
             push!(motion_samples, cur_point)
         catch e
             println(e)
