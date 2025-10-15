@@ -25,7 +25,7 @@ end
 
 Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stress.
 """
-function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
+function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
@@ -60,16 +60,9 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
             end
         end
     else
-        try 
-            res = solve(projective_stress_system; show_progress = false)
-            return real_solutions(res)[1]
-        catch
-            nothing
-        end
-
         N = size(flexes)[2]*size(stresses)[2]*2 # ambient dimension
         #TODO add Paul's test
-        for i in eachindex(λ)
+        for i in length(λ):-1:1
             try
                 L₀ = rand_subspace(length(λ); codim = length(λ)-i)
                 R_L₀ = solve(projective_stress_system; target_subspace = L₀)
@@ -86,6 +79,12 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=true, tol_rank_d
             catch e
                 continue
             end
+        end
+        try 
+            res = solve(projective_stress_system; show_progress = false)
+            return real_solutions(res)[1]
+        catch
+            nothing
         end
     end
     return []

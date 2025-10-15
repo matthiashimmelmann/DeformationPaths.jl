@@ -19,7 +19,7 @@ animate(D::DeformationPath, F::AllTypes, filename::Union{String,Nothing}=nothing
 And we can also visualize a random projection to 2D or 3D of deformation paths:
 
 ```@docs
-project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, projected_dimension::Int)
+project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing)
 ```
 
 ## Plotting Capabilities
