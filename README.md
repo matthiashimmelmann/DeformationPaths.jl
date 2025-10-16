@@ -2,6 +2,7 @@
 
 [![Documentation](https://img.shields.io/badge/docs-stable-blue.svg)](https://matthiashimmelmann.github.io/DeformationPaths.jl/)
 [![Run tests](https://github.com/matthiashimmelmann/DeformationPaths.jl/actions/workflows/run_tests.yml/badge.svg)](https://github.com/matthiashimmelmann/DeformationPaths.jl/actions/workflows/run_tests.yml)
+[![MIT license](https://img.shields.io/badge/license-MIT-yellow?style=plastic)](LICENSE)
 
 This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. By combining techniques from Riemannian optimization and homotopy continuation, we can locally find the closest point on the constraint set and thus traverse it. 
 
