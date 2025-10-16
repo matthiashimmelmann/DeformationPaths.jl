@@ -2,7 +2,7 @@ module DeformationPaths
 
 import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
-import GLMakie: NoShading, GeometryBasics, Vec3f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
+import GLMakie: NoShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
@@ -270,21 +270,22 @@ mutable struct DeformationPath
         failure_to_converge = 0
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n)
+                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                prev_flex = _prev_flex
                 if symmetric_newton
                     q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 else
                     q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 end
                 failure_to_converge = 0
-                if isapprox(q, motion_samples[end]; atol=1e-12)
+                if isapprox(q, motion_samples[end]; atol=1e-10)
                     throw("Slow Progress detected.")
                 end
                 push!(motion_samples, q)
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
                 i = i - 1
-                if failure_to_converge >= 4 || e == "The space of nontrivial infinitesimal motions is empty."
+                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     @warn "The approximation of a deformation path ended prematurely."
                     break
                 else
@@ -293,15 +294,17 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n)
-                            if symmetric_newton
-                                q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-                            else
+                            global added_index = 0
+                            for _ in 1:5
+                                q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n; tol=1e-5)
                                 q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-                            end
-                            push!(motion_samples, q)
-                            push!(motion_matrices, to_Matrix(G, Float64.(q)))                    
+                                push!(motion_samples, q)
+                                push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                                global added_index += 1
+                            end            
                         catch
+                            deleteat!(motion_samples, length(motion_samples)-added_index+1:length(motion_samples)-1)
+                            deleteat!(motion_matrices, length(motion_matrices)-added_index+1:length(motion_matrices)-1)
                             continue
                         end
                     elseif length(motion_samples)==1
@@ -309,11 +312,34 @@ mutable struct DeformationPath
                         prev_flex = -prev_flex
                     else 
                         @info "Acceleration-based cusp method is being used."
+                        flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
+                        projection = flexes*pinv(flexes'*flexes)*flexes'
                         J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
-                        acceleration = -pinv(J)*evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex
-                        acceleration = acceleration ./ norm(acceleration)
+                        #=Hessians = [evaluate(differentiate(G.jacobian[i,:], G.variables), G.variables=>motion_samples[end])  for i in axes(G.jacobian, 1)]
+                        b = [prev_flex'*H*prev_flex for H in Hessians]
+                        acceleration = -J'*pinv(J*J')*b=#
+                        acceleration = pinv(J) * (-evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex)
+                        acceleration, prev_flex = acceleration ./ norm(acceleration), prev_flex ./ norm(prev_flex)
                         prev_flex = - prev_flex - acceleration
+                        prev_flex = projection*prev_flex
                         prev_flex = prev_flex ./ norm(prev_flex)
+
+                        q = motion_samples[end] + step_size*prev_flex
+                        try
+                            if symmetric_newton
+                                q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                            else
+                                q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                            end
+                            if isapprox(q, motion_samples[end]; atol=1e-10)
+                                throw("Slow Progress detected.")
+                            end
+                            push!(motion_samples, q)
+                            push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                        catch erro
+                            failure_to_converge += 1
+                            continue
+                        end
                     end
                 end
             end
@@ -391,10 +417,10 @@ mutable struct DeformationPath
         failure_to_converge = 0
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n)
+                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
                 q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
                 failure_to_converge = 0
-                if isapprox(q, motion_samples[end]; atol=1e-12)
+                if isapprox(q, motion_samples[end]; atol=1e-10)
                     throw("Slow Progress detected.")
                 end
 
@@ -409,7 +435,7 @@ mutable struct DeformationPath
                 push!(_contacts, F.contacts)    
             catch e
                 i = i - 1
-                if failure_to_converge == 3 || e == "The space of nontrivial infinitesimal motions is empty."
+                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
@@ -417,11 +443,17 @@ mutable struct DeformationPath
                     failure_to_converge += 1
                     if failure_to_converge==1
                         try
-                            q, prev_flex = euler_step(F.G, step_size/3, prev_flex, motion_samples[end], K_n)
-                            q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
-                            push!(motion_samples, q)
-                            push!(motion_matrices, to_Matrix(F, Float64.(q)))                    
+                            global added_index = 0
+                            for _ in 1:5
+                                q, prev_flex = euler_step(F.G, step_size/5, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                                q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
+                                push!(motion_samples, q)
+                                push!(motion_matrices, to_Matrix(F, Float64.(q)))
+                                global added_index += 1
+                            end            
                         catch
+                            deleteat!(motion_samples, length(motion_samples)-added_index+1:length(motion_samples)-1)
+                            deleteat!(motion_matrices, length(motion_samples)-added_index+1:length(motion_samples)-1)
                             continue
                         end
                     elseif length(motion_samples)==1
@@ -429,11 +461,34 @@ mutable struct DeformationPath
                         prev_flex = -prev_flex
                     else
                         @info "Acceleration-based cusp method is being used."
+                        flexes = compute_nontrivial_inf_flexes(F.G, motion_samples[end], K_n; tol=1e-3)
+                        projection = flexes*pinv(flexes'*flexes)*flexes'
                         J = evaluate.(F.G.jacobian, F.G.variables=>motion_samples[end])
-                        acceleration = -pinv(J)*evaluate.(F.G.jacobian, F.G.variables=>prev_flex)*prev_flex
-                        acceleration = acceleration ./ norm(acceleration)
+                        #=Hessians = [evaluate(differentiate(F.G.jacobian[i,:], F.G.variables), F.G.variables=>motion_samples[end])  for i in axes(F.G.jacobian, 1)]
+                        b = [prev_flex'*H*prev_flex for H in Hessians]
+                        acceleration = -J'*pinv(J*J')*b=#
+                        acceleration = pinv(J) * (-evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex)
+                        acceleration, prev_flex = acceleration ./ norm(acceleration), prev_flex ./ norm(prev_flex)
                         prev_flex = - prev_flex - acceleration
+                        prev_flex = projection*prev_flex
                         prev_flex = prev_flex ./ norm(prev_flex)
+                        
+                        q = motion_samples[end] + step_size*prev_flex
+                        try
+                            if symmetric_newton
+                                q = symmetric_newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
+                            else
+                                q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
+                            end
+                            if isapprox(q, motion_samples[end]; atol=1e-10)
+                                throw("Slow Progress detected.")
+                            end
+                            push!(motion_samples, q)
+                            push!(motion_matrices, to_Matrix(F.G, Float64.(q)))
+                        catch e
+                            failure_to_converge += 1
+                            continue
+                        end
                     end
                 end
             end
