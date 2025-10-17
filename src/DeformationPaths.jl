@@ -501,15 +501,34 @@ end
 
 
 """
-    DeformationPath_EdgeContraction(F::Polytope, flex_mult, num_steps[; kwargs...])
+    DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction, contraction_target, contraction_start[; kwargs...])
 
-Create an approximate continuous motion from a `Polytope` object induced by contracting a single edge given by `edge_for_contraction`.
+Create an approximate continuous motion from a `Polytope` object induced by continuously perturbing a single edge given by `edge_for_contraction` from the length `contraction_start` to `contraction_target`.
 
 # Arguments
 - `F::Polytope`: The underlying polytope.
 - `edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}`: The edge in `F` that is supposed to be contracted.
 - `contraction_target::Real`: To what length ratio the edge is suppsed to be contracted.
-- `step_size::Real`: Step size of the deformation path. 
+- `contraction_start::Real`: The edge length where the induced deformation path begins.
+
+For additional keywords, see [`DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real)`](@ref).
+"""
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real, contraction_start::Real; kwargs...)::DeformationPath
+    D1 = DeformationPath_EdgeContraction(F, edge_for_contraction, contraction_start; kwargs...)
+    D2 = DeformationPath_EdgeContraction(F, edge_for_contraction, contraction_target; contraction_start=contraction_start, realization_start=D1.motion_samples[end], kwargs...)
+    return D2
+end
+
+"""
+    DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction, contraction_target[; kwargs...])
+
+Create an approximate continuous motion from a `Polytope` object induced by continuously perturbing a single edge given by `edge_for_contraction` from its original length to the length `contraction_target`.
+
+# Arguments
+- `F::Polytope`: The underlying polytope.
+- `edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}`: The edge in `F` that is supposed to be contracted.
+- `contraction_target::Real`: To what length ratio the edge is suppsed to be contracted.
+- `step_size::Real` (optional): Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
 function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
@@ -523,7 +542,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
     corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
     _G = deepcopy(F.G)
     _G.equations[corresponding_equation_index] = sum( (_G.xs[:,edge_for_contraction[1]]-_G.xs[:,edge_for_contraction[2]]) .^2) - c^2
-    if !is_nothing(contraction_start) && !isnothing(realization_start)
+    if !isnothing(contraction_start) && !isnothing(realization_start)
         start_c_value = contraction_start
         motion_samples = [realization_start]
     else
