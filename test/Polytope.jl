@@ -3,8 +3,9 @@
     F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'))
     plot(F)
     if is_no_ci
-        _D = DeformationPath_EdgeContraction(F, [9, 10], 0.5)
-        animate(_D,F, "../animations/dodecahedron_EdgeContraction"; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
+        _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
+        _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; contraction_start=0.75, realization_start=_D.motion_samples[end])
+        animate(_D,F, "../animations/dodecahedron_EdgeContraction"; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10],  azimuth = π/10 + 2pi * 125 / 205, elevation=π/10, renderEntirePolytope=true, padding=0.01)
         #=Defs = Vector{DeformationPath}([])
         for i in 1:14
             _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
@@ -33,7 +34,7 @@ end
     @test !is_rigid(F) # Zonotope
     if is_no_ci
         D = DeformationPath(F, [], 350; step_size=0.008, tol=1e-6)
-        animate(D,F,"../animations/greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=true,  rotation_frames=800, padding=0.1)
+        animate(D,F,"../animations/greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=false,  rotation_frames=800, padding=0.1)
     end
 end
 
@@ -46,7 +47,7 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 500; step_size=0.005, tol=1e-6)
-        animate(D,F,"../animations/truncatedDodecahedron_motion"; fixed_vertices=(9,32,33), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.025)
+        animate(D,F,"../animations/truncatedDodecahedron_motion"; fixed_vertices=(9,32,33), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.025)
     end
 en
 
@@ -58,7 +59,7 @@ en
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.0085, tol=1e-6)
-        animate(D,F,"../animations/RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, animate_rotation=true, rotation_frames=600, padding=-0.75)
+        animate(D,F,"../animations/RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, animate_rotation=false, rotation_frames=600, padding=-0.75)
     end
 end
 
@@ -70,7 +71,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [1,1,1], 200; step_size=0.01)
-        animate(D,F,"../animations/cube_motion"; fixed_vertices=(1,2,3), filetype="mp4", renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/cube_motion"; fixed_vertices=(1,2,3), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -82,7 +83,7 @@ end
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0075, tol=1e-6)
-        animate(D,F,"../animations/cuboctahedron_motion"; fixed_vertices=(1,5,9), filetype="mp4", renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi,)
+        animate(D,F,"../animations/cuboctahedron_motion"; fixed_vertices=(1,5,9), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi,)
     end
 end
 
@@ -95,7 +96,7 @@ end
     @test !is_rigid(F) # "generic" Minkowski sum of cube and octahedron
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0065, tol=1e-6, )
-        animate(D,F,"../animations/smallRhombiCuboctahedron_motion"; fixed_vertices=(1,3,9), filetype="mp4", azimuth=0.075*pi, elevation=0.05*pi, renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800)
+        animate(D,F,"../animations/smallRhombiCuboctahedron_motion"; fixed_vertices=(1,3,9), filetype="mp4", azimuth=0.075*pi, elevation=0.05*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800)
     end
 end
 
@@ -107,7 +108,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0125, tol=1e-6)
-        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(9,11,17), filetype="mp4", elevation=pi/10, azimuth=0., renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(9,11,17), filetype="mp4", elevation=pi/10, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -119,7 +120,7 @@ end
     @test !is_rigid(F) # Zontope
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-4)
-        animate(D,F,"../animations/greatRhombiCuboctahedron_motion"; fixed_vertices=(3,6,14), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/greatRhombiCuboctahedron_motion"; fixed_vertices=(3,6,14), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -160,7 +161,7 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.0075, tol=1e-6)
-        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,16), filetype="mp4", renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,16), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -317,7 +318,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-4)
-        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(1,3,7), filetype="mp4", renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(1,3,7), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -349,7 +350,7 @@ end
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
     if is_no_ci
         D = DeformationPath(F, [], 250; step_size=0.0075, tol=1e-4)
-        animate(D,F,"../animations/smallRhombiIcosidodecahedron_motion"; fixed_vertices=(7,8,40), filetype="mp4", elevation=0.05*pi, azimuth=0., renderEntirePolytope=true, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/smallRhombiIcosidodecahedron_motion"; fixed_vertices=(7,8,40), filetype="mp4", elevation=0.05*pi, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -362,6 +363,6 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0085, tol=1e-6)
-        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,15), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, elevation=0.15*pi, animate_rotation=true,  rotation_frames=800, padding=0.01)
+        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,15), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, elevation=0.15*pi, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end

@@ -512,7 +512,7 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real`: Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
     @var c
@@ -523,13 +523,17 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
     corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
     _G = deepcopy(F.G)
     _G.equations[corresponding_equation_index] = sum( (_G.xs[:,edge_for_contraction[1]]-_G.xs[:,edge_for_contraction[2]]) .^2) - c^2
-    start_c_value = sqrt( sum( (_G.realization[:,edge_for_contraction[1]]-_G.realization[:,edge_for_contraction[2]]) .^2) )
-    
-    motion_samples = [to_Array(_G, _G.realization)]
+    if !is_nothing(contraction_start) && !isnothing(realization_start)
+        start_c_value = contraction_start
+        motion_samples = [realization_start]
+    else
+        start_c_value = sqrt( sum( (_G.realization[:,edge_for_contraction[1]]-_G.realization[:,edge_for_contraction[2]]) .^2) )
+        motion_samples = [to_Array(_G, _G.realization)]
+    end
     index = 1
-    if contraction_target > 1
+    if contraction_target - start_c_value > 0
         local_step_size = -step_size
-    elseif contraction_target > 0
+    elseif contraction_target - start_c_value <= 0 && contraction_target > 0
         local_step_size = step_size
     else
         throw(error("The `contraction_target` needs to be bigger than 0, but is $(contraction_target)"))
