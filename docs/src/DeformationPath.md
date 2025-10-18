@@ -8,4 +8,10 @@ CurrentModule = DeformationPaths.DeformationPaths
 DeformationPath
 
 DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real)
+
+DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real, contraction_start::Real)
+
+resolve_singularity
+
+stich_deformation_paths
 ```

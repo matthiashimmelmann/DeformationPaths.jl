@@ -25,15 +25,16 @@ import DeformationPaths:    Framework,
                             add_equations!,
                             compute_nontrivial_inf_flexes,
                             ConstraintSystem,
-                            compute_nonblocked_flex
+                            compute_nonblocked_flex,
+                            stich_deformation_paths
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 @testset "DeformationPaths.jl" begin
-    include("Framework.jl")
     include("Polytope.jl")
+    include("Framework.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
     include("various.jl")
