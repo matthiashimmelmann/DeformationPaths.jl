@@ -1376,7 +1376,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
             dirs = [Vec3f(randmat'flex) for flex in flexes]
             arrows!(ax, pts, dirs; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, arrowsize=0.135*arrowsize)
         end
-        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol)
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol, strokewidth=1, strokecolor=:black)
     else
         foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
         if !isempty(flexes)
@@ -1384,7 +1384,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
             dirs = [Vec2f(randmat'flex) for flex in flexes]
             arrows!(ax, pts, dirs; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, arrowsize=arrowsize)
         end
-        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol)
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol, strokewidth=1, strokecolor=:black)
     end
     if !isnothing(filename)
         save("$(filename).png", fig)
