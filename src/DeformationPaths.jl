@@ -623,7 +623,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         end
     end
     _G.equations = _G.equations[filter(i->i!=corresponding_equation_index, 1:length(_G.equations))]
-    DeformationPath(_G, motion_samples)
+    return DeformationPath(_G, motion_samples)
 end
 
 
