@@ -38,6 +38,14 @@ function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, eq
 end
 
 
+function Base.:(==)(G1::ConstraintSystem, G2::ConstraintSystem)
+    """
+    Overloads the equality operator for `ConstraintSystem`.
+    """
+    return G1.vertices==G2.vertices && length(G1.variables)==length(G2.variables) &&  all(i->G1.variables[i]==G2.variables[i], eachindex(G1.variables)) && length(G1.equations)==length(G2.equations) && all(i->G1.equations[i]==G2.equations[i], eachindex(G1.equations))
+end
+
+
 function Base.show(io::IO, G::ConstraintSystem)::Nothing
     """
     Display method for the base clase `ConstraintSystem`.

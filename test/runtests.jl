@@ -25,7 +25,8 @@ import DeformationPaths:    Framework,
                             add_equations!,
                             compute_nontrivial_inf_flexes,
                             ConstraintSystem,
-                            compute_nonblocked_flex
+                            compute_nonblocked_flex,
+                            stich_deformation_paths
 using Test
 using HomotopyContinuation
 using LinearAlgebra
