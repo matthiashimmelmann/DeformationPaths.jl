@@ -927,9 +927,9 @@ Compute an animation for a 3-dimensional polytope.
 """
 function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
+    matrix_coords = !(F isa Polytope) ? D.motion_matrices : [matrix[:,1:(size(F.G.realization)[2]-length(F.facets))] for matrix in D.motion_matrices]
     (F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
 
@@ -1008,12 +1008,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     time=Observable(1)
 
     allVertices=@lift begin
-        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
+        pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
     allVertices_asLists = @lift begin
-        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
+        pointys = matrix_coords[$time]
         [F isa Polytope ? pointys[:,j] .* scaling_factor : pointys[:,j] for j in axes(pointys,2)]
     end
 
@@ -1054,7 +1054,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
             else
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth
-            end
+            end        
         end
     else
         for t in timestamps
