@@ -287,15 +287,15 @@ mutable struct DeformationPath
             catch e
                 global failure_to_converge += 1
                 if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
-                    @warn "The approximation of a deformation path ended prematurely."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     try
-                        prev_flex = resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                        prev_flex = resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                     catch err
-                        println(err)
+                        show_progress && println(err)
                         nothing
                     end
                 end
@@ -393,13 +393,13 @@ mutable struct DeformationPath
             catch e
                 global failure_to_converge += 1
                 if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
-                    @warn "The approximation of a deformation path ended prematurely."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
                 else
                     # If Newton's method only diverges once and we are in a singularity,
                     # we first try to reverse the previous flex before exiting the routine.
                     try
-                        prev_flex = resolve_singularity(F.G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                        prev_flex = resolve_singularity(F.G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                     catch
                         nothing
                     end
@@ -418,9 +418,9 @@ end
 
 Attempts to resolve a singularity at `motion_samples[end]`.
 """
-function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failure_to_converge::Int, motion_matrices::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
+function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failure_to_converge::Int, motion_matrices::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
     if failure_to_converge==1 && length(motion_samples)>1
-        @info "Trying smaller step sizes."
+        show_progress && @info "Trying smaller step sizes."
         for index in 1:5
             q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n; tol=1e-5)
             if symmetric_newton
@@ -434,10 +434,10 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failur
             index>1 && deleteat!(motion_matrices, length(motion_matrices)-1)
         end            
     elseif failure_to_converge==1
-        @info "Direction is reversed."
+        show_progress && @info "Direction is reversed."
         prev_flex = -prev_flex
     #=elseif failure_to_converge==2 && length(motion_samples)==3
-        @info "Using quadratic interpolation to predict the next point."
+        show_progress && @info "Using quadratic interpolation to predict the next point."
         interpolating_points = motion_samples[end-2:end]
         @var t, a[1:length(interpolating_points[3]), 1:2]
         quadric = interpolating_points[3]+t*a[:,1]+t^2*a[:,2]
@@ -455,7 +455,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failur
         push!(motion_samples, q)
         push!(motion_matrices, to_Matrix(G, Float64.(q)))
     elseif failure_to_converge==2 && length(motion_samples)>=4
-        @info "Using cubic interpolation to predict the next point."
+        show_progress && @info "Using cubic interpolation to predict the next point."
         interpolating_points = motion_samples[end-3:end]
         @var t, a[1:length(interpolating_points[4]), 1:3]
         cubic = interpolating_points[4]+t*a[:,1]+t^2*a[:,2]+t^3*a[:,3]
@@ -473,7 +473,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failur
         push!(motion_samples, q)
         push!(motion_matrices, to_Matrix(G, Float64.(q)))=#
     else
-        @info "Acceleration-based cusp method is being used."
+        show_progress && @info "Acceleration-based cusp method is being used."
         flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
         projection = flexes*pinv(flexes'*flexes)*flexes'
         J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
@@ -582,7 +582,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         throw(error("The `contraction_target` needs to be bigger than 0, but is $(contraction_target)"))
     end
     while true
-        println("Trial $index")
+        show_progress && println("Trial $index")
         index = index+1
         try
             cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
@@ -591,7 +591,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
             push!(motion_samples, cur_point)
             break
         catch err
-            println(err)
+            show_progress && println(err)
             continue
         end
     end
@@ -617,7 +617,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
                 cur_point = newton_correct(local_equations, _G.variables, local_jacobian, next_point; tol=tol, time_penalty=time_penalty)
                 push!(motion_samples, cur_point)
             catch _
-                @warn "The approximation of a deformation path ended prematurely."
+                show_progress && @warn "The approximation of a deformation path ended prematurely."
                 break
             end
         end

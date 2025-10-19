@@ -927,7 +927,7 @@ Compute an animation for a 3-dimensional polytope.
 """
 function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    matrix_coords = !(F isa Polytope) ? D.motion_matrices : [matrix[:,1:(size(F.G.realization)[2]-length(F.facets))] for matrix in D.motion_matrices]
+    matrix_coords = D.motion_matrices
     (F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
@@ -993,6 +993,8 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
         end
     end
     =#
+
+    matrix_coords = !(F isa Polytope) ? matrix_coords : [matrix[:,1:(size(F.G.realization)[2])-length(F.facets)] for matrix in matrix_coords]
 
     if !isnothing(padding)
         xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
