@@ -1088,13 +1088,10 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::U
     end
 
     if !isnothing(padding)
-        println("$(matrix_coords[5]) $(matrix_coords[end])")
         xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
         ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
         limits= [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
         translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
-        display(xlims)
-        display(limits)
         xlims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
         translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
         ylims!(ax, limits[1]-padding+0.5*translation-maximum(F.radii), limits[2]+padding+0.5*translation+maximum(F.radii))
