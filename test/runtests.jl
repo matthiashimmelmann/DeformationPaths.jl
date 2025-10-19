@@ -34,8 +34,8 @@ using IterTools
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 @testset "DeformationPaths.jl" begin
-    include("Framework.jl")
     include("Polytope.jl")
+    include("Framework.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
     include("various.jl")
