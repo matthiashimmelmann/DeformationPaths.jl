@@ -381,7 +381,7 @@ mutable struct DeformationPath
                 end
 
                 push!(motion_samples, q)
-                push!(_contacts, F.contacts)    
+                push!(_contacts, F.contacts)
             catch e
                 # If Newton's method only diverges once and we are in a singularity,
                 # we first try to reverse the previous flex before exiting the routine.
@@ -513,6 +513,9 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, K_n::C
         else
             show_progress && @info "Acceleration-based cusp method is being used."
             flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
+            if size(flexes)[2]==0
+                break
+            end
             projection = flexes*pinv(flexes'*flexes)*flexes'
             J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
             acceleration = pinv(J) * (-evaluate.(G.jacobian, G.variables=>_prev_flex)*_prev_flex)
