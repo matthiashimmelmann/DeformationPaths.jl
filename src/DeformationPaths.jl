@@ -369,7 +369,7 @@ mutable struct DeformationPath
                     q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
                 end
 
-                if isapprox(q, motion_samples[end]; atol=1e-10)
+                if norm(q-motion_samples[end]) < 1e-6 || norm(q-motion_samples[end]) > step_size*4
                     throw("Slow Progress detected.")
                 end
 
@@ -426,7 +426,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                 end
                 length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
                 length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
-                if norm(helper_samples[end]-motion_samples[end]) < 1e-6 || norm(helper_samples[end]-motion_samples[end]) > step_size*5
+                if norm(helper_samples[end]-motion_samples[end]) < 1e-6 || norm(helper_samples[end]-motion_samples[end]) > step_size*4
                     _prev_flex = prev_flex
                     continue
                 end
