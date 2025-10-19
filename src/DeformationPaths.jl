@@ -408,7 +408,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
     global failure_to_converge = 0
     global success = false
     _prev_flex = copy(prev_flex)
-    while failure_to_converge < 4
+    while failure_to_converge < 3
         global failure_to_converge += 1
         if failure_to_converge==1 && length(motion_samples)>1
             show_progress && @info "Trying smaller step sizes."
@@ -426,7 +426,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                 end
                 length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
                 length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
-                if norm(helper_samples[end]-motion_samples[end]) < 1e-7 || norm(helper_samples[end]-motion_samples[end]) > step_size*5
+                if norm(helper_samples[end]-motion_samples[end]) < 1e-6 || norm(helper_samples[end]-motion_samples[end]) > step_size*5
                     _prev_flex = prev_flex
                     continue
                 end
@@ -455,6 +455,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
             catch
                 continue
             end
+        #=
         elseif failure_to_converge==2 && length(motion_samples)==3
             show_progress && @info "Using quadratic interpolation to predict the next point."
             interpolating_points = motion_samples[end-2:end]
@@ -513,7 +514,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
             catch
                 _prev_flex = prev_flex
                 continue
-            end
+            end=#
         else
             show_progress && @info "Acceleration-based cusp method is being used."
             flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
