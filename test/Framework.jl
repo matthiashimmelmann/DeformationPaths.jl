@@ -1,7 +1,7 @@
 
 @testset "double_watt" begin
     F = Framework([[1,2],[2,3],[2,4],[3,9],[3,4],[3,5],[4,5],[5,6],[6,7],[7,8],[7,9],[8,9],[8,10],[9,10],[10,11]], Matrix([0 0; 1 0; 2 1; 1 2; 3 2; 4 2; 5 2; 7 2; 6 1; 7 0; 8 0;]'); pinned_vertices=[1,6,11])
-    plot(F, "../animations/Double_Watt"; padding=0.35, pin_point_offset=0.2)
+    plot(F; padding=0.35, pin_point_offset=0.2)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.05)
     if is_no_ci
         animate(D,F, "../animations/Double_Watt"; padding=0.35, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2, filetype="mp4")

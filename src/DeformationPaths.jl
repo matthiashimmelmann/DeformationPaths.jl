@@ -267,7 +267,7 @@ mutable struct DeformationPath
         prev_flex = length(flex_mult)==0 ? [0 for _ in axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
         prev_flex = prev_flex ./ norm(prev_flex)
         
-        motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
+        motion_samples = [Float64.(start_point)]
         @showprogress enabled=show_progress for i in 1:num_steps
             try
                 q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
@@ -281,15 +281,15 @@ mutable struct DeformationPath
                     throw("Slow Progress detected.")
                 end
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
-                prev_flex, success = resolve_singularity(G, motion_samples, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                 if !success || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
                 end
             end
         end
+        motion_matrices = [to_Matrix(G, Float64.(sample)) for sample in motion_samples]
         new(G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), [])
     end
 
@@ -385,7 +385,7 @@ mutable struct DeformationPath
             catch e
                 # If Newton's method only diverges once and we are in a singularity,
                 # we first try to reverse the previous flex before exiting the routine.
-                prev_flex, success = resolve_singularity(F.G, motion_samples, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                prev_flex, success = resolve_singularity(F.G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                 if !success || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
@@ -404,7 +404,7 @@ end
 
 Attempts to resolve a singularity at `motion_samples[end]`.
 """
-function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion_matrices::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
+function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
     global failure_to_converge = 0
     global success = false
     _prev_flex = copy(prev_flex)
@@ -412,7 +412,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
         global failure_to_converge += 1
         if failure_to_converge==1 && length(motion_samples)>1
             show_progress && @info "Trying smaller step sizes."
-            helper_samples, helper_matrices = [motion_samples[end]], [motion_matrices[end]]
+            helper_samples = [motion_samples[end]]
             try
                 for _ in 1:5
                     q, _prev_flex = euler_step(G, step_size/5, _prev_flex, helper_samples[end], K_n; tol=1e-5)
@@ -422,10 +422,8 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                         q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                     end
                     push!(helper_samples, q)
-                    push!(helper_matrices, to_Matrix(G, Float64.(q)))
                 end
                 length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
-                length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
                 if norm(helper_samples[end]-motion_samples[end]) < 1e-6 || norm(helper_samples[end]-motion_samples[end]) > step_size*4
                     _prev_flex = prev_flex
                     continue
@@ -435,7 +433,6 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
             catch
                 _prev_flex = prev_flex
                 length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
-                length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
                 continue
             end
         elseif failure_to_converge==1
@@ -448,7 +445,6 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                     q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 end
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))
                 global success = true
                 _prev_flex = -_prev_flex
                 break
@@ -508,7 +504,6 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                 end
 
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))
                 global success = true
                 break
             catch
@@ -539,7 +534,6 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion
                 end
 
                 push!(motion_samples, q)
-                push!(motion_matrices, to_Matrix(G, Float64.(q)))
                 global success = true
                 break
             catch

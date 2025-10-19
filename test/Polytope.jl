@@ -4,23 +4,24 @@
     plot(F)
     if is_no_ci
         Defs = Vector{DeformationPath}([])
-        for i in 1:10
-            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
+        for i in 1:12
+            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.975)
             _F = Polytope(F.facets, _D.motion_matrices[end])
-            animate(_D,_F, "../animations/animate_Dodec_Edge_Projection"; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 230, elevation=π/10, renderEntirePolytope=true, padding=0.01)
-            plot(_F; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 230, elevation=π/10)
+            animate(_D,_F, "../animations/animate_Dodec_Edge_Projection"; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 190, elevation=π/10, renderEntirePolytope=true, padding=0.01)
+            plot(_F; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)
             push!(Defs,_D)
             project_deformation_random(Defs, F, 2, "../animations/Dodec_projection")
         end
-        mini, index = findmin(D->norm((D.motion_samples[1]-D.motion_samples[2]) - (Defs[1].motion_samples[2]-Defs[1].motion_samples[1])), Defs[2:end])
+        mini, index = findmin((D1,D2)->norm((D1.motion_samples[1]-D1.motion_samples[2]) - (D2[1].motion_samples[2]-D2[1].motion_samples[1])), collect(product(Defs,Defs)))
         println("$mini, $index")
-        _D = stich_deformation_paths(Defs[1], Defs[index])
-        animate(_D,F, "../animations/dodecahedron_EdgeContraction"; scaling_factor=0.98, recompute_deformation_samples=false, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 230, elevation=π/10, renderEntirePolytope=true, padding=0.01)
-        for i in 11:14
+        DPaths = collect(product(Defs,Defs))[index]
+        _D = stich_deformation_paths(DPaths[1], DPaths[2])
+        animate(_D,F, "../animations/dodecahedron_EdgeContraction"; scaling_factor=0.98, recompute_deformation_samples=false, filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
+        for i in 13:16
             _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
             animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             _F = Polytope(F.facets, _D.motion_matrices[end])
-            plot(_F; azimuth = π/10 + 2pi * 125 / 230, special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
+            plot(_F; azimuth = π/10 + 2pi * 125 / 190, special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
             project_deformation_random(Defs, F, 2, "../animations/Dodec_projection")
         end
