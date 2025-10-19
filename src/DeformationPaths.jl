@@ -268,7 +268,6 @@ mutable struct DeformationPath
         prev_flex = prev_flex ./ norm(prev_flex)
         
         motion_samples, motion_matrices = [Float64.(start_point)], [to_Matrix(G, Float64.(start_point))]
-        global failure_to_converge = 0
         @showprogress enabled=show_progress for i in 1:num_steps
             try
                 q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
@@ -278,26 +277,16 @@ mutable struct DeformationPath
                 else
                     q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                 end
-                global failure_to_converge = 0
                 if isapprox(q, motion_samples[end]; atol=1e-10)
                     throw("Slow Progress detected.")
                 end
                 push!(motion_samples, q)
                 push!(motion_matrices, to_Matrix(G, Float64.(q)))                   
             catch e
-                global failure_to_converge += 1
-                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
+                prev_flex, success = resolve_singularity(G, motion_samples, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                if !success || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
-                else
-                    # If Newton's method only diverges once and we are in a singularity,
-                    # we first try to reverse the previous flex before exiting the routine.
-                    try
-                        prev_flex = resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
-                    catch err
-                        show_progress && println(err)
-                        nothing
-                    end
                 end
             end
         end
@@ -348,7 +337,7 @@ mutable struct DeformationPath
     # Returns
     - `DeformationPath` 
     """
-    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
+    function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, symmetric_newton::Bool=false, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         start_point = to_Array(F, F.G.realization)
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
@@ -371,12 +360,15 @@ mutable struct DeformationPath
             _contacts = [F.contacts]
         end
 
-        failure_to_converge = 0
         @showprogress enabled=show_progress for i in 1:num_steps
             try
                 q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
-                q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
-                global failure_to_converge = 0
+                if symmetric_newton
+                    q = symmetric_newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
+                end
+
                 if isapprox(q, motion_samples[end]; atol=1e-10)
                     throw("Slow Progress detected.")
                 end
@@ -391,18 +383,12 @@ mutable struct DeformationPath
                 push!(motion_samples, q)
                 push!(_contacts, F.contacts)    
             catch e
-                global failure_to_converge += 1
-                if failure_to_converge >= 3 || e == "The space of nontrivial infinitesimal motions is empty."
+                # If Newton's method only diverges once and we are in a singularity,
+                # we first try to reverse the previous flex before exiting the routine.
+                prev_flex, success = resolve_singularity(F.G, motion_samples, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                if !success || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely."
                     break
-                else
-                    # If Newton's method only diverges once and we are in a singularity,
-                    # we first try to reverse the previous flex before exiting the routine.
-                    try
-                        prev_flex = resolve_singularity(F.G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
-                    catch
-                        nothing
-                    end
                 end
             end
         end
@@ -418,81 +404,150 @@ end
 
 Attempts to resolve a singularity at `motion_samples[end]`.
 """
-function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, failure_to_converge::Int, motion_matrices::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
-    if failure_to_converge==1 && length(motion_samples)>1
-        show_progress && @info "Trying smaller step sizes."
-        for index in 1:5
-            q, prev_flex = euler_step(G, step_size/5, prev_flex, motion_samples[end], K_n; tol=1e-5)
-            if symmetric_newton
-                q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-            else
-                q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, motion_matrices::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
+    global failure_to_converge = 0
+    global success = false
+    _prev_flex = copy(prev_flex)
+    while failure_to_converge < 4
+        global failure_to_converge += 1
+        if failure_to_converge==1 && length(motion_samples)>1
+            show_progress && @info "Trying smaller step sizes."
+            helper_samples, helper_matrices = [motion_samples[end]], [motion_matrices[end]]
+            try
+                for _ in 1:5
+                    q, _prev_flex = euler_step(G, step_size/5, _prev_flex, helper_samples[end], K_n; tol=1e-5)
+                    if symmetric_newton
+                        q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                    else
+                        q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                    end
+                    push!(helper_samples, q)
+                    push!(helper_matrices, to_Matrix(G, Float64.(q)))
+                end
+                length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
+                length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
+                if norm(helper_samples[end]-motion_samples[end]) < 1e-7 || norm(helper_samples[end]-motion_samples[end]) > step_size*5
+                    _prev_flex = prev_flex
+                    continue
+                end
+                global success = true
+                break
+            catch
+                _prev_flex = prev_flex
+                length(helper_samples)>1 && push!(motion_samples, helper_samples[end])
+                length(helper_matrices)>1 && push!(motion_matrices, helper_matrices[end])
+                continue
             end
-            push!(motion_samples, q)
-            push!(motion_matrices, to_Matrix(G, Float64.(q)))
-            index>1 && deleteat!(motion_samples, length(motion_samples)-1)
-            index>1 && deleteat!(motion_matrices, length(motion_matrices)-1)
-        end            
-    elseif failure_to_converge==1
-        show_progress && @info "Direction is reversed."
-        prev_flex = -prev_flex
-    #=elseif failure_to_converge==2 && length(motion_samples)==3
-        show_progress && @info "Using quadratic interpolation to predict the next point."
-        interpolating_points = motion_samples[end-2:end]
-        @var t, a[1:length(interpolating_points[3]), 1:2]
-        quadric = interpolating_points[3]+t*a[:,1]+t^2*a[:,2]
-        equations = vcat(evaluate(quadric, t=>-step_size) .- interpolating_points[2], evaluate(quadric, t=>-2*step_size) .- interpolating_points[1])
-        a_sys = System(equations)
-        next_a = real_solutions(solve(a_sys))[1]
-        a_variables = variables(a_sys)
-        q = evaluate(quadric, vcat(t, a_variables)=>vcat(step_size, next_a))
-        if symmetric_newton
-            q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-        else
-            q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-        end
+        elseif failure_to_converge==1
+            show_progress && @info "Direction is reversed."
+            q = motion_samples[end] - step_size*_prev_flex
+            try
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                end
+                push!(motion_samples, q)
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                global success = true
+                _prev_flex = -_prev_flex
+                break
+            catch
+                continue
+            end
+        elseif failure_to_converge==2 && length(motion_samples)==3
+            show_progress && @info "Using quadratic interpolation to predict the next point."
+            interpolating_points = motion_samples[end-2:end]
+            @var t, a[1:length(interpolating_points[3]), 1:2]
+            quadric = interpolating_points[3]+t*a[:,1]+t^2*a[:,2]
+            equations = vcat(evaluate(quadric, t=>-step_size) .- interpolating_points[2], evaluate(quadric, t=>-2*step_size) .- interpolating_points[1])
+            a_sys = System(equations)
+            next_a = real_solutions(solve(a_sys))[1]
+            a_variables = variables(a_sys)
+            q = evaluate(quadric, vcat(t, a_variables)=>vcat(step_size, next_a))
+            try
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                end
 
-        push!(motion_samples, q)
-        push!(motion_matrices, to_Matrix(G, Float64.(q)))
-    elseif failure_to_converge==2 && length(motion_samples)>=4
-        show_progress && @info "Using cubic interpolation to predict the next point."
-        interpolating_points = motion_samples[end-3:end]
-        @var t, a[1:length(interpolating_points[4]), 1:3]
-        cubic = interpolating_points[4]+t*a[:,1]+t^2*a[:,2]+t^3*a[:,3]
-        equations = vcat(evaluate(cubic, t=>-step_size) .- interpolating_points[3], evaluate(cubic, t=>-2*step_size) .- interpolating_points[2], evaluate(cubic, t=>-3*step_size) .- interpolating_points[1])
-        a_sys = System(equations)
-        next_a = real_solutions(solve(a_sys))[1]
-        a_variables = variables(a_sys)
-        q = evaluate(cubic, vcat(t,a_variables)=>vcat(step_size,next_a))
-        if symmetric_newton
-            q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-        else
-            q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
-        end
+                if norm(q-motion_samples[end]) < 1e-6 || norm(q-motion_samples[end]) > step_size*5
+                    _prev_flex = prev_flex
+                    continue
+                end
 
-        push!(motion_samples, q)
-        push!(motion_matrices, to_Matrix(G, Float64.(q)))=#
-    else
-        show_progress && @info "Acceleration-based cusp method is being used."
-        flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
-        projection = flexes*pinv(flexes'*flexes)*flexes'
-        J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
-        acceleration = pinv(J) * (-evaluate.(G.jacobian, G.variables=>prev_flex)*prev_flex)
-        acceleration, prev_flex = acceleration ./ norm(acceleration), prev_flex ./ norm(prev_flex)
-        prev_flex = - prev_flex - acceleration
-        prev_flex = projection*prev_flex
-        prev_flex = prev_flex ./ norm(prev_flex)
-        
-        q = motion_samples[end] + step_size*prev_flex
-        if symmetric_newton
-            q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                push!(motion_samples, q)
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                global success = true
+                break
+            catch
+                continue
+            end
+        elseif failure_to_converge==2 && length(motion_samples)>=4
+            show_progress && @info "Using cubic interpolation to predict the next point."
+            interpolating_points = motion_samples[end-3:end]
+            @var t, a[1:length(interpolating_points[4]), 1:3]
+            cubic = interpolating_points[4]+t*a[:,1]+t^2*a[:,2]+t^3*a[:,3]
+            equations = vcat(evaluate(cubic, t=>-step_size) .- interpolating_points[3], evaluate(cubic, t=>-2*step_size) .- interpolating_points[2], evaluate(cubic, t=>-3*step_size) .- interpolating_points[1])
+            a_sys = System(equations)
+            next_a = real_solutions(solve(a_sys))[1]
+            a_variables = variables(a_sys)
+            q = evaluate(cubic, vcat(t,a_variables)=>vcat(step_size,next_a))
+            try
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                end
+
+                if norm(q-motion_samples[end]) < 1e-6 || norm(q-motion_samples[end]) > step_size*5
+                    _prev_flex = prev_flex
+                    continue
+                end
+
+                push!(motion_samples, q)
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                global success = true
+                break
+            catch
+                _prev_flex = prev_flex
+                continue
+            end
         else
-            q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+            show_progress && @info "Acceleration-based cusp method is being used."
+            flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
+            projection = flexes*pinv(flexes'*flexes)*flexes'
+            J = evaluate.(G.jacobian, G.variables=>motion_samples[end])
+            acceleration = pinv(J) * (-evaluate.(G.jacobian, G.variables=>_prev_flex)*_prev_flex)
+            acceleration, _prev_flex = acceleration ./ norm(acceleration), _prev_flex ./ norm(_prev_flex)
+            _prev_flex = - _prev_flex - acceleration
+            _prev_flex = projection*_prev_flex
+            _prev_flex = _prev_flex ./ norm(_prev_flex)
+            q = motion_samples[end] + step_size*_prev_flex
+            try
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                end
+
+                if norm(q-motion_samples[end]) < 1e-6 || norm(q-motion_samples[end]) > step_size*5
+                    _prev_flex = prev_flex
+                    continue
+                end
+
+                push!(motion_samples, q)
+                push!(motion_matrices, to_Matrix(G, Float64.(q)))
+                global success = true
+                break
+            catch
+                _prev_flex = prev_flex
+                continue
+            end
         end
-        push!(motion_samples, q)
-        push!(motion_matrices, to_Matrix(G, Float64.(q)))
     end
-    return prev_flex
+    return _prev_flex, success
 end
 
 
