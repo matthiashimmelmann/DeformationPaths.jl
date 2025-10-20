@@ -76,3 +76,9 @@ end
     animate(D,F; filetype="mp4")
 end
 
+
+@testset "bricard_octahedron" begin
+    F = Framework([(1,2),(1,3),(1,4),(1,5),(2,6),(3,6),(4,6),(5,6),(2,4),(4,3),(3,5),(5,2)], Matrix([0 0 -1; -1 -1 0; 1 -1 0; 1 1 0; -1 1 0; 0 0 1]'))
+    plot(F)
+    D = DeformationPath(F, [1], 200; step_size=0.02, show_progress=false)
+end

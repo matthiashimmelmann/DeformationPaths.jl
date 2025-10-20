@@ -1,7 +1,7 @@
 name = "DeformationPaths"
 uuid = "50c58891-b0b3-4ec2-813a-7650aafc80af"
 authors = ["matthiashimmelmann <matthias.himmelmann@outlook.de>"]
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"

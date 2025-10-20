@@ -25,10 +25,10 @@ end
 
 @testset "squareonhyperboloid" begin
     F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([-sqrt(1/2) -sqrt(1/2) -1; -1 0 0; 0 1 0; sqrt(1/2) sqrt(1/2) 1]'), x->x[1]^2+x[2]^2-x[3]^2-1)
-    plot(F)
-    D = DeformationPath(F, [1,1], 100; step_size=0.035, show_progress=false)
+    plot(F,"../animations/squareonhyperboloid"; vertex_labels=false, azimuth=3*pi/4, padding=0.35)
+    D = DeformationPath(F, [1,1], 200; step_size=0.035, show_progress=false)
     if is_no_ci
-        animate(D,F; animate_rotation=true, filetype="mp4")
+        animate(D,F,"../animations/squareonhyperboloid"; vertex_labels=false, animate_rotation=true, filetype="mp4")
     end
 end
 
