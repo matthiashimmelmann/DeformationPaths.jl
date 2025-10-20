@@ -38,6 +38,14 @@ function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, eq
 end
 
 
+function Base.:(==)(G1::ConstraintSystem, G2::ConstraintSystem)
+    """
+    Overloads the equality operator for `ConstraintSystem`.
+    """
+    return G1.vertices==G2.vertices && length(G1.variables)==length(G2.variables) &&  all(i->G1.variables[i]==G2.variables[i], eachindex(G1.variables)) && length(G1.equations)==length(G2.equations) && all(i->G1.equations[i]==G2.equations[i], eachindex(G1.equations))
+end
+
+
 function Base.show(io::IO, G::ConstraintSystem)::Nothing
     """
     Display method for the base clase `ConstraintSystem`.
@@ -357,7 +365,7 @@ mutable struct Polytope
         facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
-        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-8), equations) || throw(error("The given realization does not satisfy the constraints."))
+        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
     end

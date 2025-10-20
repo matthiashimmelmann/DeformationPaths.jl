@@ -728,7 +728,10 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     else
         for t in timestamps
@@ -736,7 +739,10 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     end
     return fig
@@ -801,7 +807,10 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     else
         for t in timestamps
@@ -809,7 +818,10 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     end
     return fig
@@ -915,9 +927,9 @@ Compute an animation for a 3-dimensional polytope.
 """
 function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
-    matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
+    matrix_coords = D.motion_matrices
     (F isa BodyHinge || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
+    ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
 
@@ -982,6 +994,8 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     end
     =#
 
+    matrix_coords = !(F isa Polytope) ? matrix_coords : [matrix[:,1:(size(F.G.realization)[2])-length(F.facets)] for matrix in matrix_coords]
+
     if !isnothing(padding)
         xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
         ylims = [minimum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][2,:] for i in eachindex(matrix_coords)]...))]
@@ -996,12 +1010,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
     time=Observable(1)
 
     allVertices=@lift begin
-        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
+        pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]) for j in axes(pointys,2)]
     end
 
     allVertices_asLists = @lift begin
-        pointys = F isa Polytope ? matrix_coords[$time][:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[$time][:,1:(size(F.G.realization)[2])]
+        pointys = matrix_coords[$time]
         [F isa Polytope ? pointys[:,j] .* scaling_factor : pointys[:,j] for j in axes(pointys,2)]
     end
 
@@ -1039,7 +1053,10 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     else
         for t in timestamps
@@ -1047,6 +1064,9 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, fi
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
             end
         end
     end
@@ -1285,7 +1305,10 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     else
         for t in timestamps
@@ -1293,7 +1316,10 @@ function animate3D_sphericaldiskpacking(D::DeformationPath, F::SphericalDiskPack
             if animate_rotation
                 ax.elevation[] = elevation
                 ax.azimuth[] = azimuth + 2pi * t / rotation_frames
-            end
+            else
+                ax.elevation[] = elevation
+                ax.azimuth[] = azimuth
+            end        
         end
     end
     return fig
@@ -1308,7 +1334,7 @@ Compute a random projection of deformation paths.
 This method can either take a single deformation path or a vector of deformation paths and projects it to curves in 2D or 3D.
 This makes it possible to visualize high-dimensional deformation spaces. 
 """
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Union{Real,Nothing}=0.1, line_width::Real=8, edge_colors=[:green3], draw_start::Bool=true, vertex_size::Real=45, vertex_color=:steelblue, vertex_symbol=:pentagon)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Union{Real,Nothing}=0.25, line_width::Real=8, edge_colors=[:gray35], flex_color=:green3, flexes::Vector=[], flex_scale=0.35, arrowsize=40, draw_start::Bool=true, vertex_size::Real=45, vertex_color=:steelblue, vertex_symbol=:pentagon)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
@@ -1321,7 +1347,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
 
     if length(edge_colors) < length(D)
         @warn "The length of `line_colors` is $(length(edge_colors)) but needs to be at least $(length(D)). Choosing distinguishable colors instead."
-        edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
+        edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(40, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
 
 
@@ -1347,10 +1373,20 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
 
     if projected_dimension==3
         foreach(j->lines!(ax, [Point3f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
-        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol)
+        if !isempty(flexes)
+            pts = [Point3f(proj_curve[1][1]) for _ in eachindex(flexes)]
+            dirs = [Vec3f(randmat'flex) for flex in flexes]
+            arrows!(ax, pts, dirs; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, arrowsize=0.135*arrowsize)
+        end
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]], [proj_curve[1][1][3]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol, strokewidth=1, strokecolor=:black)
     else
         foreach(j->lines!(ax, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
-        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol)
+        if !isempty(flexes)
+            pts = [Point2f(proj_curve[1][1]) for _ in eachindex(flexes)]
+            dirs = [Vec2f(randmat'flex) for flex in flexes]
+            arrows!(ax, pts, dirs; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, arrowsize=arrowsize)
+        end
+        draw_start && scatter!(ax, [proj_curve[1][1][1]], [proj_curve[1][1][2]]; markersize=vertex_size, color=vertex_color, marker=vertex_symbol, strokewidth=1, strokecolor=:black)
     end
     if !isnothing(filename)
         save("$(filename).png", fig)
