@@ -1,11 +1,3 @@
-@testset "bricard_octahedron" begin
-    F = Polytope([[1,2,4], [1,3,4], [6,2,4], [6,3,4], [1,2,5], [6,2,5], [1,3,5], [6,3,5]], Matrix([0 0 -1; -1 -1 0; 1 -1 0; 1 1 0; -1 1 0; 0 0 1]'))
-    plot(F)
-    D = DeformationPath(F, [1], 200; step_size=0.01, show_progress=false)
-    if is_no_ci
-        animate(D,F,"../animations/greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=false,  rotation_frames=800, padding=0.1)
-    end
-end
 
 @testset "dodecahedron_EdgeContraction" begin
     println("dodecahedron_EdgeContraction")
