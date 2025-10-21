@@ -13,6 +13,17 @@ end
 end
 
 
+@testset "bricard_octahedron" begin
+    F = BodyHinge([[1,2,4], [1,2,3], [6,2,4], [6,2,3], [1,3,5], [6,3,5], [1,3,5], [6,3,5]], Matrix([0 0 -1; -1 -1 0; 1 -1 0; 1 1 0; -1 1 0; 0 0 1]'), pinned_vertices=[1,2,3])
+    plot(F)
+    D = DeformationPath(F, [], 400; step_size=0.025, show_progress=false)
+    if is_no_ci
+        animate(D,F,"../animations/bricard_octahedron"; filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=pi/2, animate_rotation=false,  padding=0.01)
+    end
+end
+
+
+
 @testset "thales" begin
     F = AngularFramework([[1,3,2]], Matrix([-1 0; 1 0; -sqrt(1/2) sqrt(1/2);]'); pinned_vertices=[1,2])
     plot(F; padding=0.1, pin_point_offset=0.075)
@@ -25,10 +36,10 @@ end
 
 @testset "squareonhyperboloid" begin
     F = FrameworkOnSurface([[1,2],[2,3],[3,4],[1,4]], Matrix([-sqrt(1/2) -sqrt(1/2) -1; -1 0 0; 0 1 0; sqrt(1/2) sqrt(1/2) 1]'), x->x[1]^2+x[2]^2-x[3]^2-1)
-    plot(F)
-    D = DeformationPath(F, [1,1], 100; step_size=0.035, show_progress=false)
+    plot(F; vertex_labels=false, azimuth=3*pi/4, padding=0.35)
+    D = DeformationPath(F, [1,1], 200; step_size=0.035, show_progress=false)
     if is_no_ci
-        animate(D,F; animate_rotation=true, filetype="mp4")
+        animate(D,F; vertex_labels=false, animate_rotation=true, filetype="mp4")
     end
 end
 

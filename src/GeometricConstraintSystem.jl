@@ -522,9 +522,9 @@ mutable struct BodyHinge
         new(G, facets, edges)
     end
 
-    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real})
+    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        BodyHinge(vertices, facets, realization)
+        BodyHinge(vertices, facets, realization; pinned_vertices=pinned_vertices)
     end
 end
 
