@@ -41,7 +41,7 @@ compute_nonblocked_flex(F::AllTypes)
 ```@docs
 to_Array(G::ConstraintSystem, p::Matrix{<:Real})
 
-to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge}, p::Matrix{<:Real})
+to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge,BodyBar}, p::Matrix{<:Real})
 
 to_Array(F::Polytope, p::Matrix{<:Real})
 
@@ -58,4 +58,6 @@ fix_antipodals!(F::Polytope)
 tetrahedral_symmetry!(F::Polytope)
 
 triangle_shrinking(F::Polytope)
+
+Dodecahedron
 ```

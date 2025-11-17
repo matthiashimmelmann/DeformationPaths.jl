@@ -6,7 +6,7 @@
     if is_no_ci
         Defs = Vector{DeformationPath}([])
         for i in 1:12
-            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
+            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.925)
             _F = Polytope(F.facets, _D.motion_matrices[end])
             animate(_D,_F, "../animations/animate_Dodec_Edge_Projection"; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 190, elevation=π/10, renderEntirePolytope=true, padding=0.01)
             plot(_F; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)

@@ -20,6 +20,7 @@ FrameworkOnSurface
 Framework
 VolumeHypergraph
 BodyHinge
+BodyBar
 AngularFramework
 ```
 
