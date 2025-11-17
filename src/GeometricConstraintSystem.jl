@@ -529,9 +529,55 @@ mutable struct BodyHinge
 end
 
 
+"""
+    BodyBar([vertices,] facets, realization[; pinned_vertices])
 
-AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
-AllTypesWithoutSpherePacking = Union{Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge}
+Class for body-bar frameworks, which are essentially polytopes with rigid facets and connecting .
+"""
+mutable struct BodyBar
+    G::ConstraintSystem
+    facets::Vector{Vector{Int}}
+    edges::Vector{Tuple{Int,Int}}
+
+    function BodyBar(vertices::Vector{Int}, edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+        realization = Float64.(realization)
+        dimension = size(realization)[1]
+        dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
+        all(v->v in vertices, pinned_vertices) || throw("pinned_vertices does not have the correct format.")
+        all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
+        all(edge->all(v->v in vertices, edge), edges) && all(edge->length(edge)==2, edges) || throw("The edges don't have the correct format. They need to contain 2 vertices each.")
+
+        facets = [Vector(facet) for facet in facets]
+        edges = [(edge[1],edge[2]) for edge in edges]
+        !(size(realization)[1]==dimension && size(realization)[2]==length(vertices)) && throw("The realization does not have the correct format.")
+
+        @var x[1:dimension, 1:length(vertices)]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
+        for v in pinned_vertices
+            xs[:,v] .= realization[:,v]
+        end
+
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
+        bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
+        bars = collect(Set(bars))
+        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,bars)]
+        equations = filter(eq->eq!=0, bar_equations)
+        G = ConstraintSystem(vertices, variables, equations, realization, xs)
+        new(G, facets, edges)
+    end
+
+    function BodyBar(edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+        vertices = sort(collect(Set(vcat([[v for v in facet] for facet in vcat(edges,facets)]...))))
+        BodyBar(vertices, edges, facets, realization; pinned_vertices=pinned_vertices)
+    end
+end
+
+
+
+
+AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge,BodyBar}
+AllTypesWithoutSpherePacking = Union{Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge,BodyBar}
 
 function Base.show(io::IO, F::AllTypes)
     """
@@ -548,7 +594,7 @@ function Base.show(io::IO, F::AllTypes)
             print(io,"\n\tSurface:\t\t$(F.surface([x,y,z])) = 0")
         end
     end
-    if typeof(F) in [Polytope, BodyHinge]
+    if typeof(F) in [Polytope, BodyHinge, BodyBar]
         print(io,"\tFacets:\t\t$(F.facets[1])")
         for i in 2:min(3,length(F.facets))
             print(io,", $(F.facets[i])")
@@ -664,7 +710,7 @@ end
 
 Transform a realization `p` to a vector of coordinates.
 """
-function to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge}, p::Matrix{<:Real})::Vector{<:Real}
+function to_Array(F::Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge,BodyBar}, p::Matrix{<:Real})::Vector{<:Real}
     return to_Array(F.G, p)
 end
 

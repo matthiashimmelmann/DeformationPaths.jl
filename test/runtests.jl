@@ -19,6 +19,7 @@ import DeformationPaths:    Framework,
                             is_inf_rigid,
                             is_second_order_rigid,
                             BodyHinge,
+                            BodyBar,
                             triangle_shrinking,
                             fix_antipodals!,
                             tetrahedral_symmetry!,
@@ -31,12 +32,18 @@ using Test
 using HomotopyContinuation
 using LinearAlgebra
 using IterTools
+using Colors
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
+
+teal = RGB(0/255, 128/255, 128/255)
+soft_teal = RGB(160/255,218/255,218/255)
+coral=RGB(255/255, 127/255, 80/255)
+
 @testset "DeformationPaths.jl" begin
-    include("various.jl")
-    include("SpherePacking.jl")
     include("Polytope.jl")
+    include("various.jl")
     include("Framework.jl")
+    include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
 end
