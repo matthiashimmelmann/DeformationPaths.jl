@@ -5,43 +5,69 @@
 Plot the geometric constraint system `F`.
 
 This is a wrapper method for plotting of the individual geometric constraint systems. 
-It calls one of the following: [`plot_flexes!`](@ref), [`plot_framework`](@ref), [`plot_frameworkonsurface`](@ref), [`plot_hypergraph`](@ref), [`plot_polytope`](@ref), [`plot_spherepacking`](@ref) and [`plot_sphericaldiskpacking`](@ref).
+It calls one of the following: [`plot_flexes!`](@ref), [`plot_framework!`](@ref), [`plot_frameworkonsurface!`](@ref), [`plot_hypergraph!`](@ref), [`plot_polytope!`](@ref), [`plot_spherepacking!`](@ref) and [`plot_sphericaldiskpacking!`](@ref).
 """
-function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; kwargs...)
+function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/10, elevation=π/10, perspectiveness=0., kwargs...)
+    fig = Figure(size=(1000,1000))
+    if F.G.dimension==2
+        ax = Axis(fig[1,1], name = :mainaxis)
+    elseif F.G.dimension==3
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness, name = :mainaxis)
+    else
+        throw("The dimension must either be 2 or 3!")
+    end
+    hidespines!(ax)
+    hidedecorations!(ax)
+
+    plot!(ax, F; kwargs...)
+
+    if !isnothing(filename)
+        save("$(filename).png", fig)
+    end
+
+    return fig
+end
+
+
+"""
+    plot!(ax, F)
+
+Add a plot on top of the existing axis `ax`.
+"""
+function plot!(ax::Union{Axis,Axis3}, F::AllTypes; kwargs...)
     if typeof(F)==Framework || typeof(F)==AngularFramework
-        global fig = plot_framework(F, filename; kwargs...)
+        plot_framework!(ax, F; kwargs...)
     elseif typeof(F)==FrameworkOnSurface
-        global fig = plot_frameworkonsurface(F, filename; kwargs...)    
+        plot_frameworkonsurface!(ax, F; kwargs...)    
     elseif typeof(F)==VolumeHypergraph
-        global fig = plot_hypergraph(F, filename; kwargs...)
+        plot_hypergraph!(ax, F; kwargs...)
     elseif typeof(F)==Polytope || typeof(F)==BodyHinge || typeof(F)==BodyBar
-        global fig = plot_polytope(F, filename; kwargs...)
+        plot_polytope!(ax, F; kwargs...)
     elseif typeof(F)==SpherePacking
-        global fig = plot_spherepacking(F, filename; kwargs...)
+        plot_spherepacking!(ax, F; kwargs...)
     elseif typeof(F)==SphericalDiskPacking
-        global fig = plot_sphericaldiskpacking(F, filename; kwargs...)
+        plot_sphericaldiskpacking!(ax, F; kwargs...)
     else
         throw("The type of 'F' needs to be either Framework, AngularFramework, Polytope, BodyHinge, BodyBar, SpherePacking, SphericalDiskPacking, FrameworkOnSurface or VolumeHypergraph, but is $(typeof(F))")
     end
-    
-    return fig
 end
+
 
 """
     plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, linewidth, arrowsize)
 
 Add infinitesimal flexes to a plot of a geometric constraint system
 """
-function plot_flexes!(ax, F::AllTypes, flex_Real::Int, flex_color, flex_scale, linewidth, arrowsize)
+function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Int, flex_color, flex_scale, linewidth, arrowsize)
     if F isa Framework
-        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif F isa AngularFramework
-        K_n = AngularFramework([[i,j,k] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) for k in eachindex(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices)
+        K_n = AngularFramework([[i,j,k] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) for k in eachindex(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif F isa FrameworkOnSurface
         K_n = deepcopy(G)
         add_equations!(K_n, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(F.G.vertices) if i<j]])
     elseif F isa VolumeHypergraph
-        K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization)
+        K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization).G
     elseif F isa Polytope || F isa SpherePacking || F isa BodyHinge || F isa BodyBar
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     elseif  F isa SphericalDiskPacking
@@ -52,44 +78,44 @@ function plot_flexes!(ax, F::AllTypes, flex_Real::Int, flex_color, flex_scale, l
         throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge', 'bodybar', or 'polytope', but is '$(type)'.")
     end
 
-    flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real])
+    flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
     if F.G.dimension==2
-        pts = [Point2f(F.G.realization[:,i]) for i in eachindex(F.G.vertices)]
-        dirs = [Vec2f(flex[:,i]) for i in eachindex(F.G.vertices)]
+        dirs, pts = [], []
+        for i in eachindex(F.G.vertices)
+            if norm(flex[:,i])>1e-6
+                push!(pts, Point2f(F.G.realization[:,i]))
+                push!(dirs, Vec2f(flex[:,i]))
+            end
+        end
         arrows!(ax, pts, dirs; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, linewidth=linewidth, arrowsize=arrowsize)
     else
-        pts = [Point3f(F.G.realization[:,i]) for i in eachindex(F.G.vertices)]
-        dirs = [Vec3f(flex[:,i]) for i in eachindex(F.G.vertices)]
+        dirs, pts = [], []
+        for i in eachindex(F.G.vertices)
+            if norm(flex[:,i])>1e-6
+                push!(pts, Point3f(F.G.realization[:,i]))
+                push!(dirs, Vec3f(flex[:,i]))
+            end
+        end
         arrows!(ax, pts, dirs; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, arrowsize=0.135)
     end
 end
 
 """
-    plot_framework(F, filename)
+    plot_framework!(ax, F)
 
 Plot a bar-joint or angular framework.
 """
-function plot_framework(F::Union{Framework,AngularFramework}, filename::Union{String, Nothing}; padding::Union{Real,Nothing}=0.15, vertex_size=55, azimuth=π / 10, elevation=pi/10, perspectiveness=0., vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, markercolor=:red3, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    fig = Figure(size=(1000,1000))
+function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
-    for i in axes(matrix_coords)[2]
-        matrix_coords[:,i] = matrix_coords[:,i] - centroid
-    end
-
-    if F.G.dimension==2
-        ax = Axis(fig[1,1])
-    elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
-        zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
-    else
-        throw("The dimension must either be 2 or 3!")
-    end
-
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
         ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
-        limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+        if F.G.dimension==3
+            zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
+            limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+        else
+            limits = [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
+        end
         translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
         xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
         translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
@@ -99,8 +125,6 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::Union{St
             zlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
         end
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     if typeof(F)==AngularFramework
@@ -120,34 +144,23 @@ function plot_framework(F::Union{Framework,AngularFramework}, filename::Union{St
     end
     
     if plot_flexes
-        plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
+        plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width, arrowsize)
     end
 
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    show_pins && foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
 
 
 """
-    plot_frameworkonsurface(F, filename)
+    plot_frameworkonsurface!(ax, F)
 
 Plot a bar-joint framework constrained to a surface.
 """
-function plot_frameworkonsurface(F::FrameworkOnSurface, filename::Union{String, Nothing}; padding::Union{Real,Nothing}=0.15, azimuth=pi/10, alpha=0.45, fontsize=28, elevation=pi/8, perspectiveness=0., vertex_size=55, line_width=10, edge_color=:steelblue, markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    fig = Figure(size=(1000,1000))
+function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; padding::Union{Real,Nothing}=0.15, alpha=0.45, fontsize=28, vertex_size=55, line_width=10, edge_color=:steelblue, pin_markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization
-
-    if F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
-    else
-        throw("The dimension must either be 2 or 3!")
-    end
 
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
     ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
@@ -167,8 +180,6 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::Union{String, 
         y = collect(Float64, range(limits[1], step=(limits[2]-limits[1])/surface_samples, length = surface_samples+1))
         z = collect(Float64, range(limits[1], step=(limits[2]-limits[1])/surface_samples, length = surface_samples+1))
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
 
     A = [F.surface([xi,yi,zi]) for xi in x, yi in y, zi in z]
     mc_ranged = MC(A, Int; x, y, z)
@@ -183,39 +194,22 @@ function plot_frameworkonsurface(F::FrameworkOnSurface, filename::Union{String, 
 
     allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
     foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
 
 
 """
-    plot_spherepacking(F, filename)
+    plot_spherepacking!(ax, F)
 
 Plot a sphere packing.
 """
-function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; padding::Union{Real,Nothing}=0.15, fontsize=28, azimuth=pi/10, alpha=0.1, elevation=pi/8, perspectiveness=0., disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
-    fig = Figure(size=(1000,1000))
+function plot_spherepacking!(ax::Union{Axis,Axis3}, F::SpherePacking; padding::Union{Real,Nothing}=0.15, fontsize=28, alpha=0.1, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, pin_markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
-    for i in axes(matrix_coords,2)
-        matrix_coords[:,i] = matrix_coords[:,i] - centroid
-    end
 
     allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     limit_vertices = allVertices
-
-    if F.G.dimension==2
-        ax = Axis(fig[1,1])
-    elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
-    else
-        throw("The dimension must either be 2 or 3!")
-    end
 
     if !haskey(kwargs, "dualgraph_color")
         dualgraph_color = F.G.dimension==2 ? D2_dualgraph_color : D3_dualgraph_color
@@ -248,8 +242,6 @@ function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; 
         ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
         F.G.dimension==3 && zlims!(ax, limits[1]-padding, limits[2]+padding)
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
 
     if plot_flexes
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
@@ -259,25 +251,18 @@ function plot_spherepacking(F::SpherePacking, filename::Union{String, Nothing}; 
         markersize = F.G.dimension==2 ? D2_markersize : D3_markersize
     end
     
-    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, [(allVertices)[v]]; markersize=markersize, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
 
 
 """
-    plot_sphericaldiskpacking(F, filename)
+    plot_sphericaldiskpacking!(ax, F)
 
 Plot a spherical disk packing.
 """
-function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{String, Nothing}; azimuth=pi/10, elevation=pi/8, fontsize=32, perspectiveness=0., padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    fig = Figure(size=(1000,1000))
+function plot_sphericaldiskpacking!(ax::Union{Axis,Axis3}, F::SphericalDiskPacking; fontsize=32, padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization    
-
-    ax = Axis3(fig[1,1], aspect=(1,1,1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
     if !isnothing(padding)
         xlims!(ax,-1.5-padding, 1.5+padding)
         ylims!(ax,-1.5-padding, 1.5+padding)
@@ -287,8 +272,6 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{Stri
         ylims!(ax,-1.5, 1.5)
         zlims!(ax,-1.5, 1.5)
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
     mesh!(ax, Sphere(Point3f(0), 1f0); transparency=true, color = (sphere_color,alpha))
 
     if plot_flexes
@@ -296,9 +279,9 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{Stri
     end
 
     planePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])^2) for j in axes(matrix_coords,2)]
-    koebePoints =[]
+    koebePoints = []
     spherePoints = [Point3f(matrix_coords[:,j]./norm(matrix_coords[:,j])) for j in axes(matrix_coords,2)]
-    rotatedPoints=[]
+    rotatedPoints = []
     #foreach(edge->linesegments!(ax, [spherePoints[Int64(edge[1])], spherePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     for i in eachindex(F.G.vertices)
         rotation_axis = cross([0, 0, 1], spherePoints[i])
@@ -320,51 +303,39 @@ function plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{Stri
     end
     foreach(edge->linesegments!(ax, [koebePoints[Int64(edge[1])], koebePoints[Int64(edge[2])]]; linewidth = line_width, color=dualgraph_color), F.contacts)
     vertex_labels && foreach(i->text!(ax, [(rotatedPoints)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
     
 
 """
-    plot_hypergraph(F, filename)
+    plot_hypergraph!(ax, F)
 
 Plot a volume-constrained hypergraph.
 """
-function plot_hypergraph(F::VolumeHypergraph, filename::Union{String, Nothing}; padding::Union{Real,Nothing}=0.15, alpha=0.25, azimuth=pi/10, fontsize=28, elevation=pi/8, perspectiveness=0., vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    fig = Figure(size=(1000,1000))
+function plot_hypergraph!(ax::Union{Axis,Axis3}, F::VolumeHypergraph; padding::Union{Real,Nothing}=0.15, alpha=0.25, fontsize=28, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = Base.copy(F.G.realization)
-    centroid = sum(matrix_coords[:,i] for i in axes(matrix_coords,2)) ./ size(matrix_coords)[2]
-    for i in axes(matrix_coords,2)
-        matrix_coords[:,i] = matrix_coords[:,i] - centroid
-    end
 
-    if facet_colors==nothing
+    if isnothing(facet_colors)
         facet_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(F.volumes), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(20, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
-    end
-
-    if F.G.dimension==2
-        ax = Axis(fig[1,1])
-    elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
-        zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
-    else
-        throw("The dimension must either be 2 or 3!")
     end
     
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
         ylims = [minimum(vcat(matrix_coords[2,:])), maximum(matrix_coords[2,:])]
-        limits= F.G.dimension==2 ? [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])] : [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+        if F.G.dimension==3
+            zlims = [minimum(vcat(matrix_coords[3,:])), maximum(matrix_coords[3,:])]
+            limits = [minimum([xlims[1], ylims[1], zlims[1]]), maximum([xlims[2], ylims[2], zlims[2]])]
+        else 
+            limits = [minimum([xlims[1], ylims[1]]), maximum([xlims[2], ylims[2]])]
+        end
         translation = (xlims[1]-limits[1]) - (limits[2]-xlims[2])
         xlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
         translation = (ylims[1]-limits[1]) - (limits[2]-ylims[2])
         ylims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
-        F.G.dimension==3 && zlims!(ax, limits[1]-padding, limits[2]+padding)
+        if F.G.dimension==3
+            translation = (zlims[1]-limits[1]) - (limits[2]-zlims[2])
+            zlims!(ax, limits[1]-padding+0.5*translation, limits[2]+padding+0.5*translation)
+        end
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
 
     if plot_flexes
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
@@ -375,24 +346,16 @@ function plot_hypergraph(F::VolumeHypergraph, filename::Union{String, Nothing}; 
     foreach(i->lines!(ax, [(allVertices)[Int64(v)] for v in vcat(F.volumes[i], F.volumes[i][1])]; linewidth=line_width, linestyle=:dash, color=facet_colors[i]), 1:length(F.volumes))
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
 
 
 """
-    plot_polytope(F, filename)
+    plot_polytope!(ax, F)
 
 Plot a polytope.
 """
-function plot_polytope(F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String, Nothing}; vertex_size::Real=12, special_edge=nothing, fontsize=28, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, perspectiveness=0., azimuth=π/10, elevation=π/8, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    fig = Figure(size=(1000,1000))
-    ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
-
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
-
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
     centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
@@ -408,8 +371,6 @@ function plot_polytope(F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{Str
         ylims!(ax, limits[1]-padding, limits[2]+padding)
         zlims!(ax, limits[1]-padding, limits[2]+padding)
     end
-    hidespines!(ax)
-    hidedecorations!(ax)
 
     helper_polytope_repr = F isa Polytope ? matrix_coords[:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[:,1:(size(F.G.realization)[2])]
     polytope_repr = [F isa Polytope ? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
@@ -419,7 +380,7 @@ function plot_polytope(F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{Str
         for face in F.facets
             try
                 mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(polytope_repr)[j] for j in face]), CDDLib.Library(:exact))); shading=NoShading, color=(facet_color,alpha), transparency=true)
-            catch e
+            catch _
                 continue
             end
         end
@@ -448,10 +409,6 @@ function plot_polytope(F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{Str
 
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color),  1:(F isa Polytope ? size(F.G.realization)[2]-length(F.facets) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
-    if !isnothing(filename)
-        save("$(filename).png", fig)
-    end
-    return fig
 end
 
 
@@ -510,7 +467,7 @@ end
 
 Compute an animation for a 2-dimensional bar-joint framework.
 """
-function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, pin_markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -586,7 +543,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 
@@ -612,7 +569,7 @@ end
 
 Compute an animation for a 3-dimensional bar-joint framework.
 """
-function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, vertex_labels=false, font_color=:lightgrey, line_width::Real=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), fixed_direction=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, pin_markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, vertex_labels=false, font_color=:lightgrey, line_width::Real=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -717,7 +674,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
-    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 
@@ -761,7 +718,7 @@ end
 
 Compute an animation for a 3-dimensional bar-joint framework constrained to a surface.
 """
-function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::Union{String,Nothing}; alpha=0.45, fontsize=28, framerate::Int=25, animate_rotation=false, azimuth = pi/4, elevation=pi/8, perspectiveness=0., rotation_frames = 480, markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, line_width::Real=10, edge_color=:steelblue, vertex_labels=true, font_color=:lightgrey, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
+function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename::Union{String,Nothing}; alpha=0.45, fontsize=28, framerate::Int=25, animate_rotation=false, azimuth = pi/4, elevation=pi/8, perspectiveness=0., rotation_frames = 480, pin_markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, line_width::Real=10, edge_color=:steelblue, vertex_labels=true, font_color=:lightgrey, vertex_color=:black, filetype::String="gif", surface_color=:grey80, surface_samples=150)
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -798,7 +755,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
@@ -1095,7 +1052,7 @@ end
 
 Compute an animation for a 2-dimensional sticky disk packing.
 """
-function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.08, fontsize=32, framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_labels=true, disk_strokewidth::Real=8.5, line_width::Real=7, font_color=:black, sphere_color=:steelblue, markersize::Real=75, markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
+function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.08, fontsize=32, framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_labels=true, disk_strokewidth::Real=8.5, line_width::Real=7, font_color=:black, sphere_color=:steelblue, markersize::Real=75, pin_markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -1129,7 +1086,7 @@ function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::U
         lines!(ax, @lift([($disk_vertices)[v] for v in vcat(1:n_circle_segments,1)]); linewidth = disk_strokewidth, color=sphere_color)
     end
 
-    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !isnothing(filename)
@@ -1155,7 +1112,7 @@ end
 
 Compute an animation for a 3-dimensional sticky sphere packing.
 """
-function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, fontsize=28, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; alpha=0.2, framerate::Int=25, fontsize=28, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, pin_markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1))
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -1190,7 +1147,7 @@ function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename:
     end
     linesegments!(ax, @lift(vcat([[($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]] for edge in $contacts]...)); linewidth = line_width, color=dualgraph_color)
     
-    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    foreach(v->scatter!(ax, @lift([($allVertices)[v]]); markersize=markersize, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
     timestamps = range(1, length(D.motion_samples), step=step)
     if !isnothing(filename)

@@ -6,13 +6,13 @@
     if is_no_ci
         Defs = Vector{DeformationPath}([])
         for i in 1:12
-            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.925)
+            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.95)
             _F = Polytope(F.facets, _D.motion_matrices[end])
             animate(_D,_F, "../animations/animate_Dodec_Edge_Projection"; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 190, elevation=π/10, renderEntirePolytope=true, padding=0.01)
             plot(_F; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)
             push!(Defs,_D)
             for i in 1:20
-                project_deformation_random(Defs, F, 2, "../animations/Dodec_projection$i"; padding=nothing, vertex_size=60)
+                project_deformation_random(Defs, F, 2, "../animations/Dodec_projection$i"; padding=nothing, vertex_size=60, edge_colors=[:gray35 for _ in 1:20])
             end
         end
         #println([norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])) for Defo in collect(Iterators.product(Defs,Defs))])

@@ -9,6 +9,7 @@ we can plot a geometric constraint system by calling
 
 ```@docs
 plot(F::AllTypes, filename::Union{String,Nothing}=nothing)
+plot!(ax::Union{Axis,Axis3}, F::AllTypes)
 ```
 
 A specific continuous motion of a geometric constraint system can be animated via

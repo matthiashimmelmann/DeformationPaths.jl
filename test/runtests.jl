@@ -7,6 +7,7 @@ import DeformationPaths:    Framework,
                             VolumeHypergraph,
                             SpherePacking,
                             plot,
+                            plot!,
                             SphericalDiskPacking,
                             to_Array,
                             equations!,
@@ -33,6 +34,7 @@ using HomotopyContinuation
 using LinearAlgebra
 using IterTools
 using Colors
+import GLMakie: save
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 
@@ -41,9 +43,9 @@ soft_teal = RGB(160/255,218/255,218/255)
 coral=RGB(255/255, 127/255, 80/255)
 
 @testset "DeformationPaths.jl" begin
+    include("Framework.jl")
     include("Polytope.jl")
     include("various.jl")
-    include("Framework.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
 end

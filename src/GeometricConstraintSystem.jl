@@ -730,9 +730,14 @@ end
 
 Transform a vector of coordinates `q` to a realization matrix.
 """
-function to_Matrix(G::ConstraintSystem, q::Vector{<:Real})::Matrix{<:Real}
+function to_Matrix(G::ConstraintSystem, q::Vector{<:Real}; flexes=false)::Matrix{<:Real}
     point = Matrix{Float64}(Base.copy(G.realization))
     point = evaluate.(G.xs, G.variables=>q)
+    if flexes
+        for i in eachindex(G.pinned_vertices)
+            point[:,G.pinned_vertices[i]] = [0 for _ in 1:size(point)[1]]
+        end
+    end
     return point
 end
 
@@ -742,6 +747,6 @@ end
 
 Transform a vector of coordinates `q` to a realization matrix.
 """
-function to_Matrix(F::AllTypes, q::Vector{<:Real})::Matrix{<:Real}
-    return to_Matrix(F.G, q)
+function to_Matrix(F::AllTypes, q::Vector{<:Real}; flexes=false)::Matrix{<:Real}
+    return to_Matrix(F.G, q; flexes=flexes)
 end
