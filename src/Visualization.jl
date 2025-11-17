@@ -10,9 +10,9 @@ It calls one of the following: [`plot_flexes!`](@ref), [`plot_framework!`](@ref)
 function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/10, elevation=π/10, perspectiveness=0., kwargs...)
     fig = Figure(size=(1000,1000))
     if F.G.dimension==2
-        ax = Axis(fig[1,1], name = :mainaxis)
+        ax = Axis(fig[1,1])
     elseif F.G.dimension==3
-        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness, name = :mainaxis)
+        ax = Axis3(fig[1,1], aspect = (1, 1, 1), azimuth=azimuth, elevation=elevation, perspectiveness=perspectiveness)
     else
         throw("The dimension must either be 2 or 3!")
     end
@@ -25,7 +25,7 @@ function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/
         save("$(filename).png", fig)
     end
 
-    return fig
+    return fig, ax
 end
 
 

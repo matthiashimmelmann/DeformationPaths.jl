@@ -9,11 +9,12 @@ end
 end
 
 @testset "3Prism" begin
-    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.2 0; 1.15 1; 1.15+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
-    D = DeformationPath(F, [-1], 22; step_size=0.025)
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.1 0; 1.1 1; 1.1+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
+    D = DeformationPath(F, [-1], 25; step_size=0.025)
     F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
-    fig = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false,padding=0.5)
-    plot!(fig[:mainaxis], F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, vertex_labels=false)
+    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.5)
+    #linesegments
+    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, vertex_labels=false, padding=0.5)
     save("3Prism.png", fig)
 end
 
