@@ -15,6 +15,7 @@ include("GeometricConstraintSystem.jl")
 include("InfinitessimalFlexes.jl")
 include("PredictorCorrector.jl")
 include("Rigidity.jl")
+include("GCS_database.jl")
 
 export  ConstraintSystem, 
         Framework,
@@ -38,11 +39,13 @@ export  ConstraintSystem,
         is_inf_rigid,
         is_second_order_rigid,
         BodyHinge,
+        BodyBar,
         compute_nontrivial_inf_flexes,
         fix_antipodals!,
         tetrahedral_symmetry!,
         compute_nonblocked_flex,
-        stich_deformation_paths
+        stich_deformation_paths,
+        Dodecahedron
 
 """
     DeformationPath(G, motion_samples[; tol])
@@ -64,7 +67,7 @@ Class for constructing approximate deformation paths.
 - `motion_samples::Vector{<:Vector{<:Real}}`: List of previously computed realizations in array format.
 - `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
 - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
-- `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"` and `"sphericaldiskpacking"`.
+- `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"`, `"bodybar"` and `"sphericaldiskpacking"`.
 - `step_size::Real`: Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 - `random_flex::Bool` (optional): If `flex_mult` is not provided (e.g. as `[]`), we can instead provide a random linear combination (`true`) or it is uniformly chosen as `[1,...,1]` (`false`). Default value: `false`.
@@ -193,7 +196,7 @@ mutable struct DeformationPath
     - `G::ConstraintSystem`: The underlying geometric constraint system.
     - `flex_mult::Vector`: The initial infinitesimal flex as a linear combination of the nontrivial infinitesimal flexes at the realization provided by the underlying geometric constraint system.
     - `num_steps::Int`: Number of steps the algorithm is supposed to take. 
-    - `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"` and `"sphericaldiskpacking"`.
+    - `type::DataType`: Type of the geometric constraint system for computing the trivial infinitessimal flexes. Possible values: `"framework"`, `"angularframework"`, `"frameworkonsurface"`, `"hypergraph"`, `"polytope"`, `"diskpacking"`, `"bodyhinge"`, `"bodybar"` and `"sphericaldiskpacking"`.
     - `step_size::Real`: Step size of the deformation path. 
     - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
     - `random_flex::Bool` (optional): If `flex_mult` is not provided (e.g. as `[]`), we can instead provide a random linear combination (`true`) or it is uniformly chosen as `[1,...,1]` (`false`). Default value: `false`.
@@ -243,14 +246,14 @@ mutable struct DeformationPath
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
         elseif type==VolumeHypergraph
             K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization).G
-        elseif type==Polytope || type==SpherePacking || type==BodyHinge
+        elseif type==Polytope || type==SpherePacking || type==BodyHinge || type==BodyBar
             K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
         elseif  type==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
             K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
         else
-            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge' or 'polytope', but is '$(type)'.")
+            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge', 'bodybar' or 'polytope', but is '$(type)'.")
         end
         flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
         if flex_mult==[]
