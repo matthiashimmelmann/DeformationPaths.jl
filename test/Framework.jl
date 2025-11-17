@@ -13,8 +13,9 @@ end
     D = DeformationPath(F, [-1], 25; step_size=0.025)
     F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
     fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.5)
-    #linesegments
-    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, vertex_labels=false, padding=0.5)
+    points = [[Point2f0(D.motion_matrices[i][:,j]) for i in eachindex(D.motion_matrices)] for j in 1:size(D.motion_matrices[end])[2]]
+    foreach(pt->linesegments!(ax,points; color=coral, line_width=12), points)
+    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=0.5)
     save("3Prism.png", fig)
 end
 
