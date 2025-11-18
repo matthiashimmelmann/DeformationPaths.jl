@@ -612,7 +612,7 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real` (optional): Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.001, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.0025, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=4)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
     @var c
@@ -657,16 +657,17 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+2*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty)
             push!(motion_samples, cur_point)
-        catch _
-            interpolating_points = motion_samples[end-3:end]
-            @var t, a[1:length(interpolating_points[3]), 1:4]
-            quadric = a[:,1]+t*a[:,2]+t^2*a[:,3]+t^3*a[:,4]
-            equations = vcat(evaluate(quadric, t=>step-local_step_size), evaluate(quadric, t=>step-2*local_step_size), evaluate(quadric, t=>step-3*local_step_size), evaluate(quadric, t=>step-4*local_step_size))
+        catch e
+            @warn e
+            interpolating_points = motion_samples[end-2:end]
+            @var t, a[1:length(interpolating_points[3]), 1:2]
+            quadric = a[:,1]+t*a[:,1]+t^2*a[:,2]
+            equations = vcat(evaluate(quadric, t=>step-local_step_size), evaluate(quadric, t=>step-2*local_step_size))
             a_variables = vcat(a...)
             a_matrix = evaluate(differentiate(equations, a_variables), a_variables=>[0 for _ in a_variables])
-            a_b_vector = vcat(interpolating_points[4], interpolating_points[3], interpolating_points[2], interpolating_points[1])
+            a_b_vector = vcat(interpolating_points[2], interpolating_points[1])
             a_solutions = a_matrix \ a_b_vector
             next_point = evaluate(quadric, vcat([t],a_variables)=>vcat([step], a_solutions))
             local_equations = evaluate(_G.equations, c=>step)
@@ -674,7 +675,8 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
                 cur_point = newton_correct(local_equations, _G.variables, local_jacobian, next_point; tol=tol, time_penalty=time_penalty)
                 push!(motion_samples, cur_point)
             catch _
-                show_progress && @warn "The approximation of a deformation path ended prematurely."
+                #show_progress && 
+                @warn "The approximation of a deformation path ended prematurely."
                 break
             end
         end

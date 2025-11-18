@@ -34,7 +34,7 @@ using HomotopyContinuation
 using LinearAlgebra
 using IterTools
 using Colors
-import GLMakie: save, Point2f0, linesegments!
+import GLMakie: save, Point2f, arrows!, lines!
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 
