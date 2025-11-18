@@ -9,14 +9,14 @@ end
 end
 
 @testset "3Prism" begin
-    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.1 0; 1.1 1; 1.1+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
-    D = DeformationPath(F, [-1], 28; step_size=0.025)
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
+    D = DeformationPath(F, [-1], 27; step_size=0.025)
     F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
     fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
-    points = [[Point2f0(D.motion_matrices[i][:,j]) for i in eachindex(D.motion_matrices)] for j in 1:size(D.motion_matrices[end])[2]]
-    foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
-    foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && arrows!(ax, [pt[end-1]], [pt[end]-pt[end-1]]; arrowcolor = coral, linecolor = coral, linewidth=line_width), points)
     plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
+    add_shadow!(ax, F, D; line_color=coral)
+    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
+    scatter!(ax, points; vertex_color=:black, vertex_size=55)
     save("3Prism.png", fig)
 end
 

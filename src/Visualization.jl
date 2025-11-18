@@ -115,7 +115,7 @@ function add_shadow!(ax::Union{Axis,Axis3}, F::AllTypes, D::DeformationPath; fle
         else
             foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end]; color = flex_color, linewidth=line_width), points)
         end
-    else
+    elseif F.G.dimension==3
         points = [[Point3f0(D.motion_matrices[i][:,j]) for i in eachindex(D.motion_matrices)] for j in 1:size(D.motion_matrices[end])[2]]
         if draw_arrows
             foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
@@ -123,6 +123,8 @@ function add_shadow!(ax::Union{Axis,Axis3}, F::AllTypes, D::DeformationPath; fle
         else
             foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end]; color = flex_color, linewidth=line_width), points)
         end
+    else
+        throw(error("The method `add_shadow` is only supported in dimensions 2 and 3, but the current dimension is $(F.G.dimension)"))
     end
 end
 

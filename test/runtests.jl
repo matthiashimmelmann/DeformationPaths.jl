@@ -28,13 +28,14 @@ import DeformationPaths:    Framework,
                             compute_nontrivial_inf_flexes,
                             ConstraintSystem,
                             compute_nonblocked_flex,
-                            stich_deformation_paths
+                            stich_deformation_paths,
+                            add_shadow!
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 using IterTools
 using Colors
-import GLMakie: save, Point2f, arrows!, lines!
+import GLMakie: save, scatter!, Point2f
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 
