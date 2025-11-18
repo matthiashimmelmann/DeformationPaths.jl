@@ -14,9 +14,9 @@ end
     F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
     fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
     plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
-    add_shadow!(ax, F, D; line_color=coral)
+    add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
-    scatter!(ax, points; vertex_color=:black, vertex_size=55)
+    scatter!(ax, points; color=:black, markersize=55)
     save("3Prism.png", fig)
 end
 
