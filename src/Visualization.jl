@@ -106,15 +106,23 @@ end
 
 Plot a curve that traces the motion_matrices along the deformation path `D`.
 """
-function add_shadow!(ax::Union{Axis,Axis3}, F::AllTypes, D::DeformationPath; flex_color=:green3, flex_scale=0.35, arrowsize=40, line_width=12)
+function add_shadow!(ax::Union{Axis,Axis3}, F::AllTypes, D::DeformationPath; flex_color=:green3, flex_scale=0.35, arrowsize=40, line_width=12, draw_arrows=true)
     if F.G.dimension==2
         points = [[Point2f0(D.motion_matrices[i][:,j]) for i in eachindex(D.motion_matrices)] for j in 1:size(D.motion_matrices[end])[2]]
-        foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
-        foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && arrows!(ax, [pt[end-1]], [pt[end]-pt[end-1]]; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, linewidth=line_width, arrowsize=arrowsize), points)
+        if draw_arrows
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && arrows!(ax, [pt[end-1]], [pt[end]-pt[end-1]]; lengthscale=flex_scale, arrowcolor = flex_color, linecolor = flex_color, linewidth=line_width, arrowsize=arrowsize), points)
+        else
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end]; color = flex_color, linewidth=line_width), points)
+        end
     else
         points = [[Point3f0(D.motion_matrices[i][:,j]) for i in eachindex(D.motion_matrices)] for j in 1:size(D.motion_matrices[end])[2]]
-        foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
-        foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && arrows!(ax, [pt[end-1]], [pt[end]-pt[end-1]]; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, linewidth=line_width, arrowsize=0.135), points)
+        if draw_arrows
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end-1]; color = flex_color, linewidth=line_width), points)
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && arrows!(ax, [pt[end-1]], [pt[end]-pt[end-1]]; lengthscale=flex_scale*8, arrowcolor = flex_color, linecolor = flex_color, linewidth=line_width, arrowsize=0.135), points)
+        else
+            foreach(pt->(norm(pt[end]-pt[1])>1e-6||norm(pt[rand(2:length(pt)-1)]-pt[1])>1e-6) && lines!(ax, pt[1:end]; color = flex_color, linewidth=line_width), points)
+        end
     end
 end
 

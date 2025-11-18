@@ -26,19 +26,21 @@ project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F:
 ## Plotting Capabilities
 
 ```@docs
-plot_flexes!(ax, F::AllTypes, flex_Real::Int, flex_color, flex_scale, linewidth, arrowsize)
+add_shadow!
 
-plot_framework(F::Union{Framework,AngularFramework}, filename::Union{String,Nothing})
+plot_flexes!
 
-plot_frameworkonsurface(F::FrameworkOnSurface, filename::Union{String,Nothing})
+plot_framework!
 
-plot_spherepacking(F::SpherePacking, filename::Union{String,Nothing})
+plot_frameworkonsurface!
 
-plot_sphericaldiskpacking(F::SphericalDiskPacking, filename::Union{String,Nothing})
+plot_spherepacking!
 
-plot_hypergraph(F::VolumeHypergraph, filename::Union{String,Nothing})
+plot_sphericaldiskpacking!
 
-plot_polytope(F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing})
+plot_hypergraph!
+
+plot_polytope!
 ```
 
 ## Animation Methods
@@ -54,7 +56,7 @@ animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface, filename
 
 animate2D_hypergraph(D::DeformationPath, F::VolumeHypergraph, filename::Union{String,Nothing})
 
-animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge}, filename::Union{String,Nothing})
+animate3D_polytope
 
 animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing})
 
