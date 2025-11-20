@@ -55,42 +55,63 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, armijo_linesearch::Bool=true, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
-    while(norm(evaluate(equations, variables=>q)) > tol)
-        J = evaluate.(jac, variables=>q)
-        stress_dimension = size(nullspace(J'; atol=1e-8))[2]
-        if stress_dimension > 0
-            rand_mat = randn(Float64, length(equations) - stress_dimension, length(equations))
-            new_equations = rand_mat*equations
-            J = rand_mat*J
-        else
-            new_equations = equations
-        end
-
-        #Armijo Line Search
-        r_val = evaluate(new_equations, variables=>q)
-        v = -(J \ r_val)
-        global damping, damping_too_small = 0.9, 0
-        qnew = q + damping*v
-        while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
-            global damping = damping*0.7
-            qnew = q + damping*v
-            if damping < 1e-10
-                global damping_too_small += 1
-                qnew = q + 0.1*v
-                break
+    if armijo_linesearch
+        while(norm(evaluate(equations, variables=>q)) > tol)
+            J = evaluate.(jac, variables=>q)
+            stress_dimension = size(nullspace(J'; atol=1e-8))[2]
+            if stress_dimension > 0
+                rand_mat = randn(Float64, length(equations) - stress_dimension, length(equations))
+                new_equations = rand_mat*equations
+                J = rand_mat*J
+            else
+                new_equations = equations
             end
-            if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
+
+            #Armijo Line Search
+            r_val = evaluate(new_equations, variables=>q)
+            v = -(J \ r_val)
+            global damping, damping_too_small = 0.9, 0
+            qnew = q + damping*v
+            while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
+                global damping = damping*0.7
+                qnew = q + damping*v
+                if damping < 1e-12
+                    global damping_too_small += 1
+                    qnew = q + 0.025*v
+                    break
+                end
+                if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
+                    throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+                end
+            end
+            if damping >= 1e-1
+                global damping_too_small = maximum([0, damping_too_small-1])
+                q = qnew
+            end
+        end
+    else
+        while(norm([eq(variables=>q) for eq in equations]) > tol)
+            J = evaluate.(jac, variables=>q)
+            step = pinv(J)
+            qnew = q - damping * (J \ evaluate.(equations, variables=>q))
+            if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
+                global damping = damping*1.2
+            else
+                global damping = damping/2
+            end
+            if damping > 1
+                global damping = 1
+            end
+            if damping < 1e-12 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
                 throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
             end
-        end
-        if damping >= 1e-4
-            global damping_too_small -= 1
             q = qnew
         end
+
     end
     return q
 end

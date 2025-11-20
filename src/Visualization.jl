@@ -383,7 +383,7 @@ end
 
 Plot a polytope.
 """
-function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
     centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
@@ -404,11 +404,11 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
     helper_polytope_repr = F isa Polytope ? matrix_coords[:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[:,1:(size(F.G.realization)[2])]
     polytope_repr = [F isa Polytope ? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
     if typeof(F) <: Polytope && renderEntirePolytope
-        mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep((polytope_repr)), CDDLib.Library(:exact))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+        mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep((polytope_repr)), CDDLib.Library(:exact))); shading=shading, color=(facet_color,alpha), transparency=true)
     elseif typeof(F) <: BodyHinge || typeof(F) <: BodyBar || !renderEntirePolytope
         for face in F.facets
             try
-                mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(polytope_repr)[j] for j in face]), CDDLib.Library(:exact))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+                mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([(polytope_repr)[j] for j in face]), CDDLib.Library(:exact))); shading=shading, color=(facet_color,alpha), transparency=true)
             catch _
                 continue
             end
@@ -919,64 +919,66 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing}; renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Tuple{Int,Int}, Tuple{Int,Int,Int}}=(1,2), alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = D.motion_matrices
-    (F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
+    (isnothing(fixed_vertices) || F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
 
-    fixed_direction = [1.,0,0]
-    for i in eachindex(matrix_coords)
-        p0 = matrix_coords[i][:,fixed_vertices[1]]
-        for j in axes(matrix_coords[i])[2]
-            matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
-        end
-        edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
-        rotation_axis = cross(fixed_direction, edge_vector)
-        if isapprox(norm(rotation_axis), 0, atol=1e-4)
-            if fixed_direction'*edge_vector<0
-                rotation_matrix = [1 0 0; 0 -1 0; 0 0 -1;]
-            else
-                rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+    if !isnothing(fixed_vertices)
+        fixed_direction = [1.,0,0]
+        for i in eachindex(matrix_coords)
+            p0 = matrix_coords[i][:,fixed_vertices[1]]
+            for j in axes(matrix_coords[i])[2]
+                matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
             end
-        else
-            rotation_axis = rotation_axis ./ norm(rotation_axis)
-            angle = acos(fixed_direction' * edge_vector)
-            rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
-                                rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
-        end
-
-        for j in axes(matrix_coords[i],2)
-            matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
-        end
-
-        if length(fixed_vertices)==3
-            edge_vector_new = Vector(matrix_coords[i][:,fixed_vertices[3]] ./ norm(matrix_coords[i][:,fixed_vertices[3]]))
-            target_vector = [0,edge_vector_new[2],edge_vector_new[3]]
-            target_vector = target_vector ./ norm(target_vector)
-            if isapprox(edge_vector_new[3],0; atol=1e-10)
-                angle = pi
+            edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
+            rotation_axis = cross(fixed_direction, edge_vector)
+            if isapprox(norm(rotation_axis), 0, atol=1e-4)
+                if fixed_direction'*edge_vector<0
+                    rotation_matrix = [1 0 0; 0 -1 0; 0 0 -1;]
+                else
+                    rotation_matrix = [1 0 0; 0 1 0; 0 0 1;]
+                end
             else
-                angle = acos(target_vector'* [0,1,0])
+                rotation_axis = rotation_axis ./ norm(rotation_axis)
+                angle = acos(fixed_direction' * edge_vector)
+                rotation_matrix = [ cos(angle)+rotation_axis[1]^2*(1-cos(angle)) rotation_axis[1]*rotation_axis[2]*(1-cos(angle))-rotation_axis[3]*sin(angle) rotation_axis[1]*rotation_axis[3]*(1-cos(angle))+rotation_axis[2]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[2]*(1-cos(angle))+rotation_axis[3]*sin(angle) cos(angle)+rotation_axis[2]^2*(1-cos(angle)) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))-rotation_axis[1]*sin(angle); 
+                                    rotation_axis[1]*rotation_axis[3]*(1-cos(angle))-rotation_axis[2]*sin(angle) rotation_axis[2]*rotation_axis[3]*(1-cos(angle))+rotation_axis[1]*sin(angle) cos(angle)+rotation_axis[3]^2*(1-cos(angle));]
             end
-            rotation_matrix_new = [ cos(angle)+fixed_direction[1]^2*(1-cos(angle)) fixed_direction[1]*fixed_direction[2]*(1-cos(angle))-fixed_direction[3]*sin(angle) fixed_direction[1]*fixed_direction[3]*(1-cos(angle))+fixed_direction[2]*sin(angle); 
-                                fixed_direction[1]*fixed_direction[2]*(1-cos(angle))+fixed_direction[3]*sin(angle) cos(angle)+fixed_direction[2]^2*(1-cos(angle)) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))-fixed_direction[1]*sin(angle); 
-                                fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
-            if edge_vector_new[3]<0
-                rotation_matrix_new = inv(rotation_matrix_new)
-            end 
+
             for j in axes(matrix_coords[i],2)
-                matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
+                matrix_coords[i][:,j] = inv(rotation_matrix)*matrix_coords[i][:,j]
+            end
+
+            if length(fixed_vertices)==3
+                edge_vector_new = Vector(matrix_coords[i][:,fixed_vertices[3]] ./ norm(matrix_coords[i][:,fixed_vertices[3]]))
+                target_vector = [0,edge_vector_new[2],edge_vector_new[3]]
+                target_vector = target_vector ./ norm(target_vector)
+                if isapprox(edge_vector_new[3],0; atol=1e-10)
+                    angle = pi
+                else
+                    angle = acos(target_vector'* [0,1,0])
+                end
+                rotation_matrix_new = [ cos(angle)+fixed_direction[1]^2*(1-cos(angle)) fixed_direction[1]*fixed_direction[2]*(1-cos(angle))-fixed_direction[3]*sin(angle) fixed_direction[1]*fixed_direction[3]*(1-cos(angle))+fixed_direction[2]*sin(angle); 
+                                    fixed_direction[1]*fixed_direction[2]*(1-cos(angle))+fixed_direction[3]*sin(angle) cos(angle)+fixed_direction[2]^2*(1-cos(angle)) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))-fixed_direction[1]*sin(angle); 
+                                    fixed_direction[1]*fixed_direction[3]*(1-cos(angle))-fixed_direction[2]*sin(angle) fixed_direction[2]*fixed_direction[3]*(1-cos(angle))+fixed_direction[1]*sin(angle) cos(angle)+fixed_direction[3]^2*(1-cos(angle));]
+                if edge_vector_new[3]<0
+                    rotation_matrix_new = inv(rotation_matrix_new)
+                end 
+                for j in axes(matrix_coords[i],2)
+                    matrix_coords[i][:,j] = inv(rotation_matrix_new)*matrix_coords[i][:,j]
+                end
             end
         end
-    end
 
-    if recompute_deformation_samples
-        D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
-        D.motion_matrices = [to_Matrix(F, sample) for sample in D.motion_samples]
+        if recompute_deformation_samples
+            D.motion_samples = [to_Array(F, matrix_coords[i]) for i in eachindex(matrix_coords)]
+            D.motion_matrices = [to_Matrix(F, sample) for sample in D.motion_samples]
+        end
     end
 
     #=
@@ -1031,11 +1033,11 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
     if typeof(F) <: Polytope && renderEntirePolytope
-        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep(($allVertices_asLists)), CDDLib.Library(:exact)))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+        mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep(($allVertices_asLists)), CDDLib.Library(:exact)))); shading=shading, color=(facet_color,alpha), transparency=true)
     elseif typeof(F) <: BodyHinge || typeof(F) <: BodyBar || !renderEntirePolytope
         for face in F.facets
             try
-                mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([($allVertices_asLists)[j] for j in face]), CDDLib.Library(:exact)))); shading=NoShading, color=(facet_color,alpha), transparency=true)
+                mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep([($allVertices_asLists)[j] for j in face]), CDDLib.Library(:exact)))); shading=shading, color=(facet_color,alpha), transparency=true)
             catch e
                 continue
             end

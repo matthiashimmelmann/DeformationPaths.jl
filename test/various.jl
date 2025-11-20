@@ -1,3 +1,18 @@
+@testset "bricard_octahedron" begin
+    F = BodyHinge([[1,2,4], [1,2,3], [6,2,4], [6,2,3], [1,3,5], [6,3,5], [1,3,5], [6,3,5]], Matrix([0 0 -1; -1 -1 0; 1 -1 0; 1 1 0; -1 1 0; 0 0 1]'))
+    plot(F, "bricard_octahedron"; edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13)
+    D = DeformationPath(F, [], 400; step_size=0.025, show_progress=false)
+    #=for i in 25:25:length(D.motion_samples)
+        _F = BodyHinge([[1,2,4], [1,2,3], [6,2,4], [6,2,3], [1,3,5], [6,3,5], [1,3,5], [6,3,5]], D.motion_matrices[i])
+        plot(_F, "bricard_octahedron$i"; edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13)
+    end=#
+
+    if is_no_ci
+        animate(D,F,"../animations/bricard_octahedron"; filetype="mp4", edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13, padding=0.01)
+    end
+end
+
+
 @testset "bodybar_cube" begin
     F = BodyBar([[1,5],[2,6],[3,7],[4,8]], [[1,2,3,4],[5,6,7,8]], Matrix([0 0 0; 1 0 0; 1 1 0; 0 1 0; 0 0 1; 1 0 1; 1 1 1; 0 1 1;]'))
     plot(F, "bodybar_cube"; edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.5)
@@ -19,17 +34,6 @@ end
     D = DeformationPath(F, [], 100; step_size=0.025)
     animate(D,F; filetype="mp4")
 end
-
-
-@testset "bricard_octahedron" begin
-    F = BodyHinge([[1,2,4], [1,2,3], [6,2,4], [6,2,3], [1,3,5], [6,3,5], [1,3,5], [6,3,5]], Matrix([0 0 -1; -1 -1 0; 1 -1 0; 1 1 0; -1 1 0; 0 0 1]'), pinned_vertices=[1,2,3])
-    plot(F)
-    D = DeformationPath(F, [], 400; step_size=0.025, show_progress=false)
-    if is_no_ci
-        animate(D,F,"../animations/bricard_octahedron"; filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=pi/2, animate_rotation=false,  padding=0.01)
-    end
-end
-
 
 
 @testset "thales" begin
