@@ -88,7 +88,7 @@ mutable struct Framework
         dimension = size(realization)[1]
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         bars = [bar[1]<=bar[2] ? Tuple(bar) : Tuple([bar[2],bar[1]]) for bar in bars]
-        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
+        size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format. Length(vertices): $(length(vertices)); realization: $(size(realization)[2])")
         dimension>=1 || throw("The dimension is not an integer bigger than 0.")
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))

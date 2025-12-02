@@ -12,7 +12,6 @@
     end
 end
 
-
 @testset "bodybar_cube" begin
     F = BodyBar([[1,5],[2,6],[3,7],[4,8]], [[1,2,3,4],[5,6,7,8]], Matrix([0 0 0; 1 0 0; 1 1 0; 0 1 0; 0 0 1; 1 0 1; 1 1 1; 0 1 1;]'))
     plot(F, "bodybar_cube"; edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.5)

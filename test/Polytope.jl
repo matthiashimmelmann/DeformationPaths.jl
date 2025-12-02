@@ -5,8 +5,8 @@
     plot(F,"dodecahedron_EdgeContraction"; special_edge=[9,10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, renderEntirePolytope=true, padding=0.01)
     if is_no_ci
         Defs = Vector{DeformationPath}([])
-        for i in 1:5
-            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.9)
+        for i in 1:8
+            _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
             _F = Polytope(F.facets, _D.motion_matrices[end])
             animate(_D,_F, "../animations/animate_Dodec_Edge_Projection"; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], azimuth = π/10 + 2pi * 125 / 190, elevation=π/10, renderEntirePolytope=true, padding=0.01)
             plot(_F; special_edge=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)
@@ -20,14 +20,15 @@
         #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
         DPaths = collect(Iterators.product(Defs,Defs))
         _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
+        project_deformation_random([_D], F, 2, "../animations/Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
         animate(_D,F, "../animations/dodecahedron_EdgeContraction"; scaling_factor=0.98, recompute_deformation_samples=false, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, filetype="mp4", special_edge=[9, 10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, renderEntirePolytope=true, padding=0.01)
-        for i in 6:8
+        for i in 9:11
             _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
             animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             _F = Polytope(F.facets, _D.motion_matrices[end])
             plot(_F; azimuth = π/10 + 2pi * 125 / 190, special_edge=[9, 10], renderEntirePolytope=true, padding=0.01)
             push!(Defs,_D)
-            project_deformation_random(Defs, F, 2, "../animations/Dodec_projection")
+            project_deformation_random(Defs, F, 2, "../animations/Dodec_projection"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
         end
     end
 end

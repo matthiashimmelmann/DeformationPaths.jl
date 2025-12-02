@@ -604,8 +604,8 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
     length(fixed_vertices)==length(collect(Set(fixed_vertices))) && fixed_vertices[1] in D.G.vertices && fixed_vertices[2] in D.G.vertices && (length(fixed_vertices)==2 || fixed_vertices[3] in D.G.vertices) || throw("The elements of `fixed_vertices`` are not vertices of the underlying graph.")
     
-    if isapprox(norm(fixed_direction),0;atol=1e-6)
-        @warn "fixed_direction is $(norm(fixed_direction)) which is too close to 0! We thus set it to [1,0,0]"
+    if isapprox(norm(fixed_direction),0;atol=1e-6) || length(fixed_direction)!=3
+        @warn "fixed_direction has norm $(norm(fixed_direction)) and length $(length(fixed_direction)) which does not work! We thus set it to [1,0,0]"
         fixed_direction = [1.,0,0]
     end
     fixed_direction = fixed_direction ./ norm(fixed_direction)
@@ -926,9 +926,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
-
-    if !isnothing(fixed_vertices)
+    if isapprox(norm(fixed_direction),0;atol=1e-6) || length(fixed_direction)!=3
+        @warn "fixed_direction has norm $(norm(fixed_direction)) and length $(length(fixed_direction)) which does not work! We thus set it to [1,0,0]"
         fixed_direction = [1.,0,0]
+    end
+    
+    if !isnothing(fixed_vertices)
         for i in eachindex(matrix_coords)
             p0 = matrix_coords[i][:,fixed_vertices[1]]
             for j in axes(matrix_coords[i])[2]
