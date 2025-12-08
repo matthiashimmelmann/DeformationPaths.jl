@@ -1,3 +1,35 @@
+@testset "rigid_prestress_stable" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'); pinned_vertices=[1,4])
+    plot(F,"rigid_prestress_stable"; edge_color=teal, flex_color=coral, padding=0.25, plot_flexes=true, flex_Real=[1], show_pins=false, flex_scale=0.5, vertex_labels=false)
+    @test !is_inf_rigid(F)
+    @test is_second_order_rigid(F)
+    @test is_rigid(F)
+end
+
+
+@testset "flexible_prestress_stable_component" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5],[1,6]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2; -sqrt(1/2) sqrt(1/2)]'); pinned_vertices=[1,4])
+    plot(F,"flexible_prestress_stable_component"; edge_color=teal, flex_color=coral, show_pins=false, flex_Real=[-1,-1], padding=0.25, plot_flexes=true, flex_scale=0.5, vertex_labels=false)
+    D = DeformationPath(F, [1,1], 200; step_size=0.025, show_progress=false)
+    if is_no_ci
+        animate(D,F; filetype="mp4")
+    end
+end
+
+
+@testset "K_4_edge" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4],[2,4],[1,3],[2,5]], Matrix([0. 0; 1 0; 1 1; 0 1; 2 0]'); pinned_vertices=[1,2])
+    D = DeformationPath(F, [-1], 30; step_size=0.025)
+    F2 = Framework([[1,2],[2,3],[3,4],[1,4],[2,4],[1,3],[2,5]], D.motion_matrices[end]; pinned_vertices=[1,2]) 
+    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, vertex_color=:lightgrey, vertex_size=7)
+    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=0.15)
+    add_shadow!(ax, F, D; flex_color=coral)
+    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
+    scatter!(ax, points; color=:black, markersize=55)
+    save("K_4_edge.png", fig)
+end
+
+
 @testset "rigid_test" begin
     F = Framework([[1,2],[1,4],[1,5],[4,5],[4,3],[5,3],[2,6],[2,7],[6,7],[3,6],[3,7]], Matrix([0 0; 2 0; 1 1; 0.5-1/6 1/2+1/6; 0.5+1/6 1/2-1/6; 1.5+1/6 1/2+1/6; 1.5-1/6 1/2-1/6;]'))
     plot(F,"rigid_test"; edge_color=teal, vertex_labels=false)
@@ -42,34 +74,6 @@ end
     D = DeformationPath(F, [1], 200; step_size=0.025)
     if is_no_ci
         animate(D,F; filetype="mp4")
-    end
-end
-
-
-@testset "rigid_prestress_stable" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'))
-    @test !is_inf_rigid(F)
-    @test is_second_order_rigid(F)
-    @test is_rigid(F)
-end
-
-
-@testset "flexible_prestress_stable_component" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5],[1,6]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2; 0 -1]'))
-    plot(F)
-    D = DeformationPath(F, [1,1], 200; step_size=0.025, show_progress=false)
-    if is_no_ci
-        animate(D,F; filetype="mp4")
-    end
-end
-
-
-@testset "K_4" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4],[2,4],[1,3],[1,5]], Matrix([0. 0; 1 0; 1 1; 0 1; 0 -1]'))
-    plot(F)
-    D = DeformationPath(F, [1], 200; step_size=0.025, show_progress=false)
-    if is_no_ci
-        animate(D,F)
     end
 end
 

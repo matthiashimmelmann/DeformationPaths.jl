@@ -58,7 +58,8 @@ end
 
 Add infinitesimal flexes to a plot of a geometric constraint system
 """
-function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Int, flex_color, flex_scale, linewidth, arrowsize)
+function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,Vector{<:Number}}, flex_color, flex_scale, linewidth, arrowsize)
+    (flex_Real isa Int || flex_Real isa Vector) || throw(error("`flex_Real` does not have the correct type. It needs to be an `Int` or a `Vector`, but is a $(typeof(flex_Real))."))
     if F isa Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif F isa AngularFramework
@@ -78,7 +79,15 @@ function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Int, flex_c
         throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge', 'bodybar', or 'polytope', but is '$(type)'.")
     end
 
-    flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
+    if flex_Real isa Int
+        flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
+    else
+        flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
+        length(flex_Real)==size(flex_matrix)[2] || throw(error("The length of `flex_Real` ($(length(flex_Real))) does not match the length of the computed infinitesimal flexes, which is $(size(flex_matrix)[2])."))
+        flex_vector = flex_matrix*flex_Real
+        flex = to_Matrix(F, [v for v in flex_vector]; flexes=true)
+    end
+
     if F.G.dimension==2
         dirs, pts = [], []
         for i in eachindex(F.G.vertices)
@@ -134,7 +143,7 @@ end
 
 Plot a bar-joint or angular framework.
 """
-function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = Base.copy(F.G.realization)
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -188,7 +197,7 @@ end
 
 Plot a bar-joint framework constrained to a surface.
 """
-function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; padding::Union{Real,Nothing}=0.15, alpha=0.45, fontsize=28, vertex_size=55, line_width=10, edge_color=:steelblue, pin_markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; padding::Union{Real,Nothing}=0.15, alpha=0.45, fontsize=28, vertex_size=55, line_width=10, edge_color=:steelblue, pin_markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization
 
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -234,7 +243,7 @@ end
 
 Plot a sphere packing.
 """
-function plot_spherepacking!(ax::Union{Axis,Axis3}, F::SpherePacking; padding::Union{Real,Nothing}=0.15, fontsize=28, alpha=0.1, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, pin_markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
+function plot_spherepacking!(ax::Union{Axis,Axis3}, F::SpherePacking; padding::Union{Real,Nothing}=0.15, fontsize=28, alpha=0.1, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, pin_markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     matrix_coords = Base.copy(F.G.realization)
 
     allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
@@ -290,7 +299,7 @@ end
 
 Plot a spherical disk packing.
 """
-function plot_sphericaldiskpacking!(ax::Union{Axis,Axis3}, F::SphericalDiskPacking; fontsize=32, padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_sphericaldiskpacking!(ax::Union{Axis,Axis3}, F::SphericalDiskPacking; fontsize=32, padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization    
     if !isnothing(padding)
         xlims!(ax,-1.5-padding, 1.5+padding)
@@ -340,7 +349,7 @@ end
 
 Plot a volume-constrained hypergraph.
 """
-function plot_hypergraph!(ax::Union{Axis,Axis3}, F::VolumeHypergraph; padding::Union{Real,Nothing}=0.15, alpha=0.25, fontsize=28, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_hypergraph!(ax::Union{Axis,Axis3}, F::VolumeHypergraph; padding::Union{Real,Nothing}=0.15, alpha=0.25, fontsize=28, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = Base.copy(F.G.realization)
 
     if isnothing(facet_colors)
@@ -383,7 +392,7 @@ end
 
 Plot a polytope.
 """
-function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
     centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
@@ -919,7 +928,7 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction=[1.,0,0], alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = D.motion_matrices
     (isnothing(fixed_vertices) || F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
@@ -930,7 +939,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
         @warn "fixed_direction has norm $(norm(fixed_direction)) and length $(length(fixed_direction)) which does not work! We thus set it to [1,0,0]"
         fixed_direction = [1.,0,0]
     end
-    
+
     if !isnothing(fixed_vertices)
         for i in eachindex(matrix_coords)
             p0 = matrix_coords[i][:,fixed_vertices[1]]
