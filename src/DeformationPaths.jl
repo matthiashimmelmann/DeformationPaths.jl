@@ -700,7 +700,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
             push!(motion_samples, cur_point)
             break
         catch err
-            show_progress && println(err)
+            show_progress && @warn err
             continue
         end
     end

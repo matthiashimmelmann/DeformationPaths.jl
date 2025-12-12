@@ -94,9 +94,9 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             end
         end
     else
+        global damping = 0.15
         while(norm([eq(variables=>q) for eq in equations]) > tol)
             J = evaluate.(jac, variables=>q)
-            step = pinv(J)
             qnew = q - damping * (J \ evaluate.(equations, variables=>q))
             if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
                 global damping = damping*1.2
