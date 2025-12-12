@@ -48,7 +48,6 @@ end
     add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
     scatter!(ax, points; color=:black, markersize=55)
-    save(, fig)
 end
 
 
