@@ -267,7 +267,6 @@ mutable struct DeformationPath
                 flex_mult = [1/size(flex_space)[2] for _ in axes(flex_space,2)]
             end
         else
-            display(flex_mult)
             flex_mult = Float64.(flex_mult)
         end
         size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
