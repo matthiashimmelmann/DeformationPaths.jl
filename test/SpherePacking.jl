@@ -9,7 +9,7 @@ end
 
 @testset "squarediskpacking" begin
     F = SpherePacking([1.,1.,1.,1.], Matrix([0 0; 2 0; 0 2; 2 2]'); pinned_vertices=[1])
-    plot(F, "squarediskpacking"; sphere_color=teal)
+    plot(F; sphere_color=teal)
     D = DeformationPath(F, [1], 250; step_size=0.01, show_progress=false)
     animate(D,F; filetype="mp4")
 end
@@ -17,7 +17,7 @@ end
 
 @testset "squarediskpacking2" begin
     F = SpherePacking([1.,1.,1.,1.], Matrix([0 0; 7/4 -sqrt(15/16); 7/2 0; 7/2+sqrt(2) sqrt(2)]'); pinned_vertices=[1])
-    plot(F, "squarediskpacking2"; sphere_color=teal)
+    plot(F; sphere_color=teal)
     D = DeformationPath(F, [1,1], 250; step_size=0.01, show_progress=false)
     animate(D,F; filetype="mp4")
 end

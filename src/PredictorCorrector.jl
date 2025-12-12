@@ -76,7 +76,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             v = -(J \ r_val)
             global damping, damping_too_small = 0.9, 0
             qnew = q + damping*v
-            while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
+            while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.5 * damping * v'*v
                 global damping = damping*0.7
                 qnew = q + damping*v
                 if damping < 1e-12

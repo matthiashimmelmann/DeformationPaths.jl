@@ -47,45 +47,31 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
 
-    if fast_search
-        J_stress_energy = Matrix{Expression}(hcat([differentiate(eq, λ) for eq in projective_stress_system]...)')
-        for _ in 1:size(flexes)[2]*size(stresses)[2]*2
-            rand_flex_parameter = randn(Float64, size(flexes)[2])
-            rand_flex_parameter = rand_flex_parameter ./ norm(rand_flex_parameter)
-            try
-                q = newton_correct(projective_stress_system, λ, J_stress_energy, rand_flex_parameter; tol = tol, time_penalty=2)
-                return q
-            catch e
-                continue
-            end
-        end
+    codim = rank(evaluate.(differentiate(projective_stress_system, λ), λ=>randn(ComplexF64, length(λ))); atol=1e-10)
+    rand_pt = randn(Float64, length(λ))
+    ED_matrix = hcat(differentiate(stress_poly_system, λ), λ, λ - rand_pt)
+    if codim == length(λ)
+        ED_stress_system = projective_stress_system
     else
-        N = size(flexes)[2]*size(stresses)[2]*2 # ambient dimension
-        #TODO add Paul's test
-        for i in length(λ):-1:1
-            try
-                L₀ = rand_subspace(length(λ); codim = length(λ)-i)
-                R_L₀ = solve(projective_stress_system; target_subspace = L₀)
-                Ω = solve(
-                    f,
-                    solutions(R_L₀);
-                    start_subspace = L₀,
-                    target_subspaces = [rand_subspace(N; codim = length(λ)-i, real = true) for _ in 1:N],
-                    transform_result = (R,p) -> real_solutions(R),
-                    flatten = true,
-                    show_progress = false
-                )
-                return Ω[1]
-            catch e
-                continue
-            end
-        end
-        try 
-            res = solve(projective_stress_system; show_progress = false)
-            return real_solutions(res)[1]
-        catch
-            nothing
-        end
+        ED_stress_system = vcat(projective_stress_system, minors(A, codim+1))
     end
-    return []
+    sols = real_solutions(solve(ED_stress_system))
+    return sols
+end
+
+"""
+    minors(A, k)
+
+Compute the (k+1)x(k+1) minors of the matrix `A`
+"""
+function minors(A, k)
+    n, m = size(A)
+    rowsets = collect(combinations(1:n, k))
+    colsets = collect(combinations(1:m, k))
+
+    result = Dict()
+    for r in rowsets, c in colsets
+        result[(r, c)] = det(A[r, c])
+    end
+    return values(result)
 end
