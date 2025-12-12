@@ -47,7 +47,8 @@ export  ConstraintSystem,
         compute_nonblocked_flex,
         stich_deformation_paths,
         Dodecahedron,
-        add_shadow!
+        add_shadow!,
+        minors
 
 """
     DeformationPath(G, motion_samples[; tol])
