@@ -56,7 +56,7 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
         ED_stress_system = vcat(projective_stress_system, minors(A, codim+1))
     end
     sols = real_solutions(solve(ED_stress_system))
-    return sols
+    return isempty(sols) ? [] : sols[1]
 end
 
 """
