@@ -1,6 +1,5 @@
 @testset "bodybar_prism" begin
     F = BodyBar([[1,4],[2,5],[3,6]], [[1,2,3],[4,5,6]], Matrix([cos(0*2*pi/3) sin(0*2*pi/3) 0; cos(2*pi/3) sin(2*pi/3) 0; cos(2*2*pi/3) sin(2*2*pi/3) 0; cos(0*2*pi/3+pi/3) sin(0*2*pi/3+pi/3) 1.5; cos(2*pi/3+pi/3) sin(2*pi/3+pi/3) 1.5; cos(2*2*pi/3+pi/3) sin(2*2*pi/3+pi/3) 1.5;]'); pinned_vertices=[4,5,6])
-    display(F.G.pinned_vertices)
     plot(F, "bodybar_prism"; edge_color=logocolors.purple, vertex_color=logocolors.blue, facet_color=logocolors.red, flex_color=logocolors.green, plot_flexes=true, azimuth=0.17*pi, flex_scale=0.15, elevation=pi/13, alpha=0.5, line_width=22.5, vertex_size=75, padding=0.25)
 end
 
