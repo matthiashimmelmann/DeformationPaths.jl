@@ -80,6 +80,7 @@ function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,V
     end
 
     if flex_Real isa Int
+        flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
         flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
     else
         flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)

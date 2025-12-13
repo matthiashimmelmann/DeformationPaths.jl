@@ -194,7 +194,7 @@ mutable struct SpherePacking
     radii::Vector{<:Real}
     tolerance::Real
 
-    function SpherePacking(vertices::Vector{Int}, radii::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-8)
+    function SpherePacking(vertices::Vector{Int}, radii::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-6)
         length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         realization = Float64.(realization)
@@ -578,6 +578,7 @@ end
 
 AllTypes = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge,BodyBar}
 AllTypesWithoutSpherePacking = Union{Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,Polytope,BodyHinge,BodyBar}
+AllTypesWithoutPolytope = Union{SpherePacking,Framework,AngularFramework,FrameworkOnSurface,SphericalDiskPacking,VolumeHypergraph,BodyHinge,BodyBar}
 
 function Base.show(io::IO, F::AllTypes)
     """
@@ -675,9 +676,9 @@ end
 
 Set the realization of the constraint system `G` to `realization`.
 """
-function realization!(G::ConstraintSystem, realization::Matrix{<:Real})::Nothing
+function realization!(G::ConstraintSystem, realization::Matrix{<:Real}; check_accuracy=false)::Nothing
     point = to_Array(G, realization)
-    norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw("The point does not satisfy the constraint system's equations!")
+    !check_accuracy || norm(evaluate(G.equations, G.variables=>point))>1e-8 && throw("The point does not satisfy the constraint system's equations!")
     size(realization)[1]==G.dimension && (size(realization)[2]==length(G.vertices) || size(realization)[2]==length(G.variables)//G.dimension+length(G.pinned_vertices)) || size(realization)[2]==size(G.xs)[2] || throw("The given realization does not have the correct format.")
     size(G.xs)[1]==size(realization)[1] && size(G.xs)[2]==size(realization)[2] || throw("The given realization does not have the correct format.")
     G.realization = realization
@@ -689,8 +690,35 @@ end
 
 Set the realization of the geometric constraint system `F` to `realization`.
 """
-function realization!(F::AllTypes, realization::Matrix{<:Real})::Nothing
+function realization!(F::AllTypesWithoutPolytope, realization::Matrix{<:Real})::Nothing
     realization!(F.G, realization)
+    return nothing
+end
+
+
+"""
+    realization!(F, realization)
+
+Set the realization of the geometric constraint system `F` to `realization`.
+"""
+function realization!(F::Polytope, realization::Matrix{<:Real})::Nothing
+    if size(realization)[1]==F.G.dimension && size(realization)[2]==length(F.G.vertices)
+        normal_realization = Array{Float64,2}(undef, 3, length(F.facets))
+        for j in eachindex(F.facets)
+            normal_realization[:,j] = cross(realization[:,F.facets[j][2]] - realization[:,F.facets[j][1]], realization[:,F.facets[j][3]] - realization[:,F.facets[j][2]])
+            normal_realization[:,j] = normal_realization[:,j] ./ norm(normal_realization[:,j])
+            normal_realization[:,j] = normal_realization[:,j] ./ (realization[:,F.facets[j][1]]'*normal_realization[:,j])
+        end
+        _realization = hcat(realization, normal_realization)
+    elseif size(realization)[1]==F.G.dimension && size(realization)[2]==length(F.G.vertices)+length(F.facets)
+        _realization = Base.copy(realization)
+        for j in eachindex(F.facets)
+            _realization[:, length(F.G.vertices)+j] = _realization[:, length(F.G.vertices)+j] ./ (_realization[:, length(F.G.vertices)+j]'*_realization[:, F.facets[j][1]])
+        end
+    else
+        throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(F.G.vertices)))!")
+    end
+    realization!(F.G, _realization)
     return nothing
 end
 

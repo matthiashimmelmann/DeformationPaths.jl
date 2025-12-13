@@ -39,7 +39,9 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     end
     rigidity_matrix = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
     stresses = nullspace(rigidity_matrix'; atol=tol_rank_drop)
-        
+    if size(stresses)[2]==0
+        return flexes[1,:]
+    end
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]]
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
@@ -49,7 +51,7 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
 
     codim = rank(evaluate.(differentiate(projective_stress_system, λ), λ=>randn(ComplexF64, length(λ))); atol=1e-10)
     rand_pt = randn(Float64, length(λ))
-    ED_matrix = hcat(differentiate(stress_poly_system, λ), λ, λ - rand_pt)
+    ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ, λ - rand_pt)
     if codim == length(λ)
         ED_stress_system = projective_stress_system
     else

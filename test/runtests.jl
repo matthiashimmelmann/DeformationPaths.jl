@@ -45,8 +45,8 @@ coral=RGB(255/255, 127/255, 80/255)
 
 @testset "DeformationPaths.jl" begin
     include("Polytope.jl")
-    include("Framework.jl") 
     include("SpherePacking.jl")
+    include("Framework.jl") 
     include("various.jl")
     include("VolumeHypergraph.jl")
 end
