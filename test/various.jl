@@ -1,6 +1,6 @@
 @testset "bodybar_prism" begin
-    F = BodyBar([[1,4],[2,5],[3,6]], [[1,2,3],[4,5,6]], Matrix([cos(0*2*pi/3) sin(0*2*pi/3) 0; cos(2*pi/3) sin(2*pi/3) 0; cos(2*2*pi/3) sin(2*2*pi/3) 0; cos(0*2*pi/3+pi/3) sin(0*2*pi/3+pi/3) 1.5; cos(2*pi/3+pi/3) sin(2*pi/3+pi/3) 1.5; cos(2*2*pi/3+pi/3) sin(2*2*pi/3+pi/3) 1.5;]'); pinned_vertices=[4,5,6])
-    plot(F, "bodybar_prism"; edge_color=logocolors.purple, vertex_color=logocolors.blue, facet_color=logocolors.red, flex_color=logocolors.green, plot_flexes=true, azimuth=0.17*pi, flex_scale=0.15, elevation=pi/13, alpha=0.5, line_width=22.5, vertex_size=75, padding=0.25)
+    F = BodyBar([[1,4],[2,5],[3,6]], [[1,2,3],[4,5,6]], Matrix([cos(0*2*pi/3) sin(0*2*pi/3) 0; cos(2*pi/3) sin(2*pi/3) 0; cos(2*2*pi/3) sin(2*2*pi/3) 0; cos(0*2*pi/3+pi/3) sin(0*2*pi/3+pi/3) 1.3; cos(2*pi/3+pi/3) sin(2*pi/3+pi/3) 1.3; cos(2*2*pi/3+pi/3) sin(2*2*pi/3+pi/3) 1.3;]'); pinned_vertices=[1,2,3])
+    plot(F, "bodybar_prism"; edge_color=logocolors.blue, special_edges=[[1,4],[2,5],[3,6]], special_edge_color=logocolors.purple, vertex_color=logocolors.red, facet_color=logocolors.green, flex_color=logocolors.purple, plot_flexes=false, azimuth=0.185*pi, flex_scale=0.1, elevation=pi/12, alpha=0.5, line_width=20, vertex_size=70, padding=0.5)
 end
 
 
