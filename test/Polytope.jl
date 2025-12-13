@@ -369,8 +369,8 @@ end
     plot(F; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, elevation=0.05*pi, azimuth=0., alpha=0.65)
     @test !is_inf_rigid(F)
     @test !is_second_order_rigid(F)
-    #@test !is_rigid(F) # "generic" Minkowski sum of two simplices
     if is_no_ci
+        @test !is_rigid(F) # "generic" Minkowski sum of two simplices
         D = DeformationPath(F, [], 250; step_size=0.0075, tol=1e-4)
         animate(D,F,"../animations/smallRhombiIcosidodecahedron_motion"; fixed_vertices=(7,8,40), filetype="mp4", elevation=0.05*pi, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
