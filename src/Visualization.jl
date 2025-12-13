@@ -80,7 +80,6 @@ function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,V
     end
 
     if flex_Real isa Int
-        flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
         flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
     else
         flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
@@ -396,10 +395,10 @@ Plot a polytope.
 function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
-    centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
+    #=centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
-    end
+    end=#
 
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]

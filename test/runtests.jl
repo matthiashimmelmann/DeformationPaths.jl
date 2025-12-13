@@ -42,11 +42,12 @@ is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 teal = RGB(0/255, 128/255, 128/255)
 soft_teal = RGB(160/255,218/255,218/255)
 coral=RGB(255/255, 127/255, 80/255)
+logocolors = Colors.JULIA_LOGO_COLORS
 
 @testset "DeformationPaths.jl" begin
+    include("various.jl")
     include("Polytope.jl")
     include("SpherePacking.jl")
     include("Framework.jl") 
-    include("various.jl")
     include("VolumeHypergraph.jl")
 end

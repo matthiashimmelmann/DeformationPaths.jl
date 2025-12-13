@@ -513,12 +513,12 @@ mutable struct BodyHinge
             xs[:,v] .= realization[:,v]
         end
 
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
         bars = collect(Set(bars))
-        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(bar_equations))
-        G = ConstraintSystem(vertices, variables, equations, realization, xs)
+        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, edges)
     end
 
@@ -557,13 +557,12 @@ mutable struct BodyBar
         for v in pinned_vertices
             xs[:,v] .= realization[:,v]
         end
-
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
         bars = collect(Set(bars))
-        bar_equations = [sum( (x[:,bar[1]]-x[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,bars)]
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,bars)]
         equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices, variables, equations, realization, xs)
+        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, edges)
     end
 
