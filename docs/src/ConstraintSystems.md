@@ -34,5 +34,6 @@ add_equations!(G::ConstraintSystem, equations::Vector{Expression})
 add_equations!(F::AllTypes, equations::Vector{Expression})
 
 realization!(G::ConstraintSystem, realization::Matrix{<:Real})
-realization!(F::AllTypes, realization::Matrix{<:Real})
+realization!(F::AllTypesWithoutPolytope, realization::Matrix{<:Real})
+realization!(F::Polytope, realization::Matrix{<:Real})
 ```
