@@ -1,6 +1,9 @@
 # Compiled source #
 ###################
+Manifest.toml
+**/docs/Manifest.toml
 *.gif
+*.mp4
 *.png
 *.jpg
 *.jpeg

@@ -48,6 +48,8 @@ to_Array(F::Polytope, p::Matrix{<:Real})
 to_Matrix(G::ConstraintSystem, q::Vector{<:Real})
 
 to_Matrix(F::AllTypes, q::Vector{<:Real})
+
+minors
 ```
 
 ## Special Polytope Methods
@@ -58,6 +60,4 @@ fix_antipodals!(F::Polytope)
 tetrahedral_symmetry!(F::Polytope)
 
 triangle_shrinking(F::Polytope)
-
-Dodecahedron
 ```

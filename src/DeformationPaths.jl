@@ -2,8 +2,8 @@ module DeformationPaths
 
 import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
-import GLMakie: NoShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
-import Combinatorics: powerset
+import GLMakie: NoShading, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
+import Combinatorics: powerset, combinations
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
 import Polyhedra
@@ -24,6 +24,7 @@ export  ConstraintSystem,
         VolumeHypergraph,
         animate,
         plot,
+        plot!,
         project_deformation_random,
         Polytope,
         to_Matrix,
@@ -45,7 +46,9 @@ export  ConstraintSystem,
         tetrahedral_symmetry!,
         compute_nonblocked_flex,
         stich_deformation_paths,
-        Dodecahedron
+        Dodecahedron,
+        add_shadow!,
+        minors
 
 """
     DeformationPath(G, motion_samples[; tol])
@@ -295,6 +298,57 @@ mutable struct DeformationPath
         motion_matrices = [to_Matrix(G, Float64.(sample)) for sample in motion_samples]
         new(G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), [])
     end
+
+
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, K_n::ConstraintSystem; show_progress::Bool=true, step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing, time_penalty::Union{Real,Nothing}=2)::DeformationPath
+        num_steps>=0 && step_size>=0 && tol>0 || throw(error("The `num_steps`, the `step_size` and `tol` needs to be a nonnegative, but are  $((num_steps, step_size, tol))."))
+        if isnothing(start_point)
+            start_point = to_Array(G, G.realization)
+        else
+            norm(evaluate(G.equations, G.variables=>start_point), Inf) < sqrt(tol) || throw(error("The `start_point` does not satisfy the underlying constraints in the constraint system `G`!"))
+        end
+
+        flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
+        if flex_mult==[]
+            if random_flex
+                flex_mult = randn(Float64, size(flex_space)[2])
+                flex_mult = flex_mult ./ norm(flex_mult, 1)
+            else
+                flex_mult = [1/size(flex_space)[2] for _ in axes(flex_space,2)]
+            end
+        else
+            flex_mult = Float64.(flex_mult)
+        end
+        size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
+        prev_flex = length(flex_mult)==0 ? [0 for _ in axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
+        prev_flex = prev_flex ./ norm(prev_flex)
+        
+        motion_samples = [Float64.(start_point)]
+        @showprogress enabled=show_progress for i in 1:num_steps
+            try
+                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                prev_flex = _prev_flex
+                if symmetric_newton
+                    q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                else
+                    q = newton_correct(G, q; tol=tol, time_penalty=time_penalty)
+                end
+                if isapprox(q, motion_samples[end]; atol=1e-10)
+                    throw("Slow Progress detected.")
+                end
+                push!(motion_samples, q)
+            catch e
+                prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                if !success || e == "The space of nontrivial infinitesimal motions is empty."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely."
+                    break
+                end
+            end
+        end
+        motion_matrices = [to_Matrix(G, Float64.(sample)) for sample in motion_samples]
+        new(G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), [])
+    end
+
 
     """
         DeformationPath(F::AllTypesWithoutSpherePacking, flex_mult, num_steps[; random_flex=false, kwargs...])
@@ -611,7 +665,7 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real` (optional): Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.0015, tol::Real=1e-12, time_penalty::Union{Real,Nothing}=4)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=2)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
     @var c
@@ -643,11 +697,11 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         try
             cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
             break
         catch err
-            show_progress && println(err)
+            show_progress && @warn err
             continue
         end
     end
@@ -656,24 +710,32 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
-        catch _
-            interpolating_points = motion_samples[end-3:end]
-            @var t, a[1:length(interpolating_points[3]), 1:4]
-            quadric = a[:,1]+t*a[:,2]+t^2*a[:,3]+t^3*a[:,4]
-            equations = vcat(evaluate(quadric, t=>step-local_step_size), evaluate(quadric, t=>step-2*local_step_size), evaluate(quadric, t=>step-3*local_step_size), evaluate(quadric, t=>step-4*local_step_size))
+        catch e
+            if norm(motion_samples[end]-motion_samples[end-1])>step_size*100
+                deleteat!(motion_samples, length(motion_samples))
+                show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
+                break
+            else
+                continue
+            end
+            #Does this work?
+            interpolating_points = motion_samples[end-2:end]
+            @var t, a[1:length(interpolating_points[3]), 1:2]
+            quadric = a[:,1]+t*a[:,1]+t^2*a[:,2]
+            equations = vcat(evaluate(quadric, t=>step-local_step_size), evaluate(quadric, t=>step-2*local_step_size))
             a_variables = vcat(a...)
             a_matrix = evaluate(differentiate(equations, a_variables), a_variables=>[0 for _ in a_variables])
-            a_b_vector = vcat(interpolating_points[4], interpolating_points[3], interpolating_points[2], interpolating_points[1])
+            a_b_vector = vcat(interpolating_points[2], interpolating_points[1])
             a_solutions = a_matrix \ a_b_vector
             next_point = evaluate(quadric, vcat([t],a_variables)=>vcat([step], a_solutions))
             local_equations = evaluate(_G.equations, c=>step)
             try
                 cur_point = newton_correct(local_equations, _G.variables, local_jacobian, next_point; tol=tol, time_penalty=time_penalty)
                 push!(motion_samples, cur_point)
-            catch _
-                show_progress && @warn "The approximation of a deformation path ended prematurely."
+            catch err
+                show_progress && @warn "The approximation of a deformation path ended prematurely. $err"
                 break
             end
         end

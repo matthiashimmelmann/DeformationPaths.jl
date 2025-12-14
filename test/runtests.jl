@@ -7,6 +7,7 @@ import DeformationPaths:    Framework,
                             VolumeHypergraph,
                             SpherePacking,
                             plot,
+                            plot!,
                             SphericalDiskPacking,
                             to_Array,
                             equations!,
@@ -27,23 +28,26 @@ import DeformationPaths:    Framework,
                             compute_nontrivial_inf_flexes,
                             ConstraintSystem,
                             compute_nonblocked_flex,
-                            stich_deformation_paths
+                            stich_deformation_paths,
+                            add_shadow!
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 using IterTools
 using Colors
+import GLMakie: save, scatter!, Point2f, MultiLightShading
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 
 teal = RGB(0/255, 128/255, 128/255)
 soft_teal = RGB(160/255,218/255,218/255)
 coral=RGB(255/255, 127/255, 80/255)
+logocolors = Colors.JULIA_LOGO_COLORS
 
 @testset "DeformationPaths.jl" begin
     include("Polytope.jl")
     include("various.jl")
-    include("Framework.jl")
     include("SpherePacking.jl")
+    include("Framework.jl") 
     include("VolumeHypergraph.jl")
 end
