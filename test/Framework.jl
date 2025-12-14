@@ -56,7 +56,7 @@ end
     plot(F; padding=0.35, pin_point_offset=0.2, edge_color=teal)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.05)
     if is_no_ci
-        animate(D,F, "../animations/Double_Watt"; padding=0.352, edge_color=teal, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2, filetype="mp4")
+        animate(D,F; padding=0.352, edge_color=teal, fixed_vertices=(1,6), fixed_direction=[4,2], pin_point_offset=0.2, filetype="mp4")
         for i in 1:50
             project_deformation_random(D, F, 2, "../animations/Double_Watt$i"; padding=nothing, vertex_size=85, line_width=11)
         end
