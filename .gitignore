@@ -2,11 +2,11 @@
 ###################
 Manifest.toml
 **/docs/Manifest.toml
-*.gif
-*.mp4
-*.png
-*.jpg
-*.jpeg
+**/test/*.png
+**/test/*.mp4
+**/test/*.jpg
+**/test/*.jpeg
+**/test/*.gif
 *.7z
 *.dmg
 *.gz

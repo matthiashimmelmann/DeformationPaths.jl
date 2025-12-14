@@ -1,7 +1,7 @@
 name = "DeformationPaths"
 uuid = "50c58891-b0b3-4ec2-813a-7650aafc80af"
 authors = ["matthiashimmelmann <matthias.himmelmann@outlook.de>"]
-version = "0.3.2"
+version = "1.0.0"
 
 [deps]
 CDDLib = "3391f64e-dcde-5f30-b752-e11513730f60"
@@ -26,4 +26,4 @@ IterTools = "1.10"
 MarchingCubes = "0.1"
 Polyhedra = "0.8"
 ProgressMeter = "1.10"
-julia = "1.10"
+julia = "1.11"
