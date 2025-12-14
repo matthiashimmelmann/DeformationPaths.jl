@@ -392,9 +392,10 @@ end
 
 Plot a polytope.
 """
-function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    if !isnothing(special_edges) && !(special_edges[1] isa Vector)
-        special_edges = [special_edges]
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing,Tuple{Int,Int}}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Vector) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
     end
     isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
@@ -931,14 +932,15 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction=[1.,0,0], alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edges::Union{Nothing, Vector}=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction=[1.,0,0], alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = D.motion_matrices
     (isnothing(fixed_vertices) || F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
-    if !isnothing(special_edges) && !(special_edges[1] isa Vector)
-        special_edges = [special_edges]
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Vector) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
     end
     isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     if isapprox(norm(fixed_direction),0;atol=1e-6) || length(fixed_direction)!=3
