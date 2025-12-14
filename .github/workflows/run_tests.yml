@@ -36,4 +36,4 @@ jobs:
       - name: Run Tests
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --project=. -e 'using Pkg; Pkg.test()'
+            julia --project=. --compiled-modules=no --startup-file=no -e 'ENV["JULIA_PKG_PRECOMPILE_AUTO"] = 0; using Pkg; GC.gc(true); Pkg.test(; coverage=false)'
