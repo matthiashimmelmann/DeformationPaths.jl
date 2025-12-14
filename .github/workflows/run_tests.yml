@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --project=. -e 'push!(LOAD_PATH, "@stdlib"); using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile();'
+            julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.resolve(); Pkg.precompile();'
       - name: Run Tests
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'

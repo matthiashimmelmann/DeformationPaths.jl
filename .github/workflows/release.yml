@@ -14,10 +14,10 @@ jobs:
       - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1.10'
+          version: '1.11'
 
       - name: Install ReleaseNotes.jl
-        run: julia -e 'using Pkg; Pkg.add("ReleaseNotes")'
+        run: julia -e 'using Pkg; Pkg.instantiate(); Pkg.add("ReleaseNotes")'
 
       - name: Generate release notes
         id: notes
