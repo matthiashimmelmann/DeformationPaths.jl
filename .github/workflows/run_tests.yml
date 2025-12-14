@@ -15,12 +15,11 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 1000
+    timeout-minutes: 90
 
     env:
       JULIA_NUM_THREADS: 1
       JULIA_PKG_PRECOMPILE_AUTO: 0
-      LIBGL_ALWAYS_SOFTWARE: 1
 
     steps:
       - name: Install python
@@ -28,11 +27,8 @@ jobs:
         with:
           python-version: '3.8'
       - name: Install binary dependencies
-        run: sudo apt-get update && sudo apt-get install -y \
-             xorg-dev mesa-utils xvfb libgl1 freeglut3-dev \
-             libxrandr-dev libxinerama-dev libxcursor-dev \
-             libxi-dev libxext-dev
-
+        run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+  
       - uses: actions/checkout@v5
       - uses: julia-actions/setup-julia@latest
         with:
