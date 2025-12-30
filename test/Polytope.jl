@@ -3,9 +3,7 @@ if is_no_ci
         println("MartinsTruncatedDodecahedron")
         F = Polytope([[3,42,46,44,40,1,34,48,50,36],[47,43,4,37,51,49,35,2,41,45],[2,35,19,24,21,16,5,59,55,14],[49,51,20,25,29,31,30,28,24,19],[37,4,15,56,60,6,17,22,25,20],[43,47,52,9,33,27,11,13,56,15],[45,41,14,55,12,10,26,32,9,52],[6,60,13,11,54,58,42,3,8,39],[27,33,32,26,53,57,44,46,58,54],[10,12,59,5,38,7,1,40,57,53],[16,21,28,30,18,23,48,34,7,38],[31,29,22,17,39,8,36,50,23,18],[9,32,33],[18,30,31],[47,45,52],[50,48,23],[10,53,26],[27,54,11],[21,24,28],[29,25,22],[40,44,57],[58,46,42],[35,49,19],[20,51,37],[12,55,59],[60,56,13],[41,2,14],[15,4,43],[34,1,7],[8,3,36],[38,5,16],[17,6,39]], Matrix([0 -1.618033988749895 2.489898284882780; 0 -1.618033988749895 -2.489898284882780; 0 1.618033988749895 2.489898284882780; 0 1.618033988749895 -2.489898284882780; 0.4253254041760200 -2.927050983124842 0.2628655560595668; 0.4253254041760200 2.927050983124842 0.2628655560595668; 0.6881909602355868 -2.118033988749895 1.964167172763647; 0.6881909602355868 2.118033988749895 1.964167172763647; -2.752763840942347 0 -1.113516364411607; -2.064572880706760 -2.118033988749895 0.2628655560595668; -2.064572880706760 2.118033988749895 0.2628655560595668; -1.376381920471174 -2.618033988749895 -0.2628655560595668; -1.376381920471174 2.618033988749895 -0.2628655560595668; -0.6881909602355868 -2.118033988749895 -1.964167172763647; -0.6881909602355868 2.118033988749895 -1.964167172763647; 1.376381920471174 -2.618033988749895 0.2628655560595668; 1.376381920471174 2.618033988749895 0.2628655560595668; 2.752763840942347 0 1.113516364411607; 1.801707324647194 -1.309016994374947 -1.964167172763647; 1.801707324647194 1.309016994374947 -1.964167172763647; 2.064572880706760 -2.118033988749895 -0.2628655560595668; 2.064572880706760 2.118033988749895 -0.2628655560595668; 2.227032728823213 0 1.964167172763647; 2.227032728823213 -1.618033988749895 -1.113516364411607; 2.227032728823213 1.618033988749895 -1.113516364411607; -2.652358132999233 -1.309016994374947 0.2628655560595668; -2.652358132999233 1.309016994374947 0.2628655560595668; 2.652358132999233 -1.309016994374947 -0.2628655560595668; 2.652358132999233 1.309016994374947 -0.2628655560595668; 2.915223689058800 -0.5000000000000000 0.2628655560595668; 2.915223689058800 0.5000000000000000 0.2628655560595668; -2.915223689058800 -0.5000000000000000 -0.2628655560595668; -2.915223689058800 0.5000000000000000 -0.2628655560595668; 0.9510565162951536 -1.309016994374947 2.489898284882780; 0.9510565162951536 -1.309016994374947 -2.489898284882780; 0.9510565162951536 1.309016994374947 2.489898284882780; 0.9510565162951536 1.309016994374947 -2.489898284882780; 0.8506508083520399 -2.618033988749895 1.113516364411607; 0.8506508083520399 2.618033988749895 1.113516364411607; -0.9510565162951536 -1.309016994374947 2.489898284882780; -0.9510565162951536 -1.309016994374947 -2.489898284882780; -0.9510565162951536 1.309016994374947 2.489898284882780; -0.9510565162951536 1.309016994374947 -2.489898284882780; -1.538841768587627 -0.5000000000000000 2.489898284882780; -1.538841768587627 -0.5000000000000000 -2.489898284882780; -1.538841768587627 0.5000000000000000 2.489898284882780; -1.538841768587627 0.5000000000000000 -2.489898284882780; 1.538841768587627 -0.5000000000000000 2.489898284882780; 1.538841768587627 -0.5000000000000000 -2.489898284882780; 1.538841768587627 0.5000000000000000 2.489898284882780; 1.538841768587627 0.5000000000000000 -2.489898284882780; -2.227032728823213 0 -1.964167172763647; -2.227032728823213 -1.618033988749895 1.113516364411607; -2.227032728823213 1.618033988749895 1.113516364411607; -0.8506508083520399 -2.618033988749895 -1.113516364411607; -0.8506508083520399 2.618033988749895 -1.113516364411607; -1.801707324647194 -1.309016994374947 1.964167172763647; -1.801707324647194 1.309016994374947 1.964167172763647; -0.4253254041760200 -2.927050983124842 -0.2628655560595668; -0.4253254041760200 2.927050983124842 -0.2628655560595668]'))
         realization = Matrix([-0.09316946130649643 -1.1819937779518985 2.0204362433025262; -0.19314268933197953 -1.6549609282444353 -1.9991653376339578; -0.14039240043603035 1.4500883804485505 2.741470555463011; -0.058364544454811464 1.9279092402347469 -2.7606964502698506; 0.3891850765261194 -3.07981025189601 -0.03133556194884948; 0.2780886485485284 2.324770804499007 0.07615542597946542; 0.4888154196269724 -1.7676486775309472 1.457522701122142; 0.31785728716735884 1.7456102108189473 1.9039206432178701; -2.1230310328631736 0.08144284869939204 -0.9869469954497245; -1.9284391898030708 -2.4057121359358997 0.362149904688708; -1.850743275579804 2.130082391416822 0.43625108921094063; -1.4535714324600248 -3.0263581806208952 -0.263282720857421; -1.4539202678339596 2.418403357976359 -0.4361856706822311; -0.9783919841855155 -2.26288799304741 -1.8868007890871175; -0.8508675919793834 2.3177238793598116 -2.290299409315595; 1.2481134927319475 -2.567965461129105 0.024282577058949654; 1.2107753580545153 1.9938662452986902 0.21460944408477498; 3.151920175215743 0.09299854872601569 1.1824284192733798; 1.530199022704344 -1.0110931090484954 -1.4574513554238036; 1.6059520991118008 1.466064935887007 -1.850435180544297; 2.056755310706133 -1.9804290385302763 -0.02429711043363272; 2.0466116088820887 1.5989782260347158 -0.163710804605416; 2.454413819587491 0.23123614451563768 1.8868724644632633; 2.1531386449071674 -1.2712952030497693 -0.7213774461702918; 2.2631513106953665 1.344962589073404 -1.105341151724215; -2.1532562746163113 -1.4524093803986216 0.1637020779143447; -2.2302413710560907 1.2153134166989563 0.567044991145182; 2.8088850617946712 -1.321815273946642 0.031312665810646914; 2.883938550052545 1.0905676983073966 -0.3620976305933048; 3.2972612196801974 -0.5402618183268829 0.42150007396307937; 3.3274351574641714 0.44725416342842983 0.2632349859355647; -2.2704277796501913 -0.535424212386607 -0.21472831422480257; -2.2969199784572165 0.4539958670756328 -0.07619758507740305; 0.8822959568749018 -0.9829104374019799 1.9347952578820797; 0.6620293976807486 -1.1428847431413047 -1.9348385505559245; 0.7716690344594493 1.1018982392972239 2.5185697504344793; 0.8603481380780279 1.6297349295271055 -2.4983407538425904; 0.5438139727663638 -2.4406768439360267 0.721364193689011; 0.5784904911309902 2.0442329094111016 0.9869574680903074; -1.0042635667350714 -0.8418463866193451 2.2484991445971927; -1.1048725825053116 -1.3439932289923797 -2.264044193482247; -1.131521798426443 1.3749555883831843 2.8584915748252984; -0.958012208658938 1.5009568482071554 -2.8584811881872016; -1.8158701171027367 -0.3146556572173901 2.498333465016121; -1.2864780696208933 -0.39332424156522855 -2.5186289491764353; -1.8155274255306042 0.6512648807310742 2.7607003220685673; -1.3357717761072767 0.5815619397764795 -2.7414806910668963; 1.6336510446931125 -0.32773989117655544 1.9991426911926753; 1.152907508056488 -0.2766576660659793 -2.0204449864708365; 1.619581238646516 0.6354852600335692 2.264029297230225; 1.1108591159494319 0.6950636699932168 -2.2485654050330126; -1.7584993907093813 0.23711118180073867 -1.903837755009584; -1.9784803455015063 -1.7366808147006803 1.105455825002517; -2.1173958624183413 1.8242366031808879 1.3516300770672671; -1.0624425528749817 -2.9688691753705228 -1.1824499289215387; -1.0805771011563174 2.5775027888562967 -1.3515911315887883; -1.890609277798804 -1.074383177228017 1.85046098879756; -1.941335652579676 1.5254751008388008 2.2903703295455844; -0.5050804552022488 -3.3027770069456093 -0.4215297232720174; -0.46652570485055633 2.49671582386856 -0.5671118774236821]')
-        display([norm(F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) for bar in F.edges])
         realization!(F,realization)
-        display([norm(F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) for bar in F.edges])
         plot(F, "deformed_trunc_dod"; special_edges=F.edges[10], vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.2*pi, alpha=0.65, plot_flexes=false)
         q = newton_correct(F.G, to_Array(F,F.G.realization); tol=1e-10, time_penalty=0.1, armijo_linesearch=false)
         realization!(F, to_Matrix(F, q))
@@ -29,7 +27,7 @@ if is_no_ci
                 plot(_F; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)
                 push!(Defs,_D)
                 for i in 1:20
-                    project_deformation_random(Defs, F, 2, "../animations/Dodec_projection$i"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
+                    project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
                 end
             end
             #println([norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])) for Defo in collect(Iterators.product(Defs,Defs))])
@@ -37,7 +35,7 @@ if is_no_ci
             #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
             DPaths = collect(Iterators.product(Defs,Defs))
             _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
-            project_deformation_random([_D], F, 2, "../animations/Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
+            project_deformation_random([_D], F, 2, "Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,F; scaling_factor=0.98, recompute_deformation_samples=false, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, filetype="mp4", special_edges=[9, 10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, renderEntirePolytope=true, padding=0.01)
             for i in 9:11
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
@@ -45,7 +43,7 @@ if is_no_ci
                 _F = Polytope(F.facets, _D.motion_matrices[end])
                 plot(_F; azimuth = π/10 + 2pi * 125 / 190, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
-                project_deformation_random(Defs, F, 2, "../animations/Dodec_projection"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
+                project_deformation_random(Defs, F, 2, "Dodec_projection"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
             end
         end
     end
@@ -61,7 +59,7 @@ if is_no_ci
         @test !is_second_order_rigid(F)
         if is_no_ci
             D = DeformationPath(F, [], 500; step_size=0.005, tol=1e-6)
-            animate(D,F,"../animations/truncatedDodecahedron_motion"; fixed_vertices=(9,32,33), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.025)
+            animate(D,F,"truncatedDodecahedron_motion"; fixed_vertices=(9,32,33), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.025)
         end
     end
 end
@@ -76,7 +74,7 @@ if is_no_ci
         if is_no_ci
             @test !is_rigid(F) # Zonotope
             D = DeformationPath(F, [], 350; step_size=0.008, tol=1e-6)
-            animate(D,F,"../animations/greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=false,  rotation_frames=800, padding=0.1)
+            animate(D,F,"greatRhombiIcosidodecahedron_motion"; fixed_vertices=(2,6,8), filetype="mp4", renderEntirePolytope=true, azimuth=0.15*pi, elevation=0.075*pi, animate_rotation=false,  rotation_frames=800, padding=0.1)
         end
     end
 end
@@ -89,7 +87,7 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.0085, tol=1e-6)
-        animate(D,F,"../animations/RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, animate_rotation=false, rotation_frames=600, padding=-0.75)
+        animate(D,F,"RhombicDodecahedron_motion"; fixed_vertices=(2,1,3), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, animate_rotation=false, rotation_frames=600, padding=-0.75)
     end
 end
 
@@ -101,7 +99,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [1,1,1], 200; step_size=0.01)
-        animate(D,F,"../animations/cube_motion"; fixed_vertices=(1,2,3), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"cube_motion"; fixed_vertices=(1,2,3), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -113,7 +111,7 @@ end
     @test !is_rigid(F) # "generic" Minkowski sum of two simplices
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0075, tol=1e-6)
-        animate(D,F,"../animations/cuboctahedron_motion"; fixed_vertices=(1,5,9), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi,)
+        animate(D,F,"cuboctahedron_motion"; fixed_vertices=(1,5,9), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi,)
     end
 end
 
@@ -126,7 +124,7 @@ end
     @test !is_rigid(F) # "generic" Minkowski sum of cube and octahedron
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0065, tol=1e-6, )
-        animate(D,F,"../animations/smallRhombiCuboctahedron_motion"; fixed_vertices=(1,3,9), filetype="mp4", azimuth=0.075*pi, elevation=0.05*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800)
+        animate(D,F,"smallRhombiCuboctahedron_motion"; fixed_vertices=(1,3,9), filetype="mp4", azimuth=0.075*pi, elevation=0.05*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800)
     end
 end
 
@@ -138,7 +136,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0125, tol=1e-6)
-        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(9,11,17), filetype="mp4", elevation=pi/10, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"truncatedOctahedron_motion"; fixed_vertices=(9,11,17), filetype="mp4", elevation=pi/10, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -150,7 +148,7 @@ end
     @test !is_rigid(F) # Zontope
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-4)
-        animate(D,F,"../animations/greatRhombiCuboctahedron_motion"; fixed_vertices=(3,6,14), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"greatRhombiCuboctahedron_motion"; fixed_vertices=(3,6,14), filetype="mp4", elevation=0.075*pi, renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -193,7 +191,7 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.0075, tol=1e-6)
-        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,16), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"RhombicTriacontahedron_motion"; fixed_vertices=(11,12,16), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -351,7 +349,7 @@ end
     @test !is_rigid(F) # zonotope
     if is_no_ci
         D = DeformationPath(F, [], 200; step_size=0.01, tol=1e-4)
-        animate(D,F,"../animations/truncatedOctahedron_motion"; fixed_vertices=(1,3,7), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"truncatedOctahedron_motion"; fixed_vertices=(1,3,7), filetype="mp4", renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end
 
@@ -385,7 +383,7 @@ if is_no_ci
         if is_no_ci
             @test !is_rigid(F) # "generic" Minkowski sum of two simplices
             D = DeformationPath(F, [], 250; step_size=0.0075, tol=1e-4)
-            animate(D,F,"../animations/smallRhombiIcosidodecahedron_motion"; fixed_vertices=(7,8,40), filetype="mp4", elevation=0.05*pi, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
+            animate(D,F,"smallRhombiIcosidodecahedron_motion"; fixed_vertices=(7,8,40), filetype="mp4", elevation=0.05*pi, azimuth=0., renderEntirePolytope=true, animate_rotation=false,  rotation_frames=800, padding=0.01)
         end
     end
 end
@@ -399,6 +397,6 @@ end
     @test !is_rigid(F)
     if is_no_ci
         D = DeformationPath(F, [], 225; step_size=0.0085, tol=1e-6)
-        animate(D,F,"../animations/RhombicTriacontahedron_motion"; fixed_vertices=(11,12,15), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, elevation=0.15*pi, animate_rotation=false,  rotation_frames=800, padding=0.01)
+        animate(D,F,"RhombicTriacontahedron_motion"; fixed_vertices=(11,12,15), filetype="mp4", renderEntirePolytope=true, azimuth=0.075*pi, elevation=0.15*pi, animate_rotation=false,  rotation_frames=800, padding=0.01)
     end
 end

@@ -15,8 +15,8 @@ end
 
 
 @testset "octehedral_decomposition" begin
-    F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'))
-    plot(F)
+    F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'); pinned_vertices=[4,5,6])
+    plot(F, "octahedral_two_removed")
     D = DeformationPath(F, [0.333, 1], 350; step_size=0.002, show_progress=false)
     animate(D, F; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5, filetype="mp4")
 end

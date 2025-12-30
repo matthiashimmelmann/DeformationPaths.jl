@@ -278,7 +278,7 @@ mutable struct VolumeHypergraph
     G::ConstraintSystem
     volumes::Vector{Vector{Int}}
 
-    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real})
+    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw("The volumes don't have the correct format.")
@@ -286,16 +286,21 @@ mutable struct VolumeHypergraph
         size(realization)[1]==dimension && size(realization)[2]==length(vertices) || throw("The realization does not have the correct format.")
         dimension>=1 || throw("The dimension is not an integer bigger than 0.")
         @var x[1:dimension, 1:length(vertices)]
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices)))]...)
-        facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([x[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
+        xs = Array{Expression,2}(undef, dimension, length(vertices))
+        xs .= x
+        for v in pinned_vertices
+            xs[:,v] = realization[:,v]
+        end
+        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+        facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([xs[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
         facet_equations = filter(eq->eq!=0, facet_equations)
-        G = ConstraintSystem(vertices,variables, facet_equations, realization, x)
+        G = ConstraintSystem(vertices, variables, facet_equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, volumes)
     end
 
-    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real})
+    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in volumes]...))))
-        VolumeHypergraph(vertices, volumes, realization)
+        VolumeHypergraph(vertices, volumes, realization; pinned_vertices=pinned_vertices)
     end
 end
 
