@@ -44,9 +44,9 @@ soft_teal = RGB(160/255,218/255,218/255)
 coral=RGB(255/255, 127/255, 80/255)
 
 @testset "DeformationPaths.jl" begin
+    include("VolumeHypergraph.jl")
     include("Framework.jl") 
     include("SpherePacking.jl")
     include("Polytope.jl")
     include("various.jl")
-    include("VolumeHypergraph.jl")
 end
