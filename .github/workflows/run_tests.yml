@@ -15,7 +15,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 1000
+    timeout-minutes: 120
 
     steps:
       - name: Install python
@@ -25,16 +25,17 @@ jobs:
       - name: Install binary dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@latest
         with:
-          version: "1.10"
+          version: "1.11"
+
       - name: Install dependencies
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --project=. -e 'using Pkg; Pkg.instantiate();'
-      
+            julia --project=. --compiled-modules=no --startup-file=no -e 'using Pkg; Pkg.instantiate(); GC.gc(true);'
+
       - name: Run Tests
         run: >
             DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24'
-            julia --project=. -e 'using Pkg; Pkg.test()'
+            julia --project=. --compiled-modules=no --startup-file=no -e 'ENV["JULIA_NUM_THREADS"] = 1; ENV["JULIA_PKG_PRECOMPILE_AUTO"] = 0; using Pkg; GC.gc(true); Pkg.test(; coverage=false)'

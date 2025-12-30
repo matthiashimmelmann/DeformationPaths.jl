@@ -6,7 +6,7 @@ Heuristically checks if a geometric constraint system `F` is (continuously) rigi
 
 See [`DeformationPath(G::DeformationPaths.ConstraintSystem, motion_samples::Vector{<:Vector{<:Real}})`](@ref) for a description of the possible parameters.
 """
-function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-3, tol::Real=1e-10, tested_random_flexes::Int=4, symmetric_newton::Bool=false, time_penalty::Union{Real,Nothing}=2)::Bool
+function is_rigid(F::AllTypes; tol_rank_drop::Real=1e-3, tol::Real=1e-10, tested_random_flexes::Int=8, symmetric_newton::Bool=false, time_penalty::Union{Real,Nothing}=2)::Bool
     #TODO needs work
     if is_inf_rigid(F; tol_rank_drop=tol_rank_drop)
         return true

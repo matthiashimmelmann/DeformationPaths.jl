@@ -6,7 +6,7 @@ This package allows the approximation of deformation paths corresponding to a va
 
 ```
 julia> ]
-(@v1.10) pkg> add DeformationPaths
+(@v1.11) pkg> add DeformationPaths
 ```
 
 ## Usage

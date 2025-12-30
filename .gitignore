@@ -1,9 +1,12 @@
 # Compiled source #
 ###################
-*.gif
-*.png
-*.jpg
-*.jpeg
+Manifest.toml
+**/docs/Manifest.toml
+**/test/*.png
+**/test/*.mp4
+**/test/*.jpg
+**/test/*.jpeg
+**/test/*.gif
 *.7z
 *.dmg
 *.gz

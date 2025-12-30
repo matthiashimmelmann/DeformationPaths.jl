@@ -20,23 +20,21 @@ end
 
 
 """
-    newton_correct(G, point[; tol, time_penalty])
+    newton_correct(G, point)
 
 Apply Newton's method to correct `point` back to the constraints in `G`.
 
 # Arguments
 - `G::ConstraintSystem`: The underlying geometric constraint system.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
-- `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
-- `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+
+For further keywords, see [`newton_correct`](@ref).
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
-
-See also [`newton_correct`](@ref)
 """
-function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; tol::Real = 1e-13, time_penalty::Union{Real,Nothing}=3)::Vector{<:Real}
-    return newton_correct(G.equations, G.variables, G.jacobian, point; tol = tol, time_penalty=time_penalty)
+function newton_correct(G::ConstraintSystem, point::Vector{<:Real}; kwargs...)::Vector{<:Real}
+    return newton_correct(G.equations, G.variables, G.jacobian, point; kwargs...)
 end
 
 """
@@ -51,6 +49,7 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 - `point::Vector{<:Real}`: The initial point that Newton's method is applied to.
 - `tol::Real` (optional): Numerical tolerance that is used as a stopping criterion for Newton's method. Default value: `1e-13`.
 - `time_penalty::Union{Real,Nothing}` (optional): If Newton's method takes too long, we stop the iteration and throw an error. Here, "too long" is measured in terms of `length(point)/time_penalty` seconds. Default value: `2`.
+- `armijo_linesearch::Bool` (optional): Flag for activating the Armijo backtracking line search procedure. Default value: `true`.
 
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
@@ -76,7 +75,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             v = -(J \ r_val)
             global damping, damping_too_small = 0.9, 0
             qnew = q + damping*v
-            while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.1 * damping * v'*v
+            while norm(evaluate(equations, variables=>qnew)) > norm(evaluate(equations, variables=>q)) - 0.5 * damping * v'*v
                 global damping = damping*0.7
                 qnew = q + damping*v
                 if damping < 1e-12
@@ -94,10 +93,19 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             end
         end
     else
+        global damping = 0.15
         while(norm([eq(variables=>q) for eq in equations]) > tol)
             J = evaluate.(jac, variables=>q)
-            step = pinv(J)
-            qnew = q - damping * (J \ evaluate.(equations, variables=>q))
+            stress_dimension = size(nullspace(J'; atol=1e-8))[2]
+            if stress_dimension > 0
+                rand_mat = randn(Float64, length(equations) - stress_dimension, length(equations))
+                new_equations = rand_mat*equations
+                J = rand_mat*J
+            else
+                new_equations = equations
+            end
+
+            qnew = q - damping * (J \ evaluate.(new_equations, variables=>q))
             if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
                 global damping = damping*1.2
             else

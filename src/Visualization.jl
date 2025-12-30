@@ -392,13 +392,17 @@ end
 
 Plot a polytope.
 """
-function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edge=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
-    isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing,Tuple{Int,Int}}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Vector) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
+    end
+    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
-    centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
+    #=centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
-    end
+    end=#
 
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -437,12 +441,12 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), edges_around_facets)
     end
 
-    if isnothing(special_edge)
+    if isnothing(special_edges)
         foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), F.edges)
     else
-        edges_here = filter(edge->!([special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]]), F.edges)
+        edges_here = filter(edge->!(any(special_edge->[special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]], special_edges)), F.edges)
         foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), edges_here)
-        linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color)
+        foreach(special_edge->linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color), special_edges)
     end
 
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color),  1:(F isa Polytope ? size(F.G.realization)[2]-length(F.facets) : size(F.G.realization)[2]))
@@ -928,13 +932,17 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction=[1.,0,0], alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edge=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing};  shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_deformation_samples::Bool=true, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction=[1.,0,0], alpha=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = D.motion_matrices
     (isnothing(fixed_vertices) || F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness, elevation=elevation, azimuth=azimuth)
 
-    isnothing(special_edge) || (special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Vector) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
+    end
+    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     if isapprox(norm(fixed_direction),0;atol=1e-6) || length(fixed_direction)!=3
         @warn "fixed_direction has norm $(norm(fixed_direction)) and length $(length(fixed_direction)) which does not work! We thus set it to [1,0,0]"
         fixed_direction = [1.,0,0]
@@ -1035,12 +1043,12 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
         foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(edges_around_facets[i][1])], ($allVertices)[Int64(edges_around_facets[i][2])]]); linewidth=line_width, color=edge_color), 1:length(edges_around_facets))
     end
 
-    if isnothing(special_edge)
+    if isnothing(special_edges)
         foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(F.edges[i][1])], ($allVertices)[Int64(F.edges[i][2])]]); linewidth=line_width, color=edge_color), 1:length(F.edges))
     else
-        edges_here = filter(edge->!([special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]]), F.edges)
+        edges_here = filter(edge->!(any(special_edge->[special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]], special_edges)), F.edges)
         foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(edges_here[i][1])], ($allVertices)[Int64(edges_here[i][2])]]); linewidth=line_width, color=edge_color), 1:length(edges_here))
-        linesegments!(ax, @lift([($allVertices)[Int64(special_edge[1])], ($allVertices)[Int64(special_edge[2])]]); linewidth=line_width+2.5, color=special_edge_color)
+        foreach(special_edge->linesegments!(ax, @lift([($allVertices)[Int64(special_edge[1])], ($allVertices)[Int64(special_edge[2])]]); linewidth=line_width+2.5, color=special_edge_color), special_edges)
     end
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
