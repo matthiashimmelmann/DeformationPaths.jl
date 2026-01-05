@@ -1,3 +1,15 @@
+@testset "hypostaticspherepacking2" begin
+    #INFO cf. Miranda Holmes-Cerfon
+    realization = Matrix([0 0 0.; 1 0 0; 1 1 0; 0 1 0; 0.5 0.5 -1/sqrt(2); -0.5 0.5 -1/sqrt(2); 1.5 0.5 -1/sqrt(2); 0 -1/3 -2*sqrt(2)/3; 1 -1/3 -2*sqrt(2)/3]')
+    F = SpherePacking([0.5 for _ in 1:9], realization)
+    display(F.contacts)
+    @test !is_inf_rigid(F; tol_rank_drop=1e-6)
+    @test is_second_order_rigid(F)
+    @test is_rigid(F)
+    plot(F, "hypostaticspherepacking2"; sphere_radius=0.25,alpha=0.45,sphere_color=soft_teal, vertex_labels=false)
+end
+
+
 @testset "hypostaticspherepacking" begin
     #INFO cf. Miranda Holmes-Cerfon
     realization = Matrix([0 0 0; 1.000000000000000 0.000000000000000 0.000000000000000; -0.500000000000000 0.866025403784439 0.000000007289415; 1.000000003306545 1.603750749657996 0.453609204877056; 0.999999994048218 0.577350265753363 -0.816496583357531; -0.000000003967855 1.539600726278313 -0.544331039863996; 0.000000003306546 1.603750740716201 0.453609226708918; 0.999999996032145 1.539600715548160 -0.544331060431297; 1.500000000000000 0.866025403784439 -0.000000007289415; 0.500000000000000 0.866025403784439 -0.000000000000000]')
