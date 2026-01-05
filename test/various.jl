@@ -1,3 +1,13 @@
+@testset "sphericaldiskpacking" begin
+    F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
+    plot(F,"sphericaldiskpacking"; disk_color=teal, sphere_color=soft_teal, dualgraph_color=(coral,0.75))
+    D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
+    if is_no_ci
+        animate(D,F; filetype="mp4")
+    end
+end
+
+
 @testset "bodybar_prism" begin
     F = BodyBar([[1,4],[2,5],[3,6]], [[1,2,3],[4,5,6]], Matrix([cos(0*2*pi/3) sin(0*2*pi/3) 0; cos(2*pi/3) sin(2*pi/3) 0; cos(2*2*pi/3) sin(2*2*pi/3) 0; cos(0*2*pi/3+pi/3) sin(0*2*pi/3+pi/3) 1.3; cos(2*pi/3+pi/3) sin(2*pi/3+pi/3) 1.3; cos(2*2*pi/3+pi/3) sin(2*2*pi/3+pi/3) 1.3;]'); pinned_vertices=[1,2,3])
     plot(F; edge_color=logocolors.blue, special_edges=[[1,4],[2,5],[3,6]], special_edge_color=logocolors.purple, vertex_color=logocolors.red, facet_color=logocolors.green, flex_color=logocolors.purple, plot_flexes=false, azimuth=0.185*pi, flex_scale=0.1, elevation=pi/12, alpha=0.5, line_width=20, vertex_size=70, padding=0.5)
@@ -14,7 +24,7 @@ end
             _F = BodyHinge([[1,2,4], [1,2,3], [6,2,4], [6,2,3], [1,3,5], [6,3,5], [1,3,5], [6,3,5]], D.motion_matrices[i])
             plot(_F, "bricard_octahedron$i"; edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13)
         end=#
-        animate(D,F,"../animations/bricard_octahedron"; filetype="mp4", edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13, padding=0.01)
+        animate(D,F,"bricard_octahedron"; filetype="mp4", edge_color=teal, vertex_color=teal, facet_color=soft_teal, alpha=0.45, azimuth=0.15*pi, elevation=pi/13, padding=0.01)
     end
 end
 
@@ -56,14 +66,4 @@ end
     plot(F; vertex_labels=false, azimuth=3*pi/4, padding=0.35)
     D = DeformationPath(F, [1,1], 200; step_size=0.035, show_progress=false)
     animate(D,F; vertex_labels=false, animate_rotation=true, filetype="mp4", edge_color=teal)
-end
-
-
-@testset "sphericaldiskpacking" begin
-    F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
-    plot(F)
-    D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
-    if is_no_ci
-        animate(D,F; filetype="mp4")
-    end
 end
