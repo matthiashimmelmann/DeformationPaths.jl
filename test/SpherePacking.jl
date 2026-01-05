@@ -2,7 +2,6 @@
     #INFO cf. Miranda Holmes-Cerfon
     realization = Matrix([0 0 0.; 1 0 0; 1 1 0; 0 1 0; 0.5 0.5 -1/sqrt(2); -0.5 0.5 -1/sqrt(2); 1.5 0.5 -1/sqrt(2); 0 -1/3 -2*sqrt(2)/3; 1 -1/3 -2*sqrt(2)/3]')
     F = SpherePacking([0.5 for _ in 1:9], realization)
-    display(F.contacts)
     @test !is_inf_rigid(F; tol_rank_drop=1e-6)
     @test is_second_order_rigid(F)
     @test is_rigid(F)
