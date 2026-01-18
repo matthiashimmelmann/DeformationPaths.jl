@@ -11,6 +11,8 @@ is_rigid(F::AllTypes)
 
 is_inf_rigid(F::AllTypes)
 
+is_prestress_stable(F::AllTypes)
+
 is_second_order_rigid(F::AllTypes)
 ```
 
