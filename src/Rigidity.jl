@@ -73,7 +73,7 @@ end
 
 Checks if a geometric constraint system `F` is prestress stable.
 """
-function is_prestress_stable(F::AllTypes;  tol_rank_drop::Real=1e-6)::Bool
+function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
