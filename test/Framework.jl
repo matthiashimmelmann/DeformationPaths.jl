@@ -7,6 +7,14 @@
 end
 
 
+@testset "coned_cube" begin
+    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
+    plot(F; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,0], show_pins=false, flex_scale=0.2, vertex_labels=false)
+    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
+    animate(D,F; filetype="mp4")
+end
+
+
 @testset "flexible_prestress_stable_component" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5],[1,6]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2; -sqrt(1/2) sqrt(1/2)]'); pinned_vertices=[1,4])
     plot(F; edge_color=teal, flex_color=coral, show_pins=false, flex_Real=[-1,-1], padding=0.25, plot_flexes=true, flex_scale=0.5, vertex_labels=false)
@@ -90,14 +98,6 @@ end
     F = Framework([[1,3],[1,4],[1,5],[1,6],[2,3],[2,4],[2,5],[2,6]], Matrix([0 0; 0 1; 1 -1; 1 0; 1 1; 1 2]'))
     plot(F)
     D = DeformationPath(F, [1], 500; step_size=0.025, show_progress=false)
-    animate(D,F; filetype="mp4")
-end
-
-
-@testset "coned_cube" begin
-    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 sqrt(2)]'))
-    plot(F)
-    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
     animate(D,F; filetype="mp4")
 end
 

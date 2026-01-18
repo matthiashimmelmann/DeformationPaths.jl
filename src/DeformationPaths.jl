@@ -1,7 +1,7 @@
 module DeformationPaths
 
 import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
 import GLMakie: NoShading, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
@@ -48,7 +48,8 @@ export  ConstraintSystem,
         stich_deformation_paths,
         Dodecahedron,
         add_shadow!,
-        minors
+        minors,
+        is_prestress_stable
 
 """
     DeformationPath(G, motion_samples[; tol])
