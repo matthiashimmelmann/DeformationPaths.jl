@@ -54,12 +54,13 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
         ED_stress_system = projective_stress_system
     else
         rand_pt = randn(Float64, length(λ))
-        ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ, λ - rand_pt)
+        ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ - rand_pt)
         ED_stress_system = vcat(projective_stress_system, minors(ED_matrix, codim+1))
     end
     sols = real_solutions(solve(ED_stress_system))
     return isempty(sols) ? [] : sols[1]
 end
+
 
 """
     minors(A, k)

@@ -83,20 +83,24 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
     end
     flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol_rank_drop)
     if size(flexes)[2]==0
-        return []
+        return true
     end
     rigidity_matrix = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
     stresses = nullspace(rigidity_matrix'; atol=tol_rank_drop)
     if size(stresses)[2]==0
-        return flexes[1,:]
+        return false
     end
-    @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] c
+    @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
-    principal_minors = [det(Hessian[1:i,1:i])-1 for i in eachindex(ω)]
-    F = System(principal_minors, variables=ω)
-    sols = real_solutions(solve(F))
+    principal_minors = [μ[i]*det(Hessian[1:i,1:i])-1 for i in eachindex(μ)]
+    mat = Matrix{ComplexF64}(evaluate.(differentiate(principal_minors, vcat(ω,μ)), vcat(ω,μ)=>randn(ComplexF64, length(vcat(ω,μ)))))
+    codim = rank(mat; atol=1e-10)
+    rand_pt = randn(Float64, length(vcat(ω,μ)))
+    ED_matrix = hcat(length(principal_minors)==1 ? differentiate(principal_minors, vcat(ω,μ))' : differentiate(principal_minors, vcat(ω,μ))', vcat(ω,μ) - rand_pt)
+    PSD_System = System(vcat(principal_minors, minors(ED_matrix, codim+1)), variables=vcat(ω,μ))
+    sols = real_solutions(solve(PSD_System))
     return !isempty(sols)
 end
