@@ -95,12 +95,18 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
-    principal_minors = [μ[i]*det(Hessian[1:i,1:i])-1 for i in eachindex(μ)]
-    mat = Matrix{ComplexF64}(evaluate.(differentiate(principal_minors, vcat(ω,μ)), vcat(ω,μ)=>randn(ComplexF64, length(vcat(ω,μ)))))
-    codim = rank(mat; atol=1e-10)
-    rand_pt = randn(Float64, length(vcat(ω,μ)))
-    ED_matrix = hcat(length(principal_minors)==1 ? differentiate(principal_minors, vcat(ω,μ))' : differentiate(principal_minors, vcat(ω,μ))', vcat(ω,μ) - rand_pt)
-    PSD_System = System(vcat(principal_minors, minors(ED_matrix, codim+1)), variables=vcat(ω,μ))
-    sols = real_solutions(solve(PSD_System))
+    principal_minors = [det(Hessian[1:i,1:i])-μ[i] for i in eachindex(μ)]
+    PSD_System = System(principal_minors, variables=ω, parameters=μ)
+    rand_pt = randn(ComplexF64, length(μ))
+    start_sols = solutions(solve(PSD_System; target_parameters=rand_pt))
+    final_sols = []
+    sols = solve(
+        PSD_System,
+        start_sols;
+        start_parameters = rand_pt,
+        target_parameters = [rand(Float64, length(μ)) for _ in 1:25],
+        transform_result = (R,p) -> real_solutions(R),
+        flatten = true
+    )
     return !isempty(sols)
 end

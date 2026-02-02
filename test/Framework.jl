@@ -2,6 +2,7 @@
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'); pinned_vertices=[1,4])
     plot(F; edge_color=teal, flex_color=coral, padding=0.25, plot_flexes=true, flex_Real=[1], show_pins=false, flex_scale=0.5, vertex_labels=false)
     @test !is_inf_rigid(F)
+    @test is_prestress_stable(F)
     @test is_second_order_rigid(F)
     @test is_rigid(F)
 end
@@ -40,11 +41,13 @@ end
 @testset "rigid_test" begin
     F = Framework([[1,2],[1,4],[1,5],[4,5],[4,3],[5,3],[2,6],[2,7],[6,7],[3,6],[3,7]], Matrix([0 0; 2 0; 1 1; 0.5-1/6 1/2+1/6; 0.5+1/6 1/2-1/6; 1.5+1/6 1/2+1/6; 1.5-1/6 1/2-1/6;]'))
     plot(F; edge_color=teal, vertex_labels=false)
+    @test is_prestress_stable(F)
 end
 
 @testset "3Frustum" begin
     F = Framework([[1,2],[2,3],[1,3],[4,5],[5,6],[4,6],[1,4],[2,5],[3,6]], Matrix([cos(2*pi/3) sin(2*pi/3); cos(4*pi/3) sin(4*pi/3); cos(6*pi/3) sin(6*pi/3); 2*cos(2*pi/3) 2*sin(2*pi/3); 2*cos(4*pi/3) 2*sin(4*pi/3); 2*cos(6*pi/3) 2*sin(6*pi/3);]'), pinned_vertices=[1,2,3])
     plot(F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, flex_scale=0.85, vertex_labels=false)
+    @test is_prestress_stable(F)
 end
 
 @testset "3Prism" begin
@@ -56,6 +59,7 @@ end
     add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
     scatter!(ax, points; color=:black, markersize=55)
+    @test !is_prestress_stable(F)
 end
 
 
@@ -81,6 +85,7 @@ end
     if is_no_ci
         animate(D,F; filetype="mp4")
     end
+    @test !is_prestress_stable(F)
 end
 
 
@@ -99,6 +104,7 @@ end
     plot(F)
     D = DeformationPath(F, [1], 500; step_size=0.025, show_progress=false)
     animate(D,F; filetype="mp4")
+    @test !is_prestress_stable(F)
 end
 
 
