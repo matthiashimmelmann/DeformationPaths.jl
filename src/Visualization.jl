@@ -509,7 +509,7 @@ end
 
 Compute an animation for a 2-dimensional bar-joint framework.
 """
-function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, pin_markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, show_pins=true, step::Int=1, padding::Union{Real,Nothing}=0.15, pin_markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -585,7 +585,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    show_pins && foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 

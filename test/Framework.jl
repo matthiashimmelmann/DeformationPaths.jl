@@ -1,3 +1,28 @@
+@testset "square" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
+    plot(F)
+    @test !is_rigid(F)
+    D = DeformationPath(F, [1], 350; step_size=0.025)
+    @test !is_prestress_stable(F)
+
+    F1 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
+    D1 = DeformationPath(F1, [1], 375; step_size=0.025)
+    if is_no_ci
+        animate(D1,F1,"square"; edge_color=teal, padding=0.1, vertex_size=10, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
+    end
+
+    F2 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 1 0]'); pinned_vertices=[1,2])
+    D2 = DeformationPath(F2, [1], 350; step_size=0.025)
+
+    F3 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 0 0; 0 1]'); pinned_vertices=[1,2])
+    D3 = DeformationPath(F3, [1], 350; step_size=0.025)
+
+    for i in 1:10
+        project_deformation_random([D1,D2,D3], F, 2, "square_realizations$i"; padding=nothing, vertex_size=70, line_width=8)
+    end
+end
+
+
 @testset "rigid_prestress_stable" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'); pinned_vertices=[1,4])
     plot(F; edge_color=teal, flex_color=coral, padding=0.25, plot_flexes=true, flex_Real=[1], show_pins=false, flex_scale=0.5, vertex_labels=false)
@@ -75,18 +100,6 @@ end
     end
 end
 
-
-
-@testset "square" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
-    plot(F)
-    @test !is_rigid(F)
-    D = DeformationPath(F, [1], 200; step_size=0.025)
-    if is_no_ci
-        animate(D,F; filetype="mp4")
-    end
-    @test !is_prestress_stable(F)
-end
 
 
 @testset "twoprism" begin

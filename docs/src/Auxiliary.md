@@ -33,6 +33,10 @@ symmetric_newton_correct(equations::Vector{Expression}, variables::Vector{Variab
 ## Infinitessimal Flexes
 
 ```@docs
+compute_inf_flexes
+
+compute_equilibrium_stresses
+
 compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}, K_n::ConstraintSystem)
 
 compute_nonblocked_flex(F::AllTypes)
