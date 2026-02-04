@@ -1,3 +1,33 @@
+@testset "24cell" begin
+    realization = Matrix([1 1 0 0; 1 -1 0 0; -1 1 0 0; -1 -1 0 0; 1 0 1 0; 1 0 -1 0; -1 0 1 0; -1 0 -1 0; 1 0 0 1; 1 0 0 -1; -1 0 0 1; -1 0 0 -1; 0 1 1 0; 0 1 -1 0; 0 -1 1 0; 0 -1 -1 0; 0 1 0 1; 0 1 0 -1; 0 -1 0 1; 0 -1 0 -1; 0 0 1 1; 0 0 1 -1; 0 0 -1 1; 0 0 -1 -1;]')
+    #=edges, facets = [], []
+    for i in 1:size(realization)[2]
+        new_edges = [(i,j) for j in i+1:size(realization)[2] if 2==sum( (realization[:,i]-realization[:,j]) .^ 2 )]
+        append!(edges, new_edges)
+    end
+    for i in 1:size(realization)[2]
+        _edges = edges[findall(edge->i in collect(edge), edges)]
+        edge_subsets = combinations(_edges, 4)
+        for subset in edge_subsets
+            vs = sort([edge[1]==i ? edge[2] : edge[1] for edge in subset])
+            _incidences_at_1 = Set([edge[1]==vs[1] ? edge[2] : edge[1] for edge in edges if vs[1] in collect(edge) && !(i in edge)])
+            _incidences_at_2 = Set([edge[1]==vs[2] ? edge[2] : edge[1] for edge in edges if vs[2] in collect(edge) && !(i in edge)])
+            _incidences_at_3 = Set([edge[1]==vs[3] ? edge[2] : edge[1] for edge in edges if vs[3] in collect(edge) && !(i in edge)])
+            _incidences_at_4 = Set([edge[1]==vs[4] ? edge[2] : edge[1] for edge in edges if vs[4] in collect(edge) && !(i in edge)])
+            inters = collect(intersect(intersect(_incidences_at_1,_incidences_at_2), intersect(_incidences_at_3,_incidences_at_4)))
+            if !isempty(inters) && !(Tuple(sort([i,vs[1],vs[2],vs[3],vs[4],inters[1]])) in facets)
+                push!(facets, Tuple(sort([i,vs[1],vs[2],vs[3],vs[4],inters[1]])))
+            end
+        end
+    end=#
+    F = FacetPolytope([(1, 2, 5, 6, 9, 10), (1, 5, 9, 13, 17, 21), (1, 5, 10, 13, 18, 22), (1, 6, 9, 14, 17, 23), (1, 6, 10, 14, 18, 24), (1, 3, 13, 14, 17, 18), (2, 5, 9, 15, 19, 21), (2, 5, 10, 15, 20, 22), (2, 6, 9, 16, 19, 23), (2, 6, 10, 16, 20, 24), (2, 4, 15, 16, 19, 20), (3, 4, 7, 8, 11, 12), (3, 7, 11, 13, 17, 21), (3, 7, 12, 13, 18, 22), (3, 8, 11, 14, 17, 23), (3, 8, 12, 14, 18, 24), (4, 7, 11, 15, 19, 21), (4, 7, 12, 15, 20, 22), (4, 8, 11, 16, 19, 23), (4, 8, 12, 16, 20, 24), (5, 7, 13, 15, 21, 22), (6, 8, 14, 16, 23, 24), (9, 11, 17, 19, 21, 23), (10, 12, 18, 20, 22, 24)], realization)
+    inf_flexes = compute_inf_flexes(F.G, to_Array(F.G, F.G.realization))
+    @test size(inf_flexes)[2] == 52
+    stresses = compute_equilibrium_stresses(F.G, to_Array(F.G, F.G.realization))
+    @test size(stresses)[2] == 4
+end
+
+
 @testset "sphericaldiskpacking" begin
     F = SphericalDiskPacking([(1,2),(1,3),(1,4),(1,5),(2,3),(2,4),(3,5),(4,5),(2,6),(3,6),(4,6),(5,6)], Matrix([sqrt(2) 0 0; 0 sqrt(2) 0; 0 0 sqrt(2); 0 -sqrt(2) 0; 0 0 -sqrt(2); -sqrt(2) 0 0]'); pinned_vertices=[1])
     plot(F,"sphericaldiskpacking"; disk_color=teal, sphere_color=soft_teal, dualgraph_color=(coral,0.75))

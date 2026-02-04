@@ -41,6 +41,8 @@ export  ConstraintSystem,
         is_second_order_rigid,
         BodyHinge,
         BodyBar,
+        compute_inf_flexes,
+        compute_equilibrium_stresses,
         compute_nontrivial_inf_flexes,
         fix_antipodals!,
         tetrahedral_symmetry!,
@@ -49,7 +51,8 @@ export  ConstraintSystem,
         Dodecahedron,
         add_shadow!,
         minors,
-        is_prestress_stable
+        is_prestress_stable,
+        FacetPolytope
 
 """
     DeformationPath(G, motion_samples[; tol])
