@@ -6,9 +6,9 @@
     @test !is_prestress_stable(F)
 
     F1 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
-    D1 = DeformationPath(F1, [1], 375; step_size=0.025)
+    D1 = DeformationPath(F1, [1], 357; step_size=0.025)
     if is_no_ci
-        animate(D1,F1,"square"; edge_color=teal, padding=0.1, vertex_size=10, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
+        animate(D1,F1; edge_color=teal, padding=0.1, vertex_size=15, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
     end
 
     F2 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 1 0]'); pinned_vertices=[1,2])
@@ -17,9 +17,17 @@
     F3 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 0 0; 0 1]'); pinned_vertices=[1,2])
     D3 = DeformationPath(F3, [1], 350; step_size=0.025)
 
-    for i in 1:10
-        project_deformation_random([D1,D2,D3], F, 2, "square_realizations$i"; padding=nothing, vertex_size=70, line_width=8)
+    if is_no_ci
+        project_deformation_random([D1,D2,D3], F, 2, "square_realizations"; padding=nothing, vertex_size=65, line_width=8)
     end
+end
+
+
+@testset "triangle" begin
+    F = Framework([[1,2],[2,3],[1,3]], Matrix([0. 0; 1 0; 0.5 sqrt(3)/2]'))
+    plot(F; edge_color=teal, padding=1, vertex_size=15, vertex_color=teal, vertex_labels=false)
+    @test is_rigid(F)
+    @test is_inf_rigid(F)
 end
 
 
