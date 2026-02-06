@@ -407,7 +407,6 @@ mutable struct FacetPolytope
             for j in eachindex(facets)
                 edge_mat = Matrix(hcat([centered_realization[:,fac] for fac in facets[j]]...)')
                 normal_realization[:,j] = pinv(edge_mat) * [1. for _ in 1:length(facets[j])]
-                display(normal_realization[:,j])
             end
             _realization = hcat(centered_realization, normal_realization)
         elseif size(centered_realization)[1]==dimension && size(centered_realization)[2]==length(vertices)+length(facets)
