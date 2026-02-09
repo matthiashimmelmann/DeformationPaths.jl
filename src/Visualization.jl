@@ -415,7 +415,7 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
     end
 
     helper_polytope_repr = F isa Polytope || F isa FacetPolytope ? matrix_coords[:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[:,1:(size(F.G.realization)[2])]
-    polytope_repr = [F isa Polytope  || F isa FacetPolytope? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
+    polytope_repr = [F isa Polytope  || F isa FacetPolytope ? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
     if (typeof(F) <: Polytope || typeof(F) <: FacetPolytope) && renderEntirePolytope
         mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep((polytope_repr)), CDDLib.Library(:exact))); shading=shading, color=(facet_color,alpha), transparency=true)
     elseif typeof(F) <: BodyHinge || typeof(F) <: BodyBar || !renderEntirePolytope
