@@ -18,7 +18,7 @@
     D3 = DeformationPath(F3, [1], 350; step_size=0.025)
 
     if is_no_ci
-        project_deformation_random([D1,D2,D3], F, 2, "square_realizations"; padding=nothing, vertex_size=65, line_width=8)
+        project_deformation_random([D1,D2,D3], F, 2, "square_realizations"; animate=true, padding=nothing, vertex_size=65, line_width=8)
     end
 end
 
