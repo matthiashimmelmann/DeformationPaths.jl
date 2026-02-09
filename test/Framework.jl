@@ -8,7 +8,7 @@
     F1 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
     D1 = DeformationPath(F1, [1], 357; step_size=0.025)
     if is_no_ci
-        animate(D1,F1; "square"; edge_color=teal, padding=0.1, vertex_size=15, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
+        animate(D1,F1,"square"; edge_color=teal, padding=0.1, vertex_size=15, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
     end
 
     F2 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 1 0]'); pinned_vertices=[1,2])
