@@ -1417,7 +1417,7 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
 
     if animate && projected_dimension!=2
-        throw(error("For animating the projected curve, we need "))
+        throw(error("For animating the projected curve, the projected_dimension needs to be 2, but is $(projected_dimension)."))
     elseif animate && projected_dimension==2
         fig2 = Figure(size=(1000,1000))
         ax2 = Axis(fig2[1,1])
