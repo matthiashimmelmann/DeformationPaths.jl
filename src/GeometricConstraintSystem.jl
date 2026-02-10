@@ -235,7 +235,6 @@ mutable struct SphericalDiskPacking
 
     function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-8)
         length(contacts)==length(inversive_distances) || throw("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")
-        display(inversive_distances)
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         realization = Float64.(realization)
         dimension = size(realization)[1]
@@ -384,6 +383,63 @@ end
 
 
 """
+    FacetPolytope([vertices,] facets, realization[; pinned_vertices])
+
+Class for 3-dimensional polytopes with facet planarity constraints.
+
+For the computation of the normals, we assume that the origin lies in the barycenter. Otherwise, we translate the polytope accordingly.
+"""
+mutable struct FacetPolytope
+    G::ConstraintSystem
+    facets::Vector{Vector{Int}}
+    x_variables::Vector{Variable}
+    n_variables::Vector{Variable}
+
+    function FacetPolytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+        realization = Float64.(realization)
+        dimension = size(realization)[1]
+        all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=dimension+1, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
+        facets = [[f for f in facet] for facet in facets]
+        all(v->v in vertices, pinned_vertices) || throw("`pinned_vertices` does not have the correct format.")
+        centered_realization = hcat([realization[:,j] - sum(realization[:,i] for i in eachindex(vertices)) ./ length(vertices)  for j in eachindex(vertices)]...)
+        if size(centered_realization)[1]==dimension && size(centered_realization)[2]==length(vertices)
+            normal_realization = Array{Float64,2}(undef, dimension, length(facets))
+            for j in eachindex(facets)
+                edge_mat = Matrix(hcat([centered_realization[:,fac] for fac in facets[j]]...)')
+                normal_realization[:,j] = pinv(edge_mat) * [1. for _ in 1:length(facets[j])]
+            end
+            _realization = hcat(centered_realization, normal_realization)
+        elseif size(centered_realization)[1]==dimension && size(centered_realization)[2]==length(vertices)+length(facets)
+            _realization = Base.copy(centered_realization)
+            for j in eachindex(facets)
+                _realization[:, length(vertices)+j] = _realization[:, length(vertices)+j] ./ (_realization[:, length(vertices)+j]'*_realization[:, facets[j][1]])
+            end
+        else
+            throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
+        end
+                
+        @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
+        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
+        xs = Expression.(hcat(x,n))
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+        facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
+        equations = filter(eq->eq!=0, facet_equations)
+        all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        new(G, facets, variables, normal_variables)
+    end
+
+    function FacetPolytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+        vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
+        FacetPolytope(vertices, facets, realization; pinned_vertices=pinned_vertices)
+    end
+end
+
+
+"""
     fix_antipodals!(F)
 
 Entangles the antipodal points in a polytope `F` so that their position is constrained to antipodal points on a sphere. 
@@ -480,7 +536,7 @@ function triangle_shrinking(F::Polytope)
                 _realization[:,k] .= t .* triangle_centers[i] .+ (1-t) .* F.G.realization[:,k]
             end
         end
-        println([_realization[:,k] for k in triangles[1]])
+        #println([_realization[:,k] for k in triangles[1]])
         P = Polytope(F.facets, _realization)
         K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(P.G.vertices) for j in eachindex(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_vertices=P.G.pinned_vertices)
         final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)

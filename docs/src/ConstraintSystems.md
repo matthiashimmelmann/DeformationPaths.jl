@@ -16,6 +16,7 @@ ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::
 SpherePacking
 SphericalDiskPacking
 Polytope
+FacetPolytope
 FrameworkOnSurface
 Framework
 VolumeHypergraph

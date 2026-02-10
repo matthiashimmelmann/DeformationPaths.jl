@@ -1,9 +1,51 @@
+@testset "square" begin
+    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
+    plot(F)
+    @test !is_rigid(F)
+    D = DeformationPath(F, [1], 350; step_size=0.025)
+    @test !is_prestress_stable(F)
+
+    F1 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
+    D1 = DeformationPath(F1, [1], 357; step_size=0.025)
+    if is_no_ci
+        animate(D1,F1,"square"; edge_color=teal, padding=0.1, vertex_size=15, vertex_color=teal, vertex_labels=false, show_pins=false, filetype="mp4")
+    end
+
+    F2 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 1 0]'); pinned_vertices=[1,2])
+    D2 = DeformationPath(F2, [1], 350; step_size=0.025)
+
+    F3 = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 0 0; 0 1]'); pinned_vertices=[1,2])
+    D3 = DeformationPath(F3, [1], 350; step_size=0.025)
+
+    if is_no_ci
+        project_deformation_random([D1,D2,D3], F, 2, "square_realizations"; animate=true, padding=nothing, vertex_size=65, line_width=8)
+    end
+end
+
+
+@testset "triangle" begin
+    F = Framework([[1,2],[2,3],[1,3]], Matrix([0. 0; 1 0; 0.5 sqrt(3)/2]'))
+    plot(F; edge_color=teal, padding=1, vertex_size=15, vertex_color=teal, vertex_labels=false)
+    @test is_rigid(F)
+    @test is_inf_rigid(F)
+end
+
+
 @testset "rigid_prestress_stable" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2]'); pinned_vertices=[1,4])
     plot(F; edge_color=teal, flex_color=coral, padding=0.25, plot_flexes=true, flex_Real=[1], show_pins=false, flex_scale=0.5, vertex_labels=false)
     @test !is_inf_rigid(F)
+    @test is_prestress_stable(F)
     @test is_second_order_rigid(F)
     @test is_rigid(F)
+end
+
+
+@testset "coned_cube" begin
+    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
+    plot(F; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,0], show_pins=false, flex_scale=0.2, vertex_labels=false)
+    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
+    animate(D,F; filetype="mp4")
 end
 
 
@@ -32,11 +74,13 @@ end
 @testset "rigid_test" begin
     F = Framework([[1,2],[1,4],[1,5],[4,5],[4,3],[5,3],[2,6],[2,7],[6,7],[3,6],[3,7]], Matrix([0 0; 2 0; 1 1; 0.5-1/6 1/2+1/6; 0.5+1/6 1/2-1/6; 1.5+1/6 1/2+1/6; 1.5-1/6 1/2-1/6;]'))
     plot(F; edge_color=teal, vertex_labels=false)
+    @test is_prestress_stable(F)
 end
 
 @testset "3Frustum" begin
     F = Framework([[1,2],[2,3],[1,3],[4,5],[5,6],[4,6],[1,4],[2,5],[3,6]], Matrix([cos(2*pi/3) sin(2*pi/3); cos(4*pi/3) sin(4*pi/3); cos(6*pi/3) sin(6*pi/3); 2*cos(2*pi/3) 2*sin(2*pi/3); 2*cos(4*pi/3) 2*sin(4*pi/3); 2*cos(6*pi/3) 2*sin(6*pi/3);]'), pinned_vertices=[1,2,3])
     plot(F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, flex_scale=0.85, vertex_labels=false)
+    @test is_prestress_stable(F)
 end
 
 @testset "3Prism" begin
@@ -48,6 +92,7 @@ end
     add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
     scatter!(ax, points; color=:black, markersize=55)
+    @test !is_prestress_stable(F)
 end
 
 
@@ -65,17 +110,6 @@ end
 
 
 
-@testset "square" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
-    plot(F)
-    @test !is_rigid(F)
-    D = DeformationPath(F, [1], 200; step_size=0.025)
-    if is_no_ci
-        animate(D,F; filetype="mp4")
-    end
-end
-
-
 @testset "twoprism" begin
     F = Framework([[1,2],[2,3],[3,1],[1,4],[2,5],[3,6],[4,5],[5,6],[6,4]], Matrix([0 0; 2 0; 1 1; 0 2; 2 2; 1 3]'))
     plot(F)
@@ -91,14 +125,7 @@ end
     plot(F)
     D = DeformationPath(F, [1], 500; step_size=0.025, show_progress=false)
     animate(D,F; filetype="mp4")
-end
-
-
-@testset "coned_cube" begin
-    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 sqrt(2)]'))
-    plot(F)
-    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
-    animate(D,F; filetype="mp4")
+    @test !is_prestress_stable(F)
 end
 
 

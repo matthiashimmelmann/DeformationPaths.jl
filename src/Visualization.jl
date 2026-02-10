@@ -69,7 +69,7 @@ function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,V
         add_equations!(K_n, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(F.G.vertices) if i<j]])
     elseif F isa VolumeHypergraph
         K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization).G
-    elseif F isa Polytope || F isa SpherePacking || F isa BodyHinge || F isa BodyBar
+    elseif F isa Polytope || F isa SpherePacking || F isa BodyHinge || F isa BodyBar || F isa FacetPolytope
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     elseif  F isa SphericalDiskPacking
         minkowski_scalar_product(e1,e2) = e1'*e2-1
@@ -398,7 +398,7 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         special_edges = [[edge[1],edge[2]] for edge in special_edges]
     end
     isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
-    matrix_coords = F isa Polytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
+    matrix_coords = F isa Polytope || F isa FacetPolytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
     #=centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
         matrix_coords[:,i] = matrix_coords[:,i] - centroid
@@ -414,9 +414,9 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         zlims!(ax, limits[1]-padding, limits[2]+padding)
     end
 
-    helper_polytope_repr = F isa Polytope ? matrix_coords[:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[:,1:(size(F.G.realization)[2])]
-    polytope_repr = [F isa Polytope ? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
-    if typeof(F) <: Polytope && renderEntirePolytope
+    helper_polytope_repr = F isa Polytope || F isa FacetPolytope ? matrix_coords[:,1:(size(F.G.realization)[2]-length(F.facets))] : matrix_coords[:,1:(size(F.G.realization)[2])]
+    polytope_repr = [F isa Polytope  || F isa FacetPolytope ? helper_polytope_repr[:,j] .* scaling_factor : helper_polytope_repr[:,j] for j in axes(helper_polytope_repr,2)]
+    if (typeof(F) <: Polytope || typeof(F) <: FacetPolytope) && renderEntirePolytope
         mesh!(ax, Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep((polytope_repr)), CDDLib.Library(:exact))); shading=shading, color=(facet_color,alpha), transparency=true)
     elseif typeof(F) <: BodyHinge || typeof(F) <: BodyBar || !renderEntirePolytope
         for face in F.facets
@@ -432,7 +432,7 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width-2, arrowsize)
     end
 
-    allVertices = F isa Polytope ? [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2]-length(F.facets))] : [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2])]
+    allVertices = F isa Polytope || F isa FacetPolytope ? [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2]-length(F.facets))] : [Point3f(matrix_coords[:,j]) for j in 1:(size(F.G.realization)[2])]
     if F isa BodyBar
         edges_around_facets = []
         for facet in F.facets
@@ -449,7 +449,7 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         foreach(special_edge->linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color), special_edges)
     end
 
-    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color),  1:(F isa Polytope ? size(F.G.realization)[2]-length(F.facets) : size(F.G.realization)[2]))
+    foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color),  1:(F isa Polytope || F isa FacetPolytope ? size(F.G.realization)[2]-length(F.facets) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
 end
 
@@ -509,7 +509,7 @@ end
 
 Compute an animation for a 2-dimensional bar-joint framework.
 """
-function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, pin_markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
+function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_deformation_samples::Bool=true, fontsize=28, fixed_vertices::Tuple{Int,Int}=(1,2), fixed_direction::Vector{<:Real}=[1.,0], framerate::Int=25, show_pins=true, step::Int=1, padding::Union{Real,Nothing}=0.15, pin_markercolor=:red3, pin_point_offset=0.1, vertex_size::Real=55, line_width::Real=12, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, vertex_labels::Bool=true, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [to_Matrix(F, D.motion_samples[i]) for i in eachindex(D.motion_samples)]
@@ -585,7 +585,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
-    foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
+    show_pins && foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
 
@@ -1010,7 +1010,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
     end
     =#
 
-    matrix_coords = !(F isa Polytope) ? matrix_coords : [matrix[:,1:(size(F.G.realization)[2])-length(F.facets)] for matrix in matrix_coords]
+    matrix_coords = !(F isa Polytope || F isa FacetPolytope) ? matrix_coords : [matrix[:,1:(size(F.G.realization)[2])-length(F.facets)] for matrix in matrix_coords]
 
     if !isnothing(padding)
         xlims = [minimum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...)), maximum(vcat([matrix_coords[i][1,:] for i in eachindex(matrix_coords)]...))]
@@ -1032,7 +1032,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
 
     allVertices_asLists = @lift begin
         pointys = matrix_coords[$time]
-        [F isa Polytope ? pointys[:,j] .* scaling_factor : pointys[:,j] for j in axes(pointys,2)]
+        [F isa Polytope || F isa FacetPolytope ? pointys[:,j] .* scaling_factor : pointys[:,j] for j in axes(pointys,2)]
     end
 
     if F isa BodyBar
@@ -1050,7 +1050,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
         foreach(i->linesegments!(ax, @lift([($allVertices)[Int64(edges_here[i][1])], ($allVertices)[Int64(edges_here[i][2])]]); linewidth=line_width, color=edge_color), 1:length(edges_here))
         foreach(special_edge->linesegments!(ax, @lift([($allVertices)[Int64(special_edge[1])], ($allVertices)[Int64(special_edge[2])]]); linewidth=line_width+2.5, color=special_edge_color), special_edges)
     end
-    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : size(F.G.realization)[2]))
+    foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:(F isa Polytope || F isa FacetPolytope ? (size(F.G.realization)[2]-length(F.facets)) : size(F.G.realization)[2]))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:(size(F.G.realization)[2]-length(F.facets)))
     if typeof(F) <: Polytope && renderEntirePolytope
         mesh!(ax, @lift(Polyhedra.Mesh(Polyhedra.polyhedron(Polyhedra.vrep(($allVertices_asLists)), CDDLib.Library(:exact)))); shading=shading, color=(facet_color,alpha), transparency=true)
@@ -1358,7 +1358,7 @@ Compute a random projection of deformation paths.
 This method can either take a single deformation path or a vector of deformation paths and projects it to curves in 2D or 3D.
 This makes it possible to visualize high-dimensional deformation spaces. 
 """
-function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; padding::Union{Real,Nothing}=0.25, line_width::Real=8, edge_colors=[:gray35], flex_color=:green3, flexes::Vector=[], flex_scale=0.35, arrowsize=40, draw_start::Bool=true, vertex_size::Real=45, vertex_color=:steelblue, vertex_symbol=:pentagon)
+function project_deformation_random(D::Union{DeformationPath,Vector{DeformationPath}}, F::AllTypes, projected_dimension::Int, filename::Union{String,Nothing}=nothing; animate::Bool=false, framerate::Int=25, padding::Union{Real,Nothing}=0.25, line_width::Real=8, edge_colors=[:gray35], flex_color=:green3, flexes::Vector=[], flex_scale=0.35, arrowsize=40, draw_start::Bool=true, vertex_size::Real=45, vertex_color=:steelblue, vertex_symbol=:pentagon)
     if !(projected_dimension in [2,3])
         throw("The projected_dimension is neither 2 nor 3.")
     end
@@ -1375,10 +1375,10 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
 
 
-    high_dim_curves = [[!(F isa Polytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
+    high_dim_curves = [[!(F isa Polytope || F isa FacetPolytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(!(F isa Polytope) ? D[1].G.variables : F.x_variables)]...)
     #proj_curve = [[(pinv(randmat'*randmat)'*randmat')'*entry for entry in curve] for curve in high_dim_curves]
-    Q, _ = qr(randn(Float64, !(F isa Polytope) ? length(D[1].G.variables) : length(F.x_variables), projected_dimension))
+    Q, _ = qr(randn(Float64, !(F isa Polytope || F isa FacetPolytope) ? length(D[1].G.variables) : length(F.x_variables), projected_dimension))
     randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in curve] for curve in high_dim_curves]
     fig = Figure(size=(1000,1000))
@@ -1414,6 +1414,28 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
     end
     if !isnothing(filename)
         save("$(filename).png", fig)
+    end
+
+    if animate && projected_dimension!=2
+        throw(error("For animating the projected curve, the projected_dimension needs to be 2, but is $(projected_dimension)."))
+    elseif animate && projected_dimension==2
+        fig2 = Figure(size=(1000,1000))
+        ax2 = Axis(fig2[1,1])
+        hidespines!(ax2)
+        hidedecorations!(ax2)
+        if !isnothing(padding)
+            xlims!(ax2,proj_curve[1][1][1]-padding, proj_curve[1][1][1]+padding)
+            ylims!(ax2,proj_curve[1][1][2]-padding, proj_curve[1][1][2]+padding)
+        end
+        foreach(j->lines!(ax2, [Point2f(pt) for pt in proj_curve[j]]; linewidth=line_width, color=edge_colors[j]), 1:length(proj_curve))
+        time=Observable(1)
+        curPos=@lift begin
+            proj_curve[1][$time]
+        end
+        scatter!(ax2, @lift(Point2f($curPos)); markersize=vertex_size, color=vertex_color, marker=vertex_symbol, strokewidth=1, strokecolor=:black)
+        record(fig2, "$(filename).mp4", 1:length(proj_curve[1]); framerate = framerate) do t
+            time[] = t
+        end
     end
     return fig
 end

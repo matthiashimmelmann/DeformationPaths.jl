@@ -66,3 +66,47 @@ function is_second_order_rigid(F::AllTypes; kwargs...)::Bool
         return false
     end
 end
+
+
+"""
+    is_prestress_stable(F)
+
+Checks if a geometric constraint system `F` is prestress stable.
+"""
+function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
+    if typeof(F)==Framework
+        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
+    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+    else
+        throw("Type of F is not yet supported. It is $(typeof(F)).")
+    end
+    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol_rank_drop)
+    if size(flexes)[2]==0
+        return true
+    end
+    rigidity_matrix = evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))
+    stresses = nullspace(rigidity_matrix'; atol=tol_rank_drop)
+    if size(stresses)[2]==0
+        return false
+    end
+    @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
+    parametrized_flex = flexes*λ
+    parametrized_stress = stresses*ω
+    stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
+    Hessian = differentiate(differentiate(stress_energy, λ), λ)
+    principal_minors = [det(Hessian[1:i,1:i])-μ[i] for i in eachindex(μ)]
+    PSD_System = System(principal_minors, variables=ω, parameters=μ)
+    rand_pt = randn(ComplexF64, length(μ))
+    start_sols = solutions(solve(PSD_System; target_parameters=rand_pt))
+    final_sols = []
+    sols = solve(
+        PSD_System,
+        start_sols;
+        start_parameters = rand_pt,
+        target_parameters = [rand(Float64, length(μ)) for _ in 1:25],
+        transform_result = (R,p) -> real_solutions(R),
+        flatten = true
+    )
+    return !isempty(sols)
+end

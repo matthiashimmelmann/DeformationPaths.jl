@@ -1,4 +1,25 @@
 """
+    compute_inf_flexes(G, point[; tol])
+
+Compute all infinitesimal flexes of a geometric constraint system `G` in `point`.
+"""
+function compute_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
+    inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
+    return inf_flexes
+end
+
+
+"""
+    compute_equilibrium_stresses(G, point[; tol])
+
+Compute all equilibrium stresses of a geometric constraint system `G` in `point`.
+"""
+function compute_equilibrium_stresses(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
+    stresses = nullspace(evaluate(G.jacobian, G.variables=>point)'; atol=tol)
+    return stresses
+end
+
+"""
     compute_nontrivial_inf_flexes(G, point, K_n[; tol])
 
 Compute the nontrivial infinitesimal flexes of a geometric constraint system `G` in `point`.
@@ -28,7 +49,7 @@ Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stres
 function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
-    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
+    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge || typeof(F)==FacetPolytope
         K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     else
         throw("Type of F is not yet supported. It is $(typeof(F)).")
@@ -54,12 +75,13 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
         ED_stress_system = projective_stress_system
     else
         rand_pt = randn(Float64, length(λ))
-        ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ, λ - rand_pt)
+        ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ - rand_pt)
         ED_stress_system = vcat(projective_stress_system, minors(ED_matrix, codim+1))
     end
     sols = real_solutions(solve(ED_stress_system))
     return isempty(sols) ? [] : sols[1]
 end
+
 
 """
     minors(A, k)
