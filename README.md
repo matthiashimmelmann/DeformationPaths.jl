@@ -4,13 +4,17 @@
 [![Run tests](https://github.com/matthiashimmelmann/DeformationPaths.jl/actions/workflows/run_tests.yml/badge.svg)](https://github.com/matthiashimmelmann/DeformationPaths.jl/actions/workflows/run_tests.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-yellow?style=plastic)](LICENSE)
 
-This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. By combining techniques from Riemannian optimization and homotopy continuation, we can locally find the closest point on the constraint set and thus traverse it. 
+This package allows the approximation of deformation paths corresponding to a variety of geometric constraint systems. By combining techniques from Riemannian optimization and homotopy continuation, we can locally find the closest point on the constraint set and thus traverse it.
+
+We wrote the paper ``Approximating Continuous Motions of Geometric Constraint Systems'' explaining the algorithmic details of this package. It can be cited as follows: [![DOI](https://img.shields.io/badge/arXiv-2602.08016-b31b1b.svg)](https://doi.org/10.48550/arXiv.2602.08016)
+
+We froze a stable version of this package on Zenodo. It can be cited as follows: [![DOI](https://zenodo.org/badge/951001222.svg)](https://doi.org/10.5281/zenodo.18605592)
 
 ## Installation
 
 ```
 julia> ]
-(@v1.10) pkg> add DeformationPaths
+(@v1.12) pkg> add DeformationPaths
 ```
 
 ## Usage
