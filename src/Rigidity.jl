@@ -97,7 +97,7 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
     matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
     
-    for matrix in matrices
+    #=for matrix in matrices
         string_output = "{"
         for i in axes(matrix,1)
             string_output *= "{"
@@ -113,8 +113,8 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
             end
         end
         string_output *= "}"
-        println(string_output)
-    end
-
+    end=#
+    
+    #INFO Test needs work
     return any(matrix->all(ev->ev>0, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<0, eigvals(matrix)), matrices)
 end
