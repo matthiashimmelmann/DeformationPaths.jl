@@ -1,3 +1,23 @@
+@testset "3Prism" begin
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'))
+    @test !is_prestress_stable(F)
+    @test !is_second_order_rigid(F)
+    inf_flexes = compute_inf_flexes(F.G, to_Array(F.G, F.G.realization))
+    @test size(inf_flexes)[2] == 1+3
+    stresses = compute_equilibrium_stresses(F.G, to_Array(F.G, F.G.realization))
+    @test size(stresses)[2] == 1
+
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
+    D = DeformationPath(F, [-1], 27; step_size=0.025)
+    F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
+    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
+    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
+    add_shadow!(ax, F, D; flex_color=coral)
+    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
+    scatter!(ax, points; color=:black, markersize=55)
+end
+
+
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F)
@@ -81,17 +101,6 @@ end
     F = Framework([[1,2],[2,3],[1,3],[4,5],[5,6],[4,6],[1,4],[2,5],[3,6]], Matrix([cos(2*pi/3) sin(2*pi/3); cos(4*pi/3) sin(4*pi/3); cos(6*pi/3) sin(6*pi/3); 2*cos(2*pi/3) 2*sin(2*pi/3); 2*cos(4*pi/3) 2*sin(4*pi/3); 2*cos(6*pi/3) 2*sin(6*pi/3);]'), pinned_vertices=[1,2,3])
     plot(F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, flex_scale=0.85, vertex_labels=false)
     @test is_prestress_stable(F)
-end
-
-@testset "3Prism" begin
-    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
-    D = DeformationPath(F, [-1], 27; step_size=0.025)
-    F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
-    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
-    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
-    add_shadow!(ax, F, D; flex_color=coral)
-    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
-    scatter!(ax, points; color=:black, markersize=55)
 end
 
 

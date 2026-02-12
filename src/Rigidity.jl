@@ -73,7 +73,7 @@ end
 
 Checks if a geometric constraint system `F` is prestress stable.
 """
-function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
+function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-10)::Bool
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
@@ -91,12 +91,15 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
         return false
     end
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
+    display(flexes)
+    display(stresses)
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
+    display(stress_energy)
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
     matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
-    
+    display(matrices)
     #=for matrix in matrices
         string_output = "{"
         for i in axes(matrix,1)
@@ -114,7 +117,7 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
         end
         string_output *= "}"
     end=#
-    
+
     #INFO Test needs work
-    return any(matrix->all(ev->ev>0, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<0, eigvals(matrix)), matrices)
+    return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)
 end
