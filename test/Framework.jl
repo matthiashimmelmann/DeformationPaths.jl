@@ -1,3 +1,11 @@
+@testset "coned_cube" begin
+    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
+    plot(F,"coned_cube"; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,1], show_pins=false, flex_scale=0.2, vertex_labels=false)
+    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
+    animate(D,F; filetype="mp4")
+end
+
+
 @testset "3Prism" begin
     F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'))
     @test !is_prestress_stable(F)
@@ -58,14 +66,6 @@ end
     @test is_prestress_stable(F)
     @test is_second_order_rigid(F)
     @test is_rigid(F)
-end
-
-
-@testset "coned_cube" begin
-    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
-    plot(F; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,0], show_pins=false, flex_scale=0.2, vertex_labels=false)
-    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
-    animate(D,F; filetype="mp4")
 end
 
 

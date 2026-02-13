@@ -91,15 +91,11 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
         return false
     end
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
-    display(flexes)
-    display(stresses)
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
-    display(stress_energy)
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
     matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
-    display(matrices)
     #=for matrix in matrices
         string_output = "{"
         for i in axes(matrix,1)
