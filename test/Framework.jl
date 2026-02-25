@@ -1,3 +1,31 @@
+@testset "coned_cube" begin
+    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
+    plot(F,"coned_cube"; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,1], show_pins=false, flex_scale=0.2, vertex_labels=false)
+    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
+    animate(D,F; filetype="mp4")
+end
+
+
+@testset "3Prism" begin
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'))
+    @test !is_prestress_stable(F)
+    @test !is_second_order_rigid(F)
+    inf_flexes = compute_inf_flexes(F.G, to_Array(F.G, F.G.realization))
+    @test size(inf_flexes)[2] == 1+3
+    stresses = compute_equilibrium_stresses(F.G, to_Array(F.G, F.G.realization))
+    @test size(stresses)[2] == 1
+
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
+    D = DeformationPath(F, [-1], 27; step_size=0.025)
+    F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
+    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
+    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
+    add_shadow!(ax, F, D; flex_color=coral)
+    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
+    scatter!(ax, points; color=:black, markersize=55)
+end
+
+
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F)
@@ -41,14 +69,6 @@ end
 end
 
 
-@testset "coned_cube" begin
-    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
-    plot(F; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,0], show_pins=false, flex_scale=0.2, vertex_labels=false)
-    D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
-    animate(D,F; filetype="mp4")
-end
-
-
 @testset "flexible_prestress_stable_component" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4],[1,5],[3,5],[4,5],[1,6]], Matrix([0. 0; 1 0; 2 0; 1 1; 1 2; -sqrt(1/2) sqrt(1/2)]'); pinned_vertices=[1,4])
     plot(F; edge_color=teal, flex_color=coral, show_pins=false, flex_Real=[-1,-1], padding=0.25, plot_flexes=true, flex_scale=0.5, vertex_labels=false)
@@ -81,18 +101,6 @@ end
     F = Framework([[1,2],[2,3],[1,3],[4,5],[5,6],[4,6],[1,4],[2,5],[3,6]], Matrix([cos(2*pi/3) sin(2*pi/3); cos(4*pi/3) sin(4*pi/3); cos(6*pi/3) sin(6*pi/3); 2*cos(2*pi/3) 2*sin(2*pi/3); 2*cos(4*pi/3) 2*sin(4*pi/3); 2*cos(6*pi/3) 2*sin(6*pi/3);]'), pinned_vertices=[1,2,3])
     plot(F; edge_color=teal, flex_color=coral, plot_flexes=true, show_pins=false, flex_scale=0.85, vertex_labels=false)
     @test is_prestress_stable(F)
-end
-
-@testset "3Prism" begin
-    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
-    D = DeformationPath(F, [-1], 27; step_size=0.025)
-    F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
-    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
-    plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
-    add_shadow!(ax, F, D; flex_color=coral)
-    points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
-    scatter!(ax, points; color=:black, markersize=55)
-    @test !is_prestress_stable(F)
 end
 
 

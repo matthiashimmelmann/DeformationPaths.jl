@@ -49,9 +49,9 @@ coral=RGB(255/255, 127/255, 80/255)
 logocolors = Colors.JULIA_LOGO_COLORS
 
 @testset "DeformationPaths.jl" begin
-    include("Framework.jl") 
-    include("various.jl")
+    include("Framework.jl")
     include("Polytope.jl")
+    include("various.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
 end

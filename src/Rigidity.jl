@@ -73,7 +73,7 @@ end
 
 Checks if a geometric constraint system `F` is prestress stable.
 """
-function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
+function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-10)::Bool
     if typeof(F)==Framework
         K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_vertices=F.G.pinned_vertices).G
     elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
@@ -95,18 +95,25 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6)::Bool
     parametrized_stress = stresses*ω
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
-    principal_minors = [det(Hessian[1:i,1:i])-μ[i] for i in eachindex(μ)]
-    PSD_System = System(principal_minors, variables=ω, parameters=μ)
-    rand_pt = randn(ComplexF64, length(μ))
-    start_sols = solutions(solve(PSD_System; target_parameters=rand_pt))
-    final_sols = []
-    sols = solve(
-        PSD_System,
-        start_sols;
-        start_parameters = rand_pt,
-        target_parameters = [rand(Float64, length(μ)) for _ in 1:25],
-        transform_result = (R,p) -> real_solutions(R),
-        flatten = true
-    )
-    return !isempty(sols)
+    matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
+    #=for matrix in matrices
+        string_output = "{"
+        for i in axes(matrix,1)
+            string_output *= "{"
+            for j in axes(matrix,2)
+                string_output *= "$(matrix[i,j])"
+                if j != size(matrix)[2]
+                    string_output *= ","
+                end
+            end
+            string_output *= "}"
+            if i != size(matrix)[1]
+                string_output *= ","
+            end
+        end
+        string_output *= "}"
+    end=#
+
+    #INFO Test needs work
+    return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)
 end
