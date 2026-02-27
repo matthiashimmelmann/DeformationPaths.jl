@@ -42,6 +42,19 @@ end
 
 
 """
+    compute_jk_flexes(G, j, k, point)
+
+"""
+function compute_jk_flexes(G::ConstraintSystem, j::Int, k::Int, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
+    Q = compute_inf_flexes(G, point; tol=tol)
+    first_order = [Q[:,i] for i in 1:size(Q)[2]]
+    second_order = [evaluate(G.jacobian, G.variables=>point) \ (-evaluate(G.jacobian, G.variables=>first_order[i])*first_order[i]) for i in length(first_order)]
+    third_order = [evaluate(G.jacobian, G.variables=>point) \ (-2*evaluate(G.jacobian, G.variables=>first_order[i])*second_order[i] - evaluate(G.jacobian, G.variables=>second_order[i])*first_order[i]) for i in length(first_order)]
+    fourth_order = [evaluate(G.jacobian, G.variables=>point) \ (-3*evaluate(G.jacobian, G.variables=>first_order[i])*third_order[i] - 3*evaluate(G.jacobian, G.variables=>second_order[i])*second_order[i] - evaluate(G.jacobian, G.variables=>third_order[i])*first_order[i]) for i in length(first_order)]
+    return [first_order, second_order, third_order, fourth_order]
+end
+
+"""
     compute_nonblocked_flex(F[; tol_rank_drop, tol])
 
 Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stress.

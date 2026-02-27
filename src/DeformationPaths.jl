@@ -52,7 +52,9 @@ export  ConstraintSystem,
         add_shadow!,
         minors,
         is_prestress_stable,
-        FacetPolytope
+        FacetPolytope,
+        find_isolated_points,
+        compute_jk_flexes
 
 """
     DeformationPath(G, motion_samples[; tol])

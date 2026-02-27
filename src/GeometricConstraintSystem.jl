@@ -517,19 +517,25 @@ function tetrahedral_symmetry!(F::Polytope)
     F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in F.G.equations]...)'
 end
 
+"""
+    find_isolated_points(F)
+"""
+function find_isolated_points(F::Polytope)
+    return solve(System(F.G.equations, F.G.variables))
+end
 
 """
     triangle_shrinking(F)
 
 Evenly shrink the triangular facets of a given polytope and compute the nontrivial infinitesimal flexes in each step.
 """
-function triangle_shrinking(F::Polytope)
+function triangle_shrinking(F::Polytope; filename="truncatedTetrahedron")
     K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
     initial_flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
     triangles = filter(facet->length(facet)==3, F.facets)
     triangle_centers = [sum(F.G.realization[:,k] for k in triang) ./ 3 for triang in triangles]
     
-    for t in 0:0.1:1
+    for t in 0:-0.1:-1
         _realization = Base.copy(F.G.realization)
         for (i,triang) in enumerate(triangles)
             for k in triang
@@ -540,7 +546,8 @@ function triangle_shrinking(F::Polytope)
         P = Polytope(F.facets, _realization)
         K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(P.G.vertices) for j in eachindex(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_vertices=P.G.pinned_vertices)
         final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)
-        plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
+        display(final_flexes)
+        plot(P, "$(filename)$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
     end
 end
 

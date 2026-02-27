@@ -113,6 +113,7 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
         end
         string_output *= "}"
     end=#
+    display([svd(matrix).S for matrix in matrices])
 
     #INFO Test needs work
     return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)

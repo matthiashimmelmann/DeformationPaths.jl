@@ -33,7 +33,9 @@ import DeformationPaths:    Framework,
                             stich_deformation_paths,
                             add_shadow!, 
                             is_prestress_stable,
-                            FacetPolytope
+                            FacetPolytope,
+                            find_isolated_points,
+                            compute_jk_flexes
 using Test
 using HomotopyContinuation
 using LinearAlgebra
@@ -49,8 +51,8 @@ coral=RGB(255/255, 127/255, 80/255)
 logocolors = Colors.JULIA_LOGO_COLORS
 
 @testset "DeformationPaths.jl" begin
-    include("Framework.jl")
     include("Polytope.jl")
+    include("Framework.jl")
     include("various.jl")
     include("SpherePacking.jl")
     include("VolumeHypergraph.jl")
