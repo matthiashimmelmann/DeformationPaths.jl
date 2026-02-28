@@ -45,15 +45,34 @@ end
     compute_jk_flexes(G, j, k, point)
 
 """
-function compute_jk_flexes(G::ConstraintSystem, j::Int, k::Int, point::Vector{<:Real}; tol::Real=1e-8)::Vector{Expression}
-    rig_mat_pinv = pinv(evaluate(G.jacobian, G.variables=>point))
-    Q = compute_inf_flexes(G, point; tol=tol)
-    first_order = [Q[:,i] for i in 1:size(Q)[2]]
-    second_order = [rig_mat_pinv * (-evaluate(G.jacobian, G.variables=>first_order[i])*first_order[i]) for i in 1:length(first_order)]
-    third_order = [rig_mat_pinv * (-2*evaluate(G.jacobian, G.variables=>first_order[i])*second_order[i] - evaluate(G.jacobian, G.variables=>second_order[i])*first_order[i]) for i in 1:length(first_order)]
-    fourth_order = [rig_mat_pinv * (-3*evaluate(G.jacobian, G.variables=>first_order[i])*third_order[i] - 3*evaluate(G.jacobian, G.variables=>second_order[i])*second_order[i] - evaluate(G.jacobian, G.variables=>third_order[i])*first_order[i]) for i in 1:length(first_order)]
-    @var _a[1:4,1:length(first_order)] t
-    return point + t*_a[1,:]'*first_order + t^2*_a[2,:]'*second_order + t^3*_a[3,:]'*third_order + t^4*_a[4,:]'*fourth_order
+function compute_jk_flexes(G::ConstraintSystem, j::Int, k::Int, point::Vector{<:Real}; t=0.05, tol::Real=1e-8)
+    rig_mat = evaluate(G.jacobian, G.variables=>point)
+    K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
+    Q = compute_nontrivial_inf_flexes(G, point, K_n; tol=tol)
+    if size(Q)[2] == 0
+        return nothing
+    end
+    flexes = vcat([[[0. for __ in 1:size(Q)[1]] for _ in 1:size(Q)[2]] for i in 1:j-1], [[Q[:,i] for i in 1:size(Q)[2]]])
+    for _k in j+1:k
+        println("$(_k)-th order: $([binomial(length(flexes),i) for i in 1:length(flexes)])")
+        b = [-sum(binomial(length(flexes),i)*evaluate(G.jacobian, G.variables=>flexes[i][L])*flexes[length(flexes)+1-i][L] for i in 1:length(flexes)) for L in 1:length(flexes[1])]
+        kth_order = [rig_mat \ b[i] for i in 1:length(b)]
+        residual = [norm(rig_mat*kth_order[i] - b[i]) for i in 1:length(kth_order)]
+        push!(flexes, [])
+        for i in 1:length(residual)
+            if residual[i] > tol
+                println("No exact solution exists: ($(_k),$(i)). Residual: $(residual[i])")
+                println("Rank difference: $(rank(rig_mat; atol=tol)) vs. $(rank(hcat(rig_mat,b[i]); atol=tol))")
+            else
+                push!(flexes[end], kth_order[i])
+            end
+        end
+        if length(flexes[end])==0
+            return nothing
+        end
+    end
+    @var _a[j:k,1:length(flexes)]
+    return point + sum(t^i*_a[i-j+1,:]'*flexes[i] for i in j:k)
 end
 
 """
