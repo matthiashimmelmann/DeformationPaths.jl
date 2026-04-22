@@ -721,7 +721,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         catch e
             if norm(motion_samples[end]-motion_samples[end-1])>step_size*100
                 deleteat!(motion_samples, length(motion_samples))
-                show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
+                show_progress && @warn "The approximation of a deformation path ended prematurely in $step. $e"
                 break
             else
                 continue
