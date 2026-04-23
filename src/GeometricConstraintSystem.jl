@@ -27,7 +27,7 @@ mutable struct ConstraintSystem
 end
 
 """
-    ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs)
+    ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs[; pinned_GCS, pinned_vertices])
 
 Constructor of a `ConstraintSystem` object.
 """
@@ -75,7 +75,7 @@ end
 
 
 """
-    Framework([vertices,] bars, realization[; pinned_vertices])
+    Framework([vertices,] bars, realization[; pinned_GCS, pinned_vertices])
 
 Class for bar-joint frameworks.
 """
@@ -133,7 +133,7 @@ end
 
 
 """
-    AngularFramework([vertices,] angles, realization[; pinned_vertices])
+    AngularFramework([vertices,] angles, realization[; pinned_GCS, pinned_vertices])
 
 Class for angular bar-joint frameworks.
 """
@@ -188,7 +188,7 @@ end
 
 
 """
-    FrameworkOnSurface([vertices,] bars, realization, surface[; pinned_vertices])
+    FrameworkOnSurface([vertices,] bars, realization, surface[; pinned_GCS, pinned_vertices])
 
 Class for bar-joint frameworks constrained to a surface.
 """
@@ -276,7 +276,7 @@ end
 
 
 """
-    SphericalDiskPacking([vertices,] contacts, [inversive_distances,] realization[; pinned_vertices])
+    SphericalDiskPacking([vertices,] contacts, [inversive_distances,] realization[; pinned_GCS, pinned_vertices])
 
 Class for spherical disk packings in Minkowski space.
 """
@@ -337,7 +337,7 @@ end
 
 
 """
-    VolumeHypergraph([vertices,] volumes, realization[; pinned_vertices])
+    VolumeHypergraph([vertices,] volumes, realization[; pinned_GCS, pinned_vertices])
 
 Class for volume-constrained hypergraphs.
 """
@@ -388,7 +388,7 @@ end
 
 
 """
-    Polytope([vertices,] facets, realization[; pinned_vertices])
+    Polytope([vertices,] facets, realization[; pinned_GCS, pinned_vertices])
 
 Class for 3-dimensional polytopes with edge-length and facet planarity constraints.
 
