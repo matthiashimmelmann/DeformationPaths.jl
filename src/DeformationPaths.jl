@@ -675,7 +675,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
     @var c
     edge_equation = sum( (F.G.xs[:,edge_for_contraction[1]]-F.G.xs[:,edge_for_contraction[2]]) .^2) - sum( (F.G.realization[:,edge_for_contraction[1]]-F.G.realization[:,edge_for_contraction[2]]) .^2)
     edge_variables = variables(edge_equation)
-    generic_point = randn(ComplexF64, size(F.G.xs)[1]*2)
+    generic_point = randn(ComplexF64, length(edge_variables))
     evaluated_edge_equation = evaluate(edge_equation, edge_variables=>generic_point)
     corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
     _G = deepcopy(F.G)
@@ -714,10 +714,10 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
         catch e
-            if norm(motion_samples[end]-motion_samples[end-1])>step_size*100
+            if norm(motion_samples[end]-motion_samples[end-1])>step_size*10
                 deleteat!(motion_samples, length(motion_samples))
                 show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                 break

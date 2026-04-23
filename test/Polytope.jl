@@ -1,4 +1,54 @@
 if is_no_ci
+    @testset "dodecahedron_EdgeContraction" begin
+        GC.gc()
+        println("dodecahedron_EdgeContraction")
+        F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'); pinned_vertices=[10,15])
+        plot(F; special_edges=[9,10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, renderEntirePolytope=true, padding=0.01)
+        if is_no_ci
+            Defs = Vector{DeformationPath}([])
+            for i in 1:15
+                _D1 = DeformationPath_EdgeContraction(F, [9, 10], 0.99; step_size=0.001)
+                _F = Polytope(F.facets, _D1.motion_matrices[end])
+                _D2 = DeformationPath_EdgeContraction(_F, [9, 10], 0.62; contraction_start=0.99, step_size=0.005)
+                _D_ = stich_deformation_paths(_D1, _D2; reversed=false)
+                _F = Polytope(F.facets, _D2.motion_matrices[end]) 
+                _D3 = DeformationPath_EdgeContraction(_F, [9, 10], 0.61; contraction_start=0.62, step_size=0.0005)
+                _D = stich_deformation_paths(_D_, _D3; reversed=false)      
+                _F = Polytope(F.facets, _D.motion_matrices[end])
+                #animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edges=[9, 10], azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=π/10, renderEntirePolytope=true, padding=0.01)
+                plot(_F, "Dodec$(i)"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=π/10)
+                push!(Defs,_D)
+                for i in 1:25
+                    project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11, vertex_color=:chartreuse3, edge_colors=vcat([:steelblue for _ in 1:15], [:gray35 for _ in 1:5]))
+                end
+            end
+            #println([norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])) for Defo in collect(Iterators.product(Defs,Defs))])
+            #mini, index = findmin(Defo->norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])), collect(Iterators.product(Defs,Defs)))
+            #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
+            #DPaths = collect(Iterators.product(Defs,Defs))
+            #_D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
+            #project_deformation_random([_D], F, 2, "Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
+            #animate(_D,F; scaling_factor=0.98, recompute_deformation_samples=false, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, filetype="mp4", special_edges=[9, 10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, renderEntirePolytope=true, padding=0.01)
+            for i in 16:20
+                _D1 = DeformationPath_EdgeContraction(F, [9, 10], 1.01; step_size=0.001)
+                _F = Polytope(F.facets, _D1.motion_matrices[end])
+                _D2 = DeformationPath_EdgeContraction(_F, [9, 10], 1.3; contraction_start=1.01, step_size=0.005)
+                _D = stich_deformation_paths(_D1, _D2; reversed=false)
+                #animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                _F = Polytope(F.facets, _D.motion_matrices[end])
+                plot(_F, "Dodec$(i)"; azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                push!(Defs,_D)
+                for i in 1:25
+                    project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11, vertex_color=:chartreuse3, edge_colors=vcat([:steelblue for _ in 1:15], [:gray35 for _ in 1:5]))
+                end
+            end
+            project_deformation_random(Defs, F, 3; padding=nothing, vertex_size=60, line_width=11, vertex_color=:chartreuse3, edge_colors=vcat([:steelblue for _ in 1:15], [:gray35 for _ in 1:5]))
+        end
+    end
+end
+
+
+if is_no_ci
     @testset "truncatedDodecahedron" begin
         println("truncatedDodecahedron")
         F = Polytope([[3,42,46,44,40,1,34,48,50,36],[47,43,4,37,51,49,35,2,41,45],[2,35,19,24,21,16,5,59,55,14],[49,51,20,25,29,31,30,28,24,19],[37,4,15,56,60,6,17,22,25,20],[43,47,52,9,33,27,11,13,56,15],[45,41,14,55,12,10,26,32,9,52],[6,60,13,11,54,58,42,3,8,39],[27,33,32,26,53,57,44,46,58,54],[10,12,59,5,38,7,1,40,57,53],[16,21,28,30,18,23,48,34,7,38],[31,29,22,17,39,8,36,50,23,18],[9,32,33],[18,30,31],[47,45,52],[50,48,23],[10,53,26],[27,54,11],[21,24,28],[29,25,22],[40,44,57],[58,46,42],[35,49,19],[20,51,37],[12,55,59],[60,56,13],[41,2,14],[15,4,43],[34,1,7],[8,3,36],[38,5,16],[17,6,39]], Matrix([0 -1.618033988749895 2.489898284882780; 0 -1.618033988749895 -2.489898284882780; 0 1.618033988749895 2.489898284882780; 0 1.618033988749895 -2.489898284882780; 0.4253254041760200 -2.927050983124842 0.2628655560595668; 0.4253254041760200 2.927050983124842 0.2628655560595668; 0.6881909602355868 -2.118033988749895 1.964167172763647; 0.6881909602355868 2.118033988749895 1.964167172763647; -2.752763840942347 0 -1.113516364411607; -2.064572880706760 -2.118033988749895 0.2628655560595668; -2.064572880706760 2.118033988749895 0.2628655560595668; -1.376381920471174 -2.618033988749895 -0.2628655560595668; -1.376381920471174 2.618033988749895 -0.2628655560595668; -0.6881909602355868 -2.118033988749895 -1.964167172763647; -0.6881909602355868 2.118033988749895 -1.964167172763647; 1.376381920471174 -2.618033988749895 0.2628655560595668; 1.376381920471174 2.618033988749895 0.2628655560595668; 2.752763840942347 0 1.113516364411607; 1.801707324647194 -1.309016994374947 -1.964167172763647; 1.801707324647194 1.309016994374947 -1.964167172763647; 2.064572880706760 -2.118033988749895 -0.2628655560595668; 2.064572880706760 2.118033988749895 -0.2628655560595668; 2.227032728823213 0 1.964167172763647; 2.227032728823213 -1.618033988749895 -1.113516364411607; 2.227032728823213 1.618033988749895 -1.113516364411607; -2.652358132999233 -1.309016994374947 0.2628655560595668; -2.652358132999233 1.309016994374947 0.2628655560595668; 2.652358132999233 -1.309016994374947 -0.2628655560595668; 2.652358132999233 1.309016994374947 -0.2628655560595668; 2.915223689058800 -0.5000000000000000 0.2628655560595668; 2.915223689058800 0.5000000000000000 0.2628655560595668; -2.915223689058800 -0.5000000000000000 -0.2628655560595668; -2.915223689058800 0.5000000000000000 -0.2628655560595668; 0.9510565162951536 -1.309016994374947 2.489898284882780; 0.9510565162951536 -1.309016994374947 -2.489898284882780; 0.9510565162951536 1.309016994374947 2.489898284882780; 0.9510565162951536 1.309016994374947 -2.489898284882780; 0.8506508083520399 -2.618033988749895 1.113516364411607; 0.8506508083520399 2.618033988749895 1.113516364411607; -0.9510565162951536 -1.309016994374947 2.489898284882780; -0.9510565162951536 -1.309016994374947 -2.489898284882780; -0.9510565162951536 1.309016994374947 2.489898284882780; -0.9510565162951536 1.309016994374947 -2.489898284882780; -1.538841768587627 -0.5000000000000000 2.489898284882780; -1.538841768587627 -0.5000000000000000 -2.489898284882780; -1.538841768587627 0.5000000000000000 2.489898284882780; -1.538841768587627 0.5000000000000000 -2.489898284882780; 1.538841768587627 -0.5000000000000000 2.489898284882780; 1.538841768587627 -0.5000000000000000 -2.489898284882780; 1.538841768587627 0.5000000000000000 2.489898284882780; 1.538841768587627 0.5000000000000000 -2.489898284882780; -2.227032728823213 0 -1.964167172763647; -2.227032728823213 -1.618033988749895 1.113516364411607; -2.227032728823213 1.618033988749895 1.113516364411607; -0.8506508083520399 -2.618033988749895 -1.113516364411607; -0.8506508083520399 2.618033988749895 -1.113516364411607; -1.801707324647194 -1.309016994374947 1.964167172763647; -1.801707324647194 1.309016994374947 1.964167172763647; -0.4253254041760200 -2.927050983124842 -0.2628655560595668; -0.4253254041760200 2.927050983124842 -0.2628655560595668]'))
@@ -60,44 +110,6 @@ if is_no_ci
         q = newton_correct(F.G, to_Array(F,F.G.realization); tol=1e-10, time_penalty=0.1, armijo_linesearch=false)
         realization!(F, to_Matrix(F, q))
         plot(F, "deformed_trunc_dod_fin"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65, plot_flexes=false)
-    end
-end
-
-
-if is_no_ci
-    @testset "dodecahedron_EdgeContraction" begin
-        GC.gc()
-        println("dodecahedron_EdgeContraction")
-        F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'))
-        plot(F; special_edges=[9,10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, renderEntirePolytope=true, padding=0.01)
-        if is_no_ci
-            Defs = Vector{DeformationPath}([])
-            for i in 1:8
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
-                animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,18), filetype="mp4", special_edges=[9, 10], azimuth = π/10 + 2pi * 125 / 190, elevation=π/10, renderEntirePolytope=true, padding=0.01)
-                plot(_F; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = π/10 + 2pi * 125 / 190, elevation=π/10)
-                push!(Defs,_D)
-                for i in 1:20
-                    project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
-                end
-            end
-            #println([norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])) for Defo in collect(Iterators.product(Defs,Defs))])
-            mini, index = findmin(Defo->norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])), collect(Iterators.product(Defs,Defs)))
-            #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
-            DPaths = collect(Iterators.product(Defs,Defs))
-            _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
-            project_deformation_random([_D], F, 2, "Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
-            animate(_D,F; scaling_factor=0.98, recompute_deformation_samples=false, azimuth = π/10 + 2pi * 125 / 190 - pi/5.75, elevation=pi/11, alpha=0.45, filetype="mp4", special_edges=[9, 10], special_edge_color=coral, edge_color=teal, vertex_color=teal, facet_color=soft_teal, renderEntirePolytope=true, padding=0.01)
-            for i in 9:11
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25)
-                animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
-                plot(_F; azimuth = π/10 + 2pi * 125 / 190, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
-                push!(Defs,_D)
-                project_deformation_random(Defs, F, 2, "Dodec_projection"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35 for _ in 1:20])
-            end
-        end
     end
 end
 
