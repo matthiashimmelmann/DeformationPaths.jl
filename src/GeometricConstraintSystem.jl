@@ -10,6 +10,7 @@ Class for Constructing a general constraint system.
 - `dimension::Int`: Dimension in which the geometric constraint system lives.
 - `xs::Union{Matrix{Variable}, Matrix{Expression}}`: Matrix representing the possible realizations of a geometric constraint system.
 - `system::System`: Polynomial system consisting of the `equations` and `variables` in the form of `HomotopyContinuation`.
+- `pinned_GCS::Bool`: Pins the geometric constraint system to a hyperplane as to remove the trivial infinitesimal flexes. If `true`, then `pinned_vertices` is set to be empty.
 - `pinned_vertices::Vector{Int}`: Pinned vertices of the system. These vertices remain unchanged and are added as constraints. Pinning can, for instance, be used to factor out rigid motions.
 """
 mutable struct ConstraintSystem
@@ -21,6 +22,7 @@ mutable struct ConstraintSystem
     dimension::Int
     xs::Union{Matrix{Variable},Matrix{Expression}}
     system::System
+    pinned_GCS::Bool
     pinned_vertices::Vector{Int}
 end
 
@@ -29,12 +31,12 @@ end
 
 Constructor of a `ConstraintSystem` object.
 """
-function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs; pinned_vertices::Vector{Int}=Vector{Int}([]))::ConstraintSystem
+function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))::ConstraintSystem
     jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
     dimension = size(realization)[1]
-    size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
+    size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || (pinned_GCS && size(realization)[2]==length(variables)//dimension+dimension*(dimension+1)//2) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
     size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
-    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_vertices)
+    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_GCS, pinned_vertices)
 end
 
 
@@ -42,7 +44,7 @@ function Base.:(==)(G1::ConstraintSystem, G2::ConstraintSystem)
     """
     Overloads the equality operator for `ConstraintSystem`.
     """
-    return G1.vertices==G2.vertices && length(G1.variables)==length(G2.variables) &&  all(i->G1.variables[i]==G2.variables[i], eachindex(G1.variables)) && length(G1.equations)==length(G2.equations) && all(i->G1.equations[i]==G2.equations[i], eachindex(G1.equations))
+    return G1.vertices==G2.vertices && length(G1.variables)==length(G2.variables) &&  all(i->G1.variables[i]==G2.variables[i], eachindex(G1.variables)) && length(G1.equations)==length(G2.equations) && all(i->G1.equations[i]==G2.equations[i], eachindex(G1.equations)) && G1.pinned_GCS==G2.pinned_GCS && Set(G1.pinned_vertices)==Set(G2.pinned_vertices)
 end
 
 
@@ -66,12 +68,11 @@ function Base.show(io::IO, G::ConstraintSystem)::Nothing
         end
     end
     if !(isempty(G.pinned_vertices))
-        print(io, "\tPinned Vertices: $(G.pinned_vertices)")
+        print(io, "\tPinned Vertices: $(G.pinned_vertices) (pinned to hyperplane: $(G.pinned_GCS))")
     end
     return nothing
 end
 
-#TODO Allow random realizations
 
 """
     Framework([vertices,] bars, realization[; pinned_vertices])
@@ -82,7 +83,7 @@ mutable struct Framework
     G::ConstraintSystem
     bars::Vector{Tuple{Int,Int}}
 
-    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function Framework(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         all(t->length(t)==2, bars) && all(bar->bar[1] in vertices && bar[2] in vertices, bars) || throw("The bars don't have the correct format.")
         realization = Float64.(realization)
         dimension = size(realization)[1]
@@ -93,19 +94,40 @@ mutable struct Framework
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] = realization[:,v]
+        if pinned_GCS
+            pinned_vertices=Vector{Int}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         bar_equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices,variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
+        G = ConstraintSystem(vertices,variables, bar_equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
         new(G, bars)
     end
 
-    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
-        Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
+        Framework(vertices, bars, realization; kwargs...)
+    end
+
+    function Framework(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, dimension::Int=2; kwargs...)
+        # Create a generic realization with the uniform distribution on 100 times the unit interval
+        vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
+        realization = 100*rand(dimension, length(vertices))
+        Framework(vertices, bars, realization; kwargs...)
     end
 end
 
@@ -120,7 +142,7 @@ mutable struct AngularFramework
     bars::Vector{Tuple{Int,Int}}
     angles::Vector{Tuple{Int,Int,Int}}
 
-    function AngularFramework(vertices::Vector{Int}, angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function AngularFramework(vertices::Vector{Int}, angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         all(t->length(t)==3, angles) && all(angle->angle[1] in vertices && angle[2] in vertices && angle[3] in vertices, angles) || throw("The angles don't have the correct format.")
         realization = Float64.(realization)
         dimension = size(realization)[1]
@@ -134,18 +156,33 @@ mutable struct AngularFramework
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] = realization[:,v]
+
+        if pinned_GCS
+            pinned_vertices=Vector{Int}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         angle_constraints = [((xs[:,angle[1]]-xs[:,angle[2]])'*(xs[:,angle[3]]-xs[:,angle[2]])) * sqrt(sum((realization[:,angle[1]]-realization[:,angle[2]]).^2)*sum((realization[:,angle[3]]-realization[:,angle[2]]).^2)) - sqrt(sum((xs[:,angle[1]]-xs[:,angle[2]]).^2)*sum((xs[:,angle[3]]-xs[:,angle[2]]).^2)) * ((realization[:,angle[1]]-realization[:,angle[2]])'*(realization[:,angle[3]]-realization[:,angle[2]])) for angle in angles]
-        G = ConstraintSystem(vertices,variables, angle_constraints, realization, xs; pinned_vertices=pinned_vertices)
+        G = ConstraintSystem(vertices,variables, angle_constraints, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
         new(G, bars, angles)
     end
 
-    function AngularFramework(angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function AngularFramework(angles::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([angle[1] for angle in angles], [angle[2] for angle in angles], [angle[3] for angle in angles]))))
-        AngularFramework(vertices, angles, realization; pinned_vertices=pinned_vertices)
+        AngularFramework(vertices, angles, realization; kwargs...)
     end
 end
 
@@ -160,7 +197,7 @@ mutable struct FrameworkOnSurface
     bars::Vector{Tuple{Int,Int}}
     surface::Function
 
-    function FrameworkOnSurface(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}, surface::Function; pinned_vertices=Vector{Int}([]))
+    function FrameworkOnSurface(vertices::Vector{Int}, bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}, surface::Function; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         try
             surface([1,1,1])
         catch
@@ -170,15 +207,15 @@ mutable struct FrameworkOnSurface
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension for FrameworkOnSurface needs to be equal to 3.")
         
-        F = Framework(vertices, bars, realization; pinned_vertices=pinned_vertices)
+        F = Framework(vertices, bars, realization; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
         G = F.G
         add_equations!(G, [surface(G.xs[:,i]) for i in eachindex(G.vertices)])
         new(G, F.bars, surface)
     end
 
-    function FrameworkOnSurface(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}, surface::Function; pinned_vertices=Vector{Int}([]))
+    function FrameworkOnSurface(bars::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, realization::Matrix{<:Real}, surface::Function; kwargs...)
         vertices = sort(collect(Set(vcat([bar[1] for bar in bars], [bar[2] for bar in bars]))))
-        FrameworkOnSurface(vertices, bars, realization, surface; pinned_vertices=pinned_vertices)
+        FrameworkOnSurface(vertices, bars, realization, surface; kwargs...)
     end
 end
 
@@ -194,7 +231,7 @@ mutable struct SpherePacking
     radii::Vector{<:Real}
     tolerance::Real
 
-    function SpherePacking(vertices::Vector{Int}, radii::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-6)
+    function SpherePacking(vertices::Vector{Int}, radii::Vector{<:Real}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-6)
         length(vertices)==length(radii) && length(radii)==size(realization)[2] && all(r->r>0, radii) || throw("The length of the radii does not match the length of the vertices or the dimensionality of the realization.")
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         realization = Float64.(realization)
@@ -206,19 +243,34 @@ mutable struct SpherePacking
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] = realization[:,v]
+
+        if pinned_GCS
+            pinned_vertices=Vector{Int}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - (radii[bar[1]]+radii[bar[2]])^2 for bar in contacts]
         bar_equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices, variables, bar_equations, realization, xs; pinned_vertices=pinned_vertices)
+        G = ConstraintSystem(vertices, variables, bar_equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
         new(G, contacts, radii, tolerance)
     end
 
-    function SpherePacking(radii::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function SpherePacking(radii::Vector{<:Real}, realization::Matrix{<:Real}; kwargs...)
         vertices = [i for i in eachindex(radii)]
-        SpherePacking(vertices, radii, realization; pinned_vertices=pinned_vertices)
+        SpherePacking(vertices, radii, realization; kwargs...)
     end
 end
 
@@ -233,7 +285,7 @@ mutable struct SphericalDiskPacking
     contacts::Vector{Tuple{Int,Int}}
     inversive_distances::Vector{<:Real}
 
-    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-8)
+    function SphericalDiskPacking(vertices::Vector{Int}, contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Real}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]), tolerance::Real=1e-8)
         length(contacts)==length(inversive_distances) || throw("The length of the inversive distances does not match the length of the vertices or the dimensionality of the realization.")
         all(v->v in vertices, pinned_vertices) || throw("Some of the pinned_vertices are not contained in vertices.")
         realization = Float64.(realization)
@@ -245,19 +297,34 @@ mutable struct SphericalDiskPacking
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] = realization[:,v]
+
+        if pinned_GCS
+            pinned_vertices=Vector{Int}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         inversive_distance_equation = [minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][1]]) * minkowski_scalar_product(xs[:,contacts[i][2]], xs[:,contacts[i][2]]) for i in eachindex(contacts)]
         inversive_distance_equation = filter(eq->eq!=0, inversive_distance_equation)
-        G = ConstraintSystem(vertices, variables, inversive_distance_equation, realization, xs; pinned_vertices=pinned_vertices)
+        G = ConstraintSystem(vertices, variables, inversive_distance_equation, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
         new(G, contacts, inversive_distances)
     end
 
-    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Real}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, inversive_distances::Vector{<:Real}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([bar[1] for bar in contacts], [bar[2] for bar in contacts]))))
-        SphericalDiskPacking(vertices, contacts, inversive_distances, realization; pinned_vertices=pinned_vertices)
+        SphericalDiskPacking(vertices, contacts, inversive_distances, realization; kwargs...)
     end
 
     function SphericalDiskPacking(contacts::Union{Vector{Tuple{Int,Int}},Vector{Vector{Int}}}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
@@ -278,7 +345,7 @@ mutable struct VolumeHypergraph
     G::ConstraintSystem
     volumes::Vector{Vector{Int}}
 
-    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS=pinned_GCS, pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw("The volumes don't have the correct format.")
@@ -288,19 +355,34 @@ mutable struct VolumeHypergraph
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] = realization[:,v]
+
+        if pinned_GCS
+            pinned_vertices=Vector{Int64}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[t[1],t[2]] for t in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(t[2] in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([xs[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
         facet_equations = filter(eq->eq!=0, facet_equations)
-        G = ConstraintSystem(vertices, variables, facet_equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        G = ConstraintSystem(vertices, variables, facet_equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, volumes)
     end
 
-    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function VolumeHypergraph(volumes::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in volumes]...))))
-        VolumeHypergraph(vertices, volumes, realization; pinned_vertices=pinned_vertices)
+        VolumeHypergraph(vertices, volumes, realization; kwargs...)
     end
 end
 
@@ -319,7 +401,7 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
@@ -361,9 +443,21 @@ mutable struct Polytope
         length(vertices)-length(bars)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(bars)+length(facets))")
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        if pinned_GCS
+            pinned_vertices=Vector{Int64}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        end
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
         xs = Expression.(hcat(x,n))
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
         for v in pinned_vertices
             xs[:,v] .= _realization[:,v]
         end
@@ -371,13 +465,13 @@ mutable struct Polytope
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
         all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
-        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
     end
 
-    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function Polytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        Polytope(vertices, facets, realization; pinned_vertices=pinned_vertices)
+        Polytope(vertices, facets, realization; kwargs...)
     end
 end
 
@@ -395,7 +489,7 @@ mutable struct FacetPolytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function FacetPolytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function FacetPolytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=dimension+1, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
@@ -419,22 +513,34 @@ mutable struct FacetPolytope
         end
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        if pinned_GCS
+            pinned_vertices=Vector{Int64}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        end
         normal_variables = vcat([n[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(facets)))]...)
         xs = Expression.(hcat(x,n))
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
         for v in pinned_vertices
             xs[:,v] .= _realization[:,v]
         end
         facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
         equations = filter(eq->eq!=0, facet_equations)
         all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
-        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, variables, normal_variables)
     end
 
-    function FacetPolytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function FacetPolytope(facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        FacetPolytope(vertices, facets, realization; pinned_vertices=pinned_vertices)
+        FacetPolytope(vertices, facets, realization; kwargs...)
     end
 end
 
@@ -555,7 +661,7 @@ mutable struct BodyHinge
     facets::Vector{Vector{Int}}
     edges::Vector{Tuple{Int,Int}}
 
-    function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function BodyHinge(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
@@ -571,22 +677,36 @@ mutable struct BodyHinge
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] .= realization[:,v]
+
+        if pinned_GCS
+            pinned_vertices=Vector{Int64}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
 
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
         bars = collect(Set(bars))
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(bar_equations))
-        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, edges)
     end
 
-    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function BodyHinge(facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in facets]...))))
-        BodyHinge(vertices, facets, realization; pinned_vertices=pinned_vertices)
+        BodyHinge(vertices, facets, realization; kwargs...)
     end
 end
 
@@ -601,7 +721,7 @@ mutable struct BodyBar
     facets::Vector{Vector{Int}}
     edges::Vector{Tuple{Int,Int}}
 
-    function BodyBar(vertices::Vector{Int}, edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function BodyBar(vertices::Vector{Int}, edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
@@ -616,21 +736,35 @@ mutable struct BodyBar
         @var x[1:dimension, 1:length(vertices)]
         xs = Array{Expression,2}(undef, dimension, length(vertices))
         xs .= x
-        for v in pinned_vertices
-            xs[:,v] .= realization[:,v]
+        if pinned_GCS
+            pinned_vertices=Vector{Int64}([])
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(i+j<=dimension+1)]...)
+        else
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
-        variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
+
+        if pinned_GCS
+            for i in 1:dimension, j in 1:dimension
+                if i+j<=dimension+1
+                    xs[i,j] .= _realization[i,j]
+                end
+            end
+        end            
+        for v in pinned_vertices
+            xs[:,v] .= _realization[:,v]
+        end
+
         bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]
         bars = collect(Set(bars))
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,bars)]
         equations = filter(eq->eq!=0, bar_equations)
-        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_vertices=Vector{Int64}(pinned_vertices))
+        G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, edges)
     end
 
-    function BodyBar(edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; pinned_vertices=Vector{Int}([]))
+    function BodyBar(edges::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int}}}, facets::Union{Vector{Vector{Int}}, Vector{Tuple{Int,Int,Int}}}, realization::Matrix{<:Real}; kwargs...)
         vertices = sort(collect(Set(vcat([[v for v in facet] for facet in vcat(edges,facets)]...))))
-        BodyBar(vertices, edges, facets, realization; pinned_vertices=pinned_vertices)
+        BodyBar(vertices, edges, facets, realization; kwargs...)
     end
 end
 

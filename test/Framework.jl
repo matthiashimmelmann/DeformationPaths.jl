@@ -26,6 +26,12 @@ end
 end
 
 
+@testset "generic_3Prism" begin
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)])
+    @test is_inf_rigid(F)
+end
+
+
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
     plot(F)
