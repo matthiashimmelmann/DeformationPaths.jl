@@ -644,9 +644,10 @@ the first deformation path needs to be the first realization of the second defor
 - `D1::DeformationPath`: First `DeformationPath`.
 - `D2::DeformationPath`: Second `DeformationPath`.
 - `reversed::Bool` (optional): Determines whether the first deformation path is reversed or not. Default value: `true`.
+- `bypass_check::Bool` (optional): Lets us bypass the check for whether the two underlying geometric constraint systems are identical.
 """
-function stich_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true)::DeformationPath
-    D1.G == D2.G || throw(error("The deformation paths need to have the same underlying constraint system."))
+function stich_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true, bypass_check::Bool=false)::DeformationPath
+    bypass_check || D1.G == D2.G || throw(error("The deformation paths need to have the same underlying constraint system."))
     if reversed
         isapprox(norm(D1.motion_samples[1]-D2.motion_samples[1]), 0, atol=1e-4) || throw(error("The motion samples are not compatible."))
         return DeformationPath(D1.G, vcat(reverse(D1.motion_samples), D2.motion_samples[2:end]); skip_check=true)
@@ -699,7 +700,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         show_progress && println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
+            cur_point = motion_samples[end] + 0.02*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
             cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
