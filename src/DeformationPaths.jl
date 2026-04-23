@@ -245,16 +245,16 @@ mutable struct DeformationPath
         end
 
         if type==Framework
-            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices).G    
+            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G    
         elseif type==AngularFramework
-            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_vertices=G.pinned_vertices).G
+            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
         elseif type==FrameworkOnSurface
             K_n = deepcopy(G)
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
         elseif type==VolumeHypergraph
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization; pinned_vertices=G.pinned_vertices).G
+            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
         elseif type==Polytope || type==SpherePacking || type==BodyHinge || type==BodyBar
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
         elseif  type==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
@@ -400,7 +400,7 @@ mutable struct DeformationPath
     """
     function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, symmetric_newton::Bool=false, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         start_point = to_Array(F, F.G.realization)
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             if flex_mult==[]
@@ -436,7 +436,7 @@ mutable struct DeformationPath
 
                 cur_realization = to_Matrix(F,Float64.(q))
                 if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
-                    _F = SpherePacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
+                    _F = SpherePacking(F.G.vertices, F.radii, cur_realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
                     DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex, tol=tol)
                     break
                 end
