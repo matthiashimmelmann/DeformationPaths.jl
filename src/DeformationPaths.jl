@@ -2,7 +2,7 @@ module DeformationPaths
 
 import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
-import GLMakie: NoShading, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
+import GLMakie: NoShading, axislegend, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
@@ -700,7 +700,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         show_progress && println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.025*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
+            cur_point = motion_samples[end] + 0.01*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
             cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
