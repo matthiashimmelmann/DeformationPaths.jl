@@ -1,3 +1,4 @@
+#TODO how to fix?
 if is_no_ci
     @testset "dodecahedron_EdgeContraction" begin
         GC.gc()
