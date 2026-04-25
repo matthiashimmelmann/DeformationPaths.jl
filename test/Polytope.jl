@@ -12,7 +12,6 @@ if is_no_ci
             for i in 1:existing_realization
                 push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"))
             end
-            #TODO incorporate read_realizations
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=4)
