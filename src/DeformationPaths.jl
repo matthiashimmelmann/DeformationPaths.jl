@@ -701,9 +701,9 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         show_progress && println("Trial $index")
         index = index+1
         try
-            cur_point = vcat(motion_samples[end][1:length(F.x_variables)] + 0.1*(rand(Float64,length(F.x_variables))-[0.5 for i in eachindex(F.x_variables)]), motion_samples[end][length(F.x_variables)+1:end])
+            cur_point = vcat(motion_samples[end][1:length(F.x_variables)] + 0.05*(rand(Float64,length(F.x_variables))-[0.5 for i in eachindex(F.x_variables)]), motion_samples[end][length(F.x_variables)+1:end])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty/4, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty*2, armijo_linesearch=false)
             push!(motion_samples, cur_point)
             break
         catch err
