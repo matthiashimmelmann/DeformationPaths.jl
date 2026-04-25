@@ -703,7 +703,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         try
             cur_point = vcat(motion_samples[end][1:length(F.x_variables)] + 0.05*(rand(Float64,length(F.x_variables))-[0.5 for i in eachindex(F.x_variables)]), motion_samples[end][length(F.x_variables)+1:end])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty*2, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
             break
         catch err
@@ -717,10 +717,10 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.2*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.25*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             starting_point = motion_samples[end]
             for t in 1:failure_to_converge
-                local_equations = evaluate(_G.equations, c=>step)
+                local_equations = evaluate(_G.equations, c=>step-local_step_size*(failure_to_converge+1-t))
                 between_cur_points = newton_correct(local_equations, _G.variables, local_jacobian, starting_point+t/(failure_to_converge+1)*(cur_point-starting_point); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
                 push!(motion_samples, between_cur_points)
             end
