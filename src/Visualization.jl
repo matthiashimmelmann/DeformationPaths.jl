@@ -394,7 +394,7 @@ Plot a polytope.
 """
 function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing,Tuple{Int,Int}}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     if !isnothing(special_edges)
-        special_edges = !(special_edges[1] isa Vector) ? [special_edges] : special_edges
+        special_edges = !(special_edges[1] isa Vector{Union{<:Vector,Tuple{Int,Int}}}) ? [special_edges] : special_edges
         special_edges = [[edge[1],edge[2]] for edge in special_edges]
     end
     isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))

@@ -3,16 +3,16 @@ if is_no_ci
     @testset "dodecahedron_EdgeContraction" begin
         GC.gc()
         println("dodecahedron_EdgeContraction")
-        F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'))
+        F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'); pinned_vertices=[10,15])
         plot(F, "Dodec0"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25)
         if is_no_ci
             Defs = Vector{DeformationPath}([])
             for i in 1:12
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=2)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.003, time_penalty=2)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
-                animate(_D,_F,"Dodec_deformation_stitched"; scaling_factor=0.98, fixed_vertices=(9,10,18), recompute_deformation_samples=true, special_edges=[9, 10], azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, renderEntirePolytope=true, padding=0.01)
-                plot(_F, "Dodec$(i)"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                plot(_F, "Dodec$(i)"; azimuth=2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                animate(_D,_F,"Dodec$(i)"; scaling_factor=0.98, filetype="mp4", fixed_vertices=(1,2,3), recompute_deformation_samples=true, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
                 for i in 1:25
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
@@ -23,13 +23,13 @@ if is_no_ci
             #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
             DPaths = collect(Iterators.product(Defs,Defs))
             _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
-            project_deformation_random([_D], F, 2, "Dodec_projection0"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
+            project_deformation_random([_D], F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_deformation_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
             for i in 13:16
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; step_size=0.005, time_penalty=2)
-                animate(_D,F; fixed_vertices=(9,10,18), filetype="mp4", special_edges=[9, 10], recompute_deformation_samples=true, renderEntirePolytope=true, padding=0.01)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; step_size=0.003, time_penalty=2)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                animate(_D,F,"Dodec$(i)"; fixed_vertices=(1,2,3), filetype="mp4", special_edges=[9, 10], recompute_deformation_samples=true, renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
                 for i in 1:25
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)

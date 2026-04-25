@@ -678,7 +678,8 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
     edge_variables = variables(edge_equation)
     generic_point = randn(ComplexF64, length(edge_variables))
     evaluated_edge_equation = evaluate(edge_equation, edge_variables=>generic_point)
-    corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
+    Set(F.G.pinned_vertices)==Set(edge_for_contraction) && throw(error("You cannot choose the `pinned_vertices` to be equal to the `edge_for_contraction`, as this would imply that the edge cannot be deformed!"))
+    corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), Union{<:Real,<:Complex}) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
     _G = deepcopy(F.G)
     _G.equations[corresponding_equation_index] = sum( (_G.xs[:,edge_for_contraction[1]]-_G.xs[:,edge_for_contraction[2]]) .^2) - c^2
     if !isnothing(contraction_start) && !isnothing(realization_start)
@@ -717,12 +718,19 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_jacobian = _G.jacobian
         try
             cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.35*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            starting_point = motion_samples[end]
+            for t in 1:failure_to_converge
+                local_equations = evaluate(_G.equations, c=>step)
+                between_cur_points = newton_correct(local_equations, _G.variables, local_jacobian, starting_point+t/(failure_to_converge+1)*(cur_point-starting_point); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+                push!(motion_samples, between_cur_points)
+            end
             push!(motion_samples, cur_point)
             global failure_to_converge = 0
         catch e
             cur_point = motion_samples[end]
             global failure_to_converge += 1
-            if failure_to_converge>=4
+            @warn "Failed to converge. `failure_to_converge=$(failure_to_converge)`."
+            if failure_to_converge>=3
                 show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                 break
             else
