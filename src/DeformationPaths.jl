@@ -719,18 +719,20 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         try
             cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.25*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             starting_point = motion_samples[end]
-            for t in 1:failure_to_converge
+            _failure_to_converge=failure_to_converge
+            for t in 1:_failure_to_converge
                 local_equations = evaluate(_G.equations, c=>step-local_step_size*(failure_to_converge+1-t))
                 between_cur_points = newton_correct(local_equations, _G.variables, local_jacobian, starting_point+t/(failure_to_converge+1)*(cur_point-starting_point); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
                 push!(motion_samples, between_cur_points)
+                global failure_to_converge = failure_to_converge-1
             end
             push!(motion_samples, cur_point)
             global failure_to_converge = 0
         catch e
             cur_point = motion_samples[end]
             global failure_to_converge += 1
-            @warn "Failed to converge. `failure_to_converge=$(failure_to_converge)`."
-            if failure_to_converge>=3
+            #@warn "Failed to converge. `failure_to_converge=$(failure_to_converge)`."
+            if failure_to_converge>=4
                 show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                 break
             else
