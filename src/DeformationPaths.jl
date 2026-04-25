@@ -461,6 +461,50 @@ end
 
 
 """
+    save_realizations(D, filename)
+
+Saves the `motion_matrices` from the `DeformationPath` `D` in a `.txt` file called `<filename>.txt`.
+"""
+function save_realizations(D::DeformationPath, filename::String)
+    open("$(filename).txt","w") do file
+        for mat in D.motion_matrices
+            for row in 1:size(mat)[1]
+                write(file, "[")
+                for val in mat[row,1:end-1]
+                    write(file, "$(val) ")
+                end
+                if row<size(mat)[1]
+                    write(file, "$(mat[row,end]); ")
+                else
+                    write(file, "$(mat[row,end])]\n")
+                end
+            end
+        end
+    end
+end
+
+
+"""
+    read_realizations(G, filename)
+
+Reads the `motion_matrices` for the `ConstraintSystem` `G` from a `.txt` file called `<filename>.txt`.
+"""
+function read_realizations(G::ConstraintSystem, filename::String)
+    #TODO
+end
+
+
+"""
+    read_realizations(F, filename)
+
+Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt`.
+"""
+function read_realizations(F::AllTypes, filename::String)
+    read_realizations(F, filename)
+end
+
+
+"""
     resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size[; tol, time_penalty, symmetric_newton])
 
 Attempts to resolve a singularity at `motion_samples[end]`.

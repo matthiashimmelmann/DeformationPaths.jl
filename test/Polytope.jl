@@ -6,25 +6,20 @@ if is_no_ci
         plot(F, "Dodec0"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25)
         if is_no_ci
             Defs = Vector{DeformationPath}([])
-            for i in 1:12
+            first_real = findfirst(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
+            first_real = isnothing(first_real) ? 0 : minimum(15,first_real)
+            for i in first_real+1:15
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=4)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
                 animate(_D,_F,"Dodec$(i)"; scaling_factor=0.98, filetype="mp4", fixed_vertices=(9,10,15), recompute_deformation_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
-                plot(_F, "Dodec$(i)"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
+                plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
                 for i in 1:25
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
                 end
-                open("realization$(i).txt","w") do file
-                    for row in eachrow(Defs[end].motion_matrices[end])
-                        for val in row[1:end-1]
-                            write(file, "$(val),")
-                        end
-                        write(file, "$(row[end])\n")
-                    end
-                end
+                save_realizations(_D, "dodecahedron_deformation_realizations$(i)")
             end
             #println([norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])) for Defo in collect(Iterators.product(Defs,Defs))])
             mini, index = findmin(Defo->norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])), collect(Iterators.product(Defs,Defs)))
@@ -33,7 +28,7 @@ if is_no_ci
             _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
             project_deformation_random([_D], F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_deformation_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
-            for i in 13:16
+            for i in 16:20
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; step_size=0.005, time_penalty=4)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
@@ -44,14 +39,7 @@ if is_no_ci
                 for i in 1:25
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
                 end
-                open("realization$(i).txt","w") do file
-                    for row in eachrow(Defs[end].motion_matrices[end])
-                        for val in row[1:end-1]
-                            write(file, "$(val),")
-                        end
-                        write(file, "$(row[end])\n")
-                    end
-                end
+                save_realizations(_D, "dodecahedron_deformation_realizations$(i)")
             end
             project_deformation_random(Defs, F, 3; padding=nothing, vertex_size=60, line_width=11)
         end
