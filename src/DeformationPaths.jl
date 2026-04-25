@@ -717,7 +717,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.35*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.2*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             starting_point = motion_samples[end]
             for t in 1:failure_to_converge
                 local_equations = evaluate(_G.equations, c=>step)
