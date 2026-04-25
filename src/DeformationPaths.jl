@@ -700,9 +700,9 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         show_progress && println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
+            cur_point = vcat(motion_samples[end][1:length(F.x_variables)] + 0.1*(rand(Float64,length(F.x_variables))-[0.5 for i in eachindex(F.x_variables)]), motion_samples[end][length(F.x_variables)+1:end])
             local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
-            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty/4, armijo_linesearch=false)
             push!(motion_samples, cur_point)
             break
         catch err
@@ -711,17 +711,25 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         end
     end
 
+    global failure_to_converge = 0
     @showprogress enabled=show_progress for step in start_c_value+local_step_size:local_step_size:contraction_target
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.35*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
+            global failure_to_converge = 0
         catch e
-            if norm(motion_samples[end]-motion_samples[end-1])>step_size*10
-                deleteat!(motion_samples, length(motion_samples))
+            cur_point = motion_samples[end]
+            global failure_to_converge += 1
+            if failure_to_converge>=4
                 show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                 break
+            else
+                continue
+            end
+            if norm(motion_samples[end]-motion_samples[end-1])>step_size*10
+                deleteat!(motion_samples, length(motion_samples))
             else
                 break
             end

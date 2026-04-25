@@ -93,7 +93,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             end
         end
     else
-        global damping = 0.15
+        global damping = 0.1
         while(norm([eq(variables=>q) for eq in equations]) > tol)
             J = evaluate.(jac, variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-8))[2]
@@ -107,7 +107,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
 
             qnew = q - damping * (J \ evaluate.(new_equations, variables=>q))
             if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
-                global damping = damping*1.2
+                global damping = damping*1.1
             else
                 global damping = damping/2
             end

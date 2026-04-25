@@ -445,7 +445,7 @@ mutable struct Polytope
             if length(pinned_vertices)!=dimension
                 throw(error("If `pinned_GCS` is true, then dimension-many pinned_vertices need to be provided"))
             end
-            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices && findfirst(t->j==t,pinned_vertices)+i <= dimension+1)]...)
+            variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices && findfirst(t->j==t, pinned_vertices)+i <= dimension+1)]...)
         else
             variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         end
@@ -465,7 +465,11 @@ mutable struct Polytope
         facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
-        #all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        if pinned_GCS
+            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices && findfirst(t->j==t, pinned_vertices)+i <= dimension+1)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        else
+            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        end
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
     end
@@ -538,7 +542,11 @@ mutable struct FacetPolytope
 
         facet_equations = vcat([[n[:,i]'*xs[:,facets[i][j]] - 1 for j in eachindex(facets[i])] for i in eachindex(facets)]...)
         equations = filter(eq->eq!=0, facet_equations)
-        #all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        if pinned_GCS
+            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices && findfirst(t->j==t, pinned_vertices)+i <= dimension+1)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        else
+            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+        end
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, variables, normal_variables)
     end
@@ -790,7 +798,7 @@ function Base.show(io::IO, F::AllTypes)
     Unifying display method for all types of geometric constraint systems.
     """
     print(io,"$(string(nameof(typeof(F)))):\n")
-    print(io,"\t$(F.G)")
+    print(io,"\t$(F.G)\n")
     if typeof(F) in [Framework, AngularFramework, FrameworkOnSurface]
         print(io,"\tBars:\t\t\t$(F.bars)")
         if F isa AngularFramework
