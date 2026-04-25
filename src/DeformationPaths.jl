@@ -52,7 +52,9 @@ export  ConstraintSystem,
         add_shadow!,
         minors,
         is_prestress_stable,
-        FacetPolytope
+        FacetPolytope,
+        read_realizations,
+        save_realizations
 
 """
     DeformationPath(G, motion_samples[; tol])
@@ -193,6 +195,39 @@ mutable struct DeformationPath
         motion_matrices = [to_Matrix(G, Float64.(sample)) for sample in motion_samples]
         new(G, 0., motion_samples, motion_matrices, Vector{Float64}([]), [])
     end
+
+    """
+        DeformationPath(F, motion_samples)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(F::AllTypes, motion_samples::Vector{<:Vector{<:Real}}; kwargs...)::DeformationPath
+        return DeformationPath(F.G, motion_samples; kwargs...)
+    end
+
+
+    """
+        DeformationPath(G, motion_matrices)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(G::ConstraintSystem, motion_matrices::Vector{<:Matrix}; tol::Real=1e-8, skip_check::Bool=false)::DeformationPath
+        tol>0 || throw(error("The tolerance `tol` needs to be a positive number, but is $(tol)."))
+        motion_samples = [to_Array(G, Float64.(sample)) for sample in motion_matrices]
+        skip_check || (all(sample->norm(evaluate(G.equations, G.variables=>sample), Inf) < tol, motion_samples) || throw(error("The `motion_samples` do not satisfy the underlying constraints in the constraint system `G`!")))
+        new(G, 0., motion_samples, motion_matrices, Vector{Float64}([]), [])
+    end
+
+
+    """
+        DeformationPath(F, motion_matrices)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(F::AllTypes, motion_matrices::Vector{<:Matrix}; kwargs...)::DeformationPath
+        return DeformationPath(F.G, motion_matrices; kwargs...)
+    end
+
 
     """
         DeformationPath(G, flex_mult, num_steps, type[; step_size, tol, random_flex, symmetric_newton, start_point])
@@ -468,8 +503,8 @@ Saves the `motion_matrices` from the `DeformationPath` `D` in a `.txt` file call
 function save_realizations(D::DeformationPath, filename::String)
     open("$(filename).txt","w") do file
         for mat in D.motion_matrices
+            write(file, "[")
             for row in 1:size(mat)[1]
-                write(file, "[")
                 for val in mat[row,1:end-1]
                     write(file, "$(val) ")
                 end
@@ -487,20 +522,42 @@ end
 """
     read_realizations(G, filename)
 
-Reads the `motion_matrices` for the `ConstraintSystem` `G` from a `.txt` file called `<filename>.txt`.
+Reads the `motion_matrices` for the `ConstraintSystem` `G` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
 """
-function read_realizations(G::ConstraintSystem, filename::String)
-    #TODO
+function read_realizations(G::ConstraintSystem, filename::String; kwargs...)::DeformationPath
+    !isfile("$(filename).txt") && throw(error("A file with the name `$(filename).txt` does not exist."))
+    motion_matrices = Vector{Matrix{Float64}}([])
+    open("$(filename).txt","r") do file
+        while !eof(file)  
+            s = readline(file)[2:end-1]
+            rows = split(s, "; ")
+            row_array=[]
+            _realization = Base.copy(G.realization)
+            for row in rows
+                col = split(row, " ")
+                col_array = [parse(Float64, col[i]) for i in eachindex(col)]
+                push!(row_array, col_array)
+            end
+            if length(row_array)!=G.dimension || !all(row->length(row)==size(G.realization)[2] && length(row)==length(row_array[1]), row_array)
+                throw(error("The dimensions of the `row_array` do not match the given geometric constraint system!"))
+            end
+            for row in eachindex(row_array)
+                _realization[row,:] .= row_array[row]
+            end
+            push!(motion_matrices, _realization)
+        end
+    end
+    return DeformationPath(G, motion_matrices; kwargs...)
 end
 
 
 """
     read_realizations(F, filename)
 
-Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt`.
+Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
 """
-function read_realizations(F::AllTypes, filename::String)
-    read_realizations(F, filename)
+function read_realizations(F::AllTypes, filename::String; kwargs...)::DeformationPath
+    read_realizations(F.G, filename)
 end
 
 

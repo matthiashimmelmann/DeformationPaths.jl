@@ -5,10 +5,15 @@ if is_no_ci
         F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'); pinned_vertices=[10,15])
         plot(F, "Dodec0"; special_edges=[9, 10], renderEntirePolytope=true, padding=0.01, azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25)
         if is_no_ci
+            number_of_realizations=15
             Defs = Vector{DeformationPath}([])
-            first_real = findfirst(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
-            first_real = isnothing(first_real) ? 0 : minimum(15,first_real)
-            for i in first_real+1:15
+            existing_realization = findfirst(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
+            existing_realization = isnothing(existing_realization) ? 0 : minimum(number_of_realizations, existing_realization)
+            for i in 1:existing_realization
+                push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"))
+            end
+            #TODO incorporate read_realizations
+            for i in existing_realization+1:number_of_realizations
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=4)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
@@ -28,7 +33,7 @@ if is_no_ci
             _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
             project_deformation_random([_D], F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_deformation_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
-            for i in 16:20
+            for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; step_size=0.005, time_penalty=4)
                 _F = Polytope(F.facets, _D.motion_matrices[end])
