@@ -13,12 +13,16 @@ if is_no_ci
             for i in 1:existing_realization
                 push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"; skip_check=true))
             end
+            for i in 1:25
+                project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
+            end
+
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=4)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
+                _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 animate(_D,_F,"Dodec$(i)"; scaling_factor=0.98, filetype="mp4", fixed_vertices=(9,10,15), recompute_deformation_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
+                _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
                 for i in 1:25
@@ -36,9 +40,9 @@ if is_no_ci
             for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 1.25; step_size=0.005, time_penalty=4)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
+                _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 animate(_D,F,"Dodec$(i)"; fixed_vertices=(9,10,15), filetype="mp4", special_edges=[9, 10], recompute_deformation_samples=true, renderEntirePolytope=true, padding=0.01)
-                _F = Polytope(F.facets, _D.motion_matrices[end])
+                _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
                 for i in 1:25
