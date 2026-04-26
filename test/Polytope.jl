@@ -7,13 +7,13 @@ if is_no_ci
         if is_no_ci
             number_of_realizations=15
             Defs = Vector{DeformationPath}([])
-            existing_realization = findfirst(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
+            existing_realization = findlast(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
             existing_realization = isnothing(existing_realization) ? 0 : minimum([number_of_realizations, existing_realization])
             display(existing_realization)
             for i in 1:existing_realization
                 push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"; skip_check=true))
             end
-            for i in 1:25
+            for i in 1:15
                 project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
             end
 
@@ -25,7 +25,7 @@ if is_no_ci
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
-                for i in 1:25
+                for i in 1:15
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
                 end
                 save_realizations(_D, "dodecahedron_deformation_realizations$(i)")
@@ -45,7 +45,7 @@ if is_no_ci
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
-                for i in 1:25
+                for i in 1:15
                     project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
                 end
                 save_realizations(_D, "dodecahedron_deformation_realizations$(i)")

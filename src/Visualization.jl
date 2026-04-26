@@ -1374,22 +1374,16 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         edge_colors = map(col -> (red(col), green(col), blue(col)), distinguishable_colors(length(D), [RGB(1,1,1), RGB(0,0,0)], dropseed=true, lchoices = range(40, stop=70, length=15), hchoices = range(0, stop=360, length=30)))
     end
 
-    display(Defo[1].motion_samples[1])
-    display(Defo[2].motion_samples[1])
-    display(Defo[3].motion_samples[1])
     high_dim_curves = [[!(F isa Polytope || F isa FacetPolytope) ? sample : sample[1:length(F.x_variables)] for sample in Defo.motion_samples] for Defo in D]
-    display(high_dim_curves[1][1])
-    display(high_dim_curves[2][1])
-    display(high_dim_curves[3][1])
     #randmat = hcat([rand(Float64,projected_dimension) for _ in eachindex(!(F isa Polytope) ? D[1].G.variables : F.x_variables)]...)
     #proj_curve = [[(pinv(randmat'*randmat)'*randmat')'*entry for entry in curve] for curve in high_dim_curves]
     Q, _ = qr(randn(Float64, !(F isa Polytope || F isa FacetPolytope) ? length(D[1].G.variables) : length(F.x_variables), projected_dimension))
     randmat = Matrix(Q)
     proj_curve = [[randmat'*entry for entry in curve] for curve in high_dim_curves]
-    display(proj_curve[1][1])
-    display(proj_curve[2][1])
-    display(proj_curve[3][1])
 
+    if !all(pt->isapprox(pt[1][1:2], proj_curve[1][1][1:2]; atol=1e-8), proj_curve)
+        throw(error("The starting points of the projected curves do not match!"))
+    end
 
     fig = Figure(size=(1000,1000))
     if projected_dimension==3
@@ -1403,10 +1397,6 @@ function project_deformation_random(D::Union{DeformationPath,Vector{DeformationP
         xlims!(ax,proj_curve[1][1][1]-padding, proj_curve[1][1][1]+padding)
         ylims!(ax,proj_curve[1][1][2]-padding, proj_curve[1][1][2]+padding)
         projected_dimension==3 && zlims!(ax,proj_curve[1][1][3]-padding, proj_curve[1][1][3]+padding)
-    end
-
-    if !all(pt->isapprox(pt[1][1:2], (randmat'*(!(F isa Polytope || F isa FacetPolytope) ? to_Array(F,F.G.realization) : to_Array(F,F.G.realization)[1:length(F.x_variables)]))[1:2]; atol=1e-6), proj_curve)
-        throw(error("The starting point of the curves does not match the given realization of `F`!"))
     end
     
     if projected_dimension==3
