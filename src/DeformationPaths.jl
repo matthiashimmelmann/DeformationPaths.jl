@@ -557,7 +557,7 @@ end
 Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
 """
 function read_realizations(F::AllTypes, filename::String; kwargs...)::DeformationPath
-    read_realizations(F.G, filename)
+    read_realizations(F.G, filename; kwargs...)
 end
 
 
@@ -771,7 +771,7 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real` (optional): Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; initial_slowdown_factor::Real=0.2, contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=2)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; initial_slowdown_factor::Real=0.2, contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=4)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
     initial_slowdown_factor>0 && initial_slowdown_factor<=1 || throw(error("`initial_slowdown_factor` needs to be between 0 and 1."))

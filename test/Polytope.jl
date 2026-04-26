@@ -8,9 +8,10 @@ if is_no_ci
             number_of_realizations=15
             Defs = Vector{DeformationPath}([])
             existing_realization = findfirst(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100000)
-            existing_realization = isnothing(existing_realization) ? 0 : minimum(number_of_realizations, existing_realization)
+            existing_realization = isnothing(existing_realization) ? 0 : minimum([number_of_realizations, existing_realization])
+            display(existing_realization)
             for i in 1:existing_realization
-                push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"))
+                push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"; skip_check=true))
             end
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
