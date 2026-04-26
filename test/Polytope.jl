@@ -22,7 +22,7 @@ if is_no_ci
                 _D = DeformationPath_EdgeContraction(F, [9, 10], 0.75; step_size=0.005, time_penalty=5)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,15), recompute_deformation_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
-                #_F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
+                _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 display("c")
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
                 push!(Defs,_D)
