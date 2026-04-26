@@ -399,7 +399,7 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; skip_check::Bool=false, pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
