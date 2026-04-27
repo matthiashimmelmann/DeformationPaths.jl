@@ -60,7 +60,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
     start_time=Base.time()
     step_count=0
     if armijo_linesearch
-        while(norm(evaluate(equations, variables=>q)) > tol && step_count<=max_steps)
+        while(norm(evaluate(equations, variables=>q)) > tol)
             step_count += 1
             J = evaluate.(jac, variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-8))[2]
@@ -85,8 +85,8 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
                     qnew = q + 0.025*v
                     break
                 end
-                if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
-                    throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+                if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty) || step_count > max_steps
+                    throw("Newton's method did not converge in time. damping=$damping, step_count=$(step_count) and time=$(Base.time()-start_time)")
                 end
             end
             if damping >= 1e-1
@@ -117,8 +117,8 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             if damping > 1
                 global damping = 1
             end
-            if damping < 1e-12 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
-                throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+            if damping < 1e-12 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty) || step_count > max_steps
+                throw("Newton's method did not converge in time. damping=$damping, step_count=$(step_count) and time=$(Base.time()-start_time)")
             end
             q = qnew
         end
