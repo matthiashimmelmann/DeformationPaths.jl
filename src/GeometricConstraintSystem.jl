@@ -106,12 +106,12 @@ mutable struct Framework
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
 
@@ -172,12 +172,12 @@ mutable struct AngularFramework
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
         
@@ -262,12 +262,12 @@ mutable struct SpherePacking
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
 
@@ -341,7 +341,7 @@ mutable struct VolumeHypergraph
     G::ConstraintSystem
     volumes::Vector{Vector{Int}}
 
-    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS=pinned_GCS, pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function VolumeHypergraph(vertices::Vector{Int}, volumes::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int,Int,Vararg{Int}}}}, realization::Matrix{<:Real}; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         all(t->length(t)==dimension+1, volumes) && all(facet->all(v->v in vertices, facet), volumes) || throw("The volumes don't have the correct format.")
@@ -364,12 +364,12 @@ mutable struct VolumeHypergraph
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
         facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([xs[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
@@ -703,12 +703,12 @@ mutable struct BodyHinge
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
 
@@ -764,12 +764,12 @@ mutable struct BodyBar
         if pinned_GCS
             for i in 1:dimension, j in pinned_vertices
                 if findfirst(t->j==t,pinned_vertices)+i <= dimension+1
-                    xs[i,j] = _realization[i,j]
+                    xs[i,j] = realization[i,j]
                 end
             end
         else
             for v in pinned_vertices
-                xs[:,v] .= _realization[:,v]
+                xs[:,v] .= realization[:,v]
             end
         end
         bars = [(i,j) for facet in facets for i in facet for j in facet if i<j]

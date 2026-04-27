@@ -615,7 +615,7 @@ end
 
 Compute an animation for a 3-dimensional bar-joint framework.
 """
-function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fontsize=28, fixed_vertices::Union{Nothing,Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction::Vector{Real}=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, pin_markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, vertex_labels=false, font_color=:lightgrey, line_width::Real=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
+function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFramework}, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fontsize=28, fixed_vertices::Union{Nothing,Tuple{Int,Int}, Tuple{Int,Int,Int}}=nothing, fixed_direction::Vector{<:Real}=[1.,0,0], framerate::Int=25, animate_rotation=false, azimuth = π / 4, elevation=pi/8, perspectiveness=0., rotation_frames = 240, pin_markercolor=:red3, pin_point_offset=0.05, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_size::Real=55, vertex_labels=false, font_color=:lightgrey, line_width::Real=12, angle_color=:lightgrey, angle_size=0.3, edge_color=:steelblue, vertex_color=:black, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1), perspectiveness=perspectiveness)
     matrix_coords = [mat for mat in D.motion_matrices]
@@ -938,7 +938,7 @@ end
 
 Compute an animation for a 3-dimensional polytope.
 """
-function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing}; shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_motion_samples::Bool=false, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}, Vector{Int}}=nothing, fixed_direction::Vector{Real}=[1.,0,0], alpha::Real=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation::Bool=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
+function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,BodyBar}, filename::Union{String,Nothing}; shading=NoShading, renderEntirePolytope::Bool=true, fontsize=28, scaling_factor::Real=0.975, recompute_motion_samples::Bool=false, fixed_vertices::Union{Nothing, Tuple{Int,Int}, Tuple{Int,Int,Int}, Vector{Int}}=nothing, fixed_direction::Vector{<:Real}=[1.,0,0], alpha::Real=0.6, font_color=:lightgrey, facet_color=:grey98, framerate::Int=25, animate_rotation::Bool=false, azimuth = π/10, elevation=π/8, perspectiveness=0., rotation_frames = 240, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_size::Real=12, line_width::Real=8.5, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, vertex_color=:steelblue, vertex_labels::Bool=false, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     matrix_coords = [mat for mat in D.motion_matrices]
     (isnothing(fixed_vertices) || F isa BodyHinge || F isa BodyBar || (fixed_vertices[1] in 1:(size(F.G.realization)[2]) && fixed_vertices[2] in 1:(size(F.G.realization)[2]) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2])))) || (fixed_vertices[1] in 1:(size(F.G.realization)[2]-length(F.facets)) && fixed_vertices[2] in 1:(size(F.G.realization)[2]-length(F.facets)) && (length(fixed_vertices)==2 || fixed_vertices[3] in 1:(size(F.G.realization)[2]-length(F.facets)))) || throw("The elements of `fixed_vertices` are not vertices of the underlying graph.")
@@ -958,7 +958,7 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
         for i in eachindex(matrix_coords)
             p0 = matrix_coords[i][:,fixed_vertices[1]]
             for j in axes(matrix_coords[i])[2]
-                matrix_coords[i][1:length(F.G.vertices),j] = matrix_coords[1:length(F.G.vertices)][:,j] - p0
+                matrix_coords[i][1:length(F.G.vertices),j] = matrix_coords[i][1:length(F.G.vertices),j] - p0
             end
             edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
             rotation_axis = cross(fixed_direction, edge_vector)
@@ -1109,7 +1109,7 @@ end
 
 Compute an animation for a 2-dimensional sticky disk packing.
 """
-function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fixed_direction::Vector{Real}=[1.,0], fixed_vertices::Union{Nothing,Vector{Int},Tuple{Int,Int}}=nothing, alpha=0.08, fontsize=32, framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_labels=true, disk_strokewidth::Real=8.5, line_width::Real=7, font_color=:black, sphere_color=:steelblue, markersize::Real=75, pin_markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
+function animate2D_diskpacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fixed_direction::Vector{<:Real}=[1.,0], fixed_vertices::Union{Nothing,Vector{Int},Tuple{Int,Int}}=nothing, alpha=0.08, fontsize=32, framerate::Int=25, step::Int=1, padding::Union{Real,Nothing}=0.15, vertex_labels=true, disk_strokewidth::Real=8.5, line_width::Real=7, font_color=:black, sphere_color=:steelblue, markersize::Real=75, pin_markercolor=:red3, dualgraph_color=:grey80, n_circle_segments::Int=50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis(fig[1,1])
     matrix_coords = [mat for mat in D.motion_matrices]
@@ -1201,7 +1201,7 @@ end
 
 Compute an animation for a 3-dimensional sticky sphere packing.
 """
-function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fixed_vertices::Union{Nothing,Tuple{Int,Int,Int}, Vector{Int}}=nothing, fixed_direction::Vector{Real}=[1.,0,0], alpha::Real=0.2, framerate::Int=25, fontsize=28, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, pin_markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
+function animate3D_spherepacking(D::DeformationPath, F::SpherePacking, filename::Union{String,Nothing}; recompute_motion_samples::Bool=false, fixed_vertices::Union{Nothing,Tuple{Int,Int,Int}, Vector{Int}}=nothing, fixed_direction::Vector{<:Real}=[1.,0,0], alpha::Real=0.2, framerate::Int=25, fontsize=28, step::Int=1, padding::Union{Real,Nothing}=0.1, vertex_labels=true, font_color=:black, line_width::Real=7, sphere_color=:steelblue, markersize::Real=55, pin_markercolor=:red3, dualgraph_color=:grey50, filetype::String="gif")
     fig = Figure(size=(1000,1000))
     ax = Axis3(fig[1,1], aspect = (1, 1, 1))
     matrix_coords = [mat for mat in D.motion_matrices]
