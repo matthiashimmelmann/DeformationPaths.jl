@@ -15,6 +15,7 @@ Manifest.toml
 *.rar
 *.tar
 *.zip
+*.txt
 
 **/animations
 **/.build

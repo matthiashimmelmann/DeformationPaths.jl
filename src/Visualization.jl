@@ -25,7 +25,7 @@ function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/
         save("$(filename).png", fig)
     end
 
-    return fig, ax
+    return fig
 end
 
 
