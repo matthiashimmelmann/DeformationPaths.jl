@@ -1,6 +1,6 @@
 name = "DeformationPaths"
 uuid = "50c58891-b0b3-4ec2-813a-7650aafc80af"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["matthiashimmelmann <matthias.himmelmann@outlook.de>"]
 
 [deps]
