@@ -7,7 +7,7 @@ Plot the geometric constraint system `F`.
 This is a wrapper method for plotting of the individual geometric constraint systems. 
 It calls one of the following: [`plot_flexes!`](@ref), [`plot_framework!`](@ref), [`plot_frameworkonsurface!`](@ref), [`plot_hypergraph!`](@ref), [`plot_polytope!`](@ref), [`plot_spherepacking!`](@ref) and [`plot_sphericaldiskpacking!`](@ref).
 """
-function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/10, elevation=π/10, perspectiveness=0., kwargs...)
+function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; output_axis::Bool=false, azimuth=π/10, elevation=π/10, perspectiveness=0., kwargs...)
     fig = Figure(size=(1000,1000))
     if F.G.dimension==2
         ax = Axis(fig[1,1])
@@ -25,7 +25,11 @@ function plot(F::AllTypes, filename::Union{String, Nothing}=nothing; azimuth=π/
         save("$(filename).png", fig)
     end
 
-    return fig
+    if output_axis
+        return fig, ax
+    else
+        return fig
+    end
 end
 
 

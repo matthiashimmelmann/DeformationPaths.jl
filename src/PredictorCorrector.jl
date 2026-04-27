@@ -54,7 +54,7 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, max_steps::Int=250, armijo_linesearch::Bool=true, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, max_steps::Int=150, armijo_linesearch::Bool=true, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
@@ -96,7 +96,7 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
         end
     else
         global damping = 0.1
-        while(norm([eq(variables=>q) for eq in equations]) > tol && step_count<=max_steps)
+        while(norm([eq(variables=>q) for eq in equations]) > tol)
             step_count += 1
             J = evaluate.(jac, variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-8))[2]
