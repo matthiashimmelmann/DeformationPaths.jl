@@ -434,7 +434,7 @@ mutable struct Polytope
                     push!(bars, Tuple(edge))
                 end
             end
-        else
+        elseif !skip_check
             throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
         end
         bars = collect(Set(bars))
@@ -466,9 +466,9 @@ mutable struct Polytope
         bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in bars]
         equations = filter(eq->eq!=0, vcat(facet_equations, bar_equations))
         if pinned_GCS
-            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices && findfirst(t->j==t, pinned_vertices)+i <= dimension+1)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+            skip_check || all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices && findfirst(t->j==t, pinned_vertices)+i <= dimension+1)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
         else
-            all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
+            skip_check || all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
         end
         G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, bars, variables, normal_variables)
