@@ -2,7 +2,7 @@
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F)
     D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
-    animate(D, F; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
+    animate(D, F; fixed_vertices=(1,2,3),tip_value=0,skip_scaling=false, filetype="mp4")
 end
 
 
@@ -10,7 +10,7 @@ end
     F = VolumeHypergraph([[1,2,3],[2,3,4]], Matrix([0 0; 1 0; 0 1; 1 1]'))
     plot(F)
     D = DeformationPath(F, [1], 100; step_size=0.01, show_progress=false)
-    animate(D, F; fixed_triangle=(1,2,3),tip_value=0,skip_stretch=false, filetype="mp4")
+    animate(D, F; fixed_vertices=(1,2,3),tip_value=0,skip_scaling=false, filetype="mp4")
 end
 
 
@@ -18,7 +18,7 @@ end
     F = VolumeHypergraph([[1,3,6],[1,2,5],[2,3,4],[1,5,6],[6,4,5]], Matrix([0 0; 3 0; 0 3; 1 1; 1 0.5; 0.5 1]'); pinned_vertices=[4,5,6])
     plot(F, "octahedral_two_removed")
     D = DeformationPath(F, [0.333, 1], 350; step_size=0.002, show_progress=false)
-    animate(D, F; fixed_triangle=(6,4,5), skip_stretch=true, target_stretch=0.5, tip_value=0.5, filetype="mp4")
+    animate(D, F; fixed_vertices=(6,4,5), skip_scaling=true, target_stretch=0.5, tip_value=0.5, filetype="mp4")
 end
 
 

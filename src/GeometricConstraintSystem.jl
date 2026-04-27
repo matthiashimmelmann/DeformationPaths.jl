@@ -309,7 +309,7 @@ mutable struct SphericalDiskPacking
 
         variables = vcat([x[i,j] for (i,j) in collect(Iterators.product(1:dimension, 1:length(vertices))) if !(j in pinned_vertices)]...)
         for v in pinned_vertices
-            xs[:,v] .= _realization[:,v]
+            xs[:,v] .= realization[:,v]
         end
 
         inversive_distance_equation = [minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(xs[:,contacts[i][1]], xs[:,contacts[i][1]]) * minkowski_scalar_product(xs[:,contacts[i][2]], xs[:,contacts[i][2]]) for i in eachindex(contacts)]

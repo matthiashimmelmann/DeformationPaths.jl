@@ -397,7 +397,7 @@ function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyB
         special_edges = !(special_edges[1] isa Vector{Union{<:Vector,Tuple{Int,Int}}}) ? [special_edges] : special_edges
         special_edges = [[edge[1],edge[2]] for edge in special_edges]
     end
-    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edges[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
+    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the polytope's 1-skeleton!"))
     matrix_coords = F isa Polytope || F isa FacetPolytope ? Base.copy(F.G.realization)[:,1:(size(F.G.realization)[2]-length(F.facets))] : Base.copy(F.G.realization)
     #=centroid = F isa Polytope ? sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2]-length(F.facets))]) ./ (size(F.G.realization)[2]-length(F.facets)) : sum([matrix_coords[:,i] for i in 1:(size(F.G.realization)[2])]) ./ (size(F.G.realization)[2])
     for i in 1:(F isa Polytope ? (size(F.G.realization)[2]-length(F.facets)) : (size(F.G.realization)[2]))
