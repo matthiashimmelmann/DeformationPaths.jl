@@ -957,8 +957,8 @@ function animate3D_polytope(D::DeformationPath, F::Union{Polytope,BodyHinge,Body
     if !isnothing(fixed_vertices)
         for i in eachindex(matrix_coords)
             p0 = matrix_coords[i][:,fixed_vertices[1]]
-            for j in axes(matrix_coords[i])[2]
-                matrix_coords[i][1:length(F.G.vertices),j] = matrix_coords[i][1:length(F.G.vertices),j] - p0
+            for j in 1:length(F.G.vertices)
+                matrix_coords[i][:,j] = matrix_coords[i][:,j] - p0
             end
             edge_vector = Vector(matrix_coords[i][:,fixed_vertices[2]] ./ norm(matrix_coords[i][:,fixed_vertices[2]]))
             rotation_axis = cross(fixed_direction, edge_vector)
