@@ -15,7 +15,9 @@ Manifest.toml
 *.rar
 *.tar
 *.zip
+*.txt
 
 **/animations
 **/.build
 **/build
+Dodec0.png

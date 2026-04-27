@@ -54,12 +54,14 @@ Apply Newton's method to correct `point` back to the constraints in `equations`.
 # Returns
 - `q::Vector{<:Real}`: A point `q` such that the Euclidean norm of the evaluated equations is at most `tol`
 """
-function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, armijo_linesearch::Bool=true, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
+function newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real}; tol::Real = 1e-13, max_steps::Int=150, armijo_linesearch::Bool=true, time_penalty::Union{Real,Nothing}=2)::Vector{<:Real}
     #TODO needs work
     q = Base.copy(point)
     start_time=Base.time()
+    step_count=0
     if armijo_linesearch
         while(norm(evaluate(equations, variables=>q)) > tol)
+            step_count += 1
             J = evaluate.(jac, variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-8))[2]
             if stress_dimension > 0
@@ -83,8 +85,8 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
                     qnew = q + 0.025*v
                     break
                 end
-                if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
-                    throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+                if damping_too_small >= 3 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty) || step_count > max_steps
+                    throw("Newton's method did not converge in time. damping=$damping, step_count=$(step_count) and time=$(Base.time()-start_time)")
                 end
             end
             if damping >= 1e-1
@@ -93,8 +95,9 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
             end
         end
     else
-        global damping = 0.15
+        global damping = 0.1
         while(norm([eq(variables=>q) for eq in equations]) > tol)
+            step_count += 1
             J = evaluate.(jac, variables=>q)
             stress_dimension = size(nullspace(J'; atol=1e-8))[2]
             if stress_dimension > 0
@@ -107,15 +110,15 @@ function newton_correct(equations::Vector{Expression}, variables::Vector{Variabl
 
             qnew = q - damping * (J \ evaluate.(new_equations, variables=>q))
             if norm(evaluate(equations, variables=>qnew)) < norm(evaluate(equations, variables=>q))
-                global damping = damping*1.2
+                global damping = damping*1.1
             else
                 global damping = damping/2
             end
             if damping > 1
                 global damping = 1
             end
-            if damping < 1e-12 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty)
-                throw("Newton's method did not converge in time. damping=$damping and time=$(Base.time()-start_time)")
+            if damping < 1e-12 || (!isnothing(time_penalty) && Base.time()-start_time > length(point)/time_penalty) || step_count > max_steps
+                throw("Newton's method did not converge in time. damping=$damping, step_count=$(step_count) and time=$(Base.time()-start_time)")
             end
             q = qnew
         end

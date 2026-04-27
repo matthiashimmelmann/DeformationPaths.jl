@@ -2,7 +2,7 @@ module DeformationPaths
 
 import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
-import GLMakie: NoShading, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
+import GLMakie: NoShading, axislegend, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
 import MarchingCubes: MC, march, makemesh
@@ -52,7 +52,9 @@ export  ConstraintSystem,
         add_shadow!,
         minors,
         is_prestress_stable,
-        FacetPolytope
+        FacetPolytope,
+        read_realizations,
+        save_realizations
 
 """
     DeformationPath(G, motion_samples[; tol])
@@ -195,6 +197,39 @@ mutable struct DeformationPath
     end
 
     """
+        DeformationPath(F, motion_samples)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(F::AllTypes, motion_samples::Vector{<:Vector{<:Real}}; kwargs...)::DeformationPath
+        return DeformationPath(F.G, motion_samples; kwargs...)
+    end
+
+
+    """
+        DeformationPath(G, motion_matrices)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(G::ConstraintSystem, motion_matrices::Vector{<:Matrix}; tol::Real=1e-8, skip_check::Bool=false)::DeformationPath
+        tol>0 || throw(error("The tolerance `tol` needs to be a positive number, but is $(tol)."))
+        motion_samples = [to_Array(G, Float64.(sample)) for sample in motion_matrices]
+        skip_check || (all(sample->norm(evaluate(G.equations, G.variables=>sample), Inf) < tol, motion_samples) || throw(error("The `motion_samples` do not satisfy the underlying constraints in the constraint system `G`!")))
+        new(G, 0., motion_samples, motion_matrices, Vector{Float64}([]), [])
+    end
+
+
+    """
+        DeformationPath(F, motion_matrices)
+
+    Constructor for deformation paths when a deformation is already known.
+    """
+    function DeformationPath(F::AllTypes, motion_matrices::Vector{<:Matrix}; kwargs...)::DeformationPath
+        return DeformationPath(F.G, motion_matrices; kwargs...)
+    end
+
+
+    """
         DeformationPath(G, flex_mult, num_steps, type[; step_size, tol, random_flex, symmetric_newton, start_point])
 
     Computes an approximate continuous motion of a generic geometric constraint system `G`.
@@ -245,16 +280,16 @@ mutable struct DeformationPath
         end
 
         if type==Framework
-            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_vertices=G.pinned_vertices).G    
+            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G    
         elseif type==AngularFramework
-            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_vertices=G.pinned_vertices).G
+            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
         elseif type==FrameworkOnSurface
             K_n = deepcopy(G)
             add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
         elseif type==VolumeHypergraph
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization; pinned_vertices=G.pinned_vertices).G
+            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
         elseif type==Polytope || type==SpherePacking || type==BodyHinge || type==BodyBar
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_vertices=G.pinned_vertices)
+            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
         elseif  type==SphericalDiskPacking
             minkowski_scalar_product(e1,e2) = e1'*e2-1
             inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
@@ -400,7 +435,7 @@ mutable struct DeformationPath
     """
     function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, symmetric_newton::Bool=false, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         start_point = to_Array(F, F.G.realization)
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_vertices=F.G.pinned_vertices)
+        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
             flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
             if flex_mult==[]
@@ -436,7 +471,7 @@ mutable struct DeformationPath
 
                 cur_realization = to_Matrix(F,Float64.(q))
                 if any(t->norm(cur_realization[:,t[1]] - cur_realization[:,t[2]]) < F.radii[t[1]] + F.radii[t[2]] - F.tolerance, powerset(F.G.vertices,2,2))
-                    _F = SpherePacking(F.G.vertices, F.radii, cur_realization; pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
+                    _F = SpherePacking(F.G.vertices, F.radii, cur_realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices, tolerance=step_size)
                     DeformationPath(_F, flex_mult, num_steps-i; motion_samples=motion_samples, _contacts=_contacts, step_size=step_size, prev_flex=prev_flex, tol=tol)
                     break
                 end
@@ -457,6 +492,72 @@ mutable struct DeformationPath
         motion_matrices = [to_Matrix(F, Float64.(sample)) for sample in motion_samples]
         new(F.G, step_size, motion_samples, motion_matrices, Vector{Float64}(flex_mult), _contacts)
     end
+end
+
+
+"""
+    save_realizations(D, filename)
+
+Saves the `motion_matrices` from the `DeformationPath` `D` in a `.txt` file called `<filename>.txt`.
+"""
+function save_realizations(D::DeformationPath, filename::String)
+    open("$(filename).txt","w") do file
+        for mat in D.motion_matrices
+            write(file, "[")
+            for row in 1:size(mat)[1]
+                for val in mat[row,1:end-1]
+                    write(file, "$(val) ")
+                end
+                if row<size(mat)[1]
+                    write(file, "$(mat[row,end]); ")
+                else
+                    write(file, "$(mat[row,end])]\n")
+                end
+            end
+        end
+    end
+end
+
+
+"""
+    read_realizations(G, filename)
+
+Reads the `motion_matrices` for the `ConstraintSystem` `G` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
+"""
+function read_realizations(G::ConstraintSystem, filename::String; kwargs...)::DeformationPath
+    !isfile("$(filename).txt") && throw(error("A file with the name `$(filename).txt` does not exist."))
+    motion_matrices = Vector{Matrix{Float64}}([])
+    open("$(filename).txt","r") do file
+        while !eof(file)  
+            s = readline(file)[2:end-1]
+            rows = split(s, "; ")
+            row_array=[]
+            _realization = Base.copy(G.realization)
+            for row in rows
+                col = split(row, " ")
+                col_array = [parse(Float64, col[i]) for i in eachindex(col)]
+                push!(row_array, col_array)
+            end
+            if length(row_array)!=G.dimension || !all(row->length(row)==size(G.realization)[2] && length(row)==length(row_array[1]), row_array)
+                throw(error("The dimensions of the `row_array` do not match the given geometric constraint system!"))
+            end
+            for row in eachindex(row_array)
+                _realization[row,:] .= row_array[row]
+            end
+            push!(motion_matrices, _realization)
+        end
+    end
+    return DeformationPath(G, motion_matrices; kwargs...)
+end
+
+
+"""
+    read_realizations(F, filename)
+
+Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
+"""
+function read_realizations(F::AllTypes, filename::String; kwargs...)::DeformationPath
+    read_realizations(F.G, filename; kwargs...)
 end
 
 
@@ -644,9 +745,10 @@ the first deformation path needs to be the first realization of the second defor
 - `D1::DeformationPath`: First `DeformationPath`.
 - `D2::DeformationPath`: Second `DeformationPath`.
 - `reversed::Bool` (optional): Determines whether the first deformation path is reversed or not. Default value: `true`.
+- `bypass_check::Bool` (optional): Lets us bypass the check for whether the two underlying geometric constraint systems are identical.
 """
-function stich_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true)::DeformationPath
-    D1.G == D2.G || throw(error("The deformation paths need to have the same underlying constraint system."))
+function stich_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true, bypass_check::Bool=false)::DeformationPath
+    bypass_check || D1.G == D2.G || throw(error("The deformation paths need to have the same underlying constraint system."))
     if reversed
         isapprox(norm(D1.motion_samples[1]-D2.motion_samples[1]), 0, atol=1e-4) || throw(error("The motion samples are not compatible."))
         return DeformationPath(D1.G, vcat(reverse(D1.motion_samples), D2.motion_samples[2:end]); skip_check=true)
@@ -669,15 +771,17 @@ Create an approximate continuous motion from a `Polytope` object induced by cont
 - `step_size::Real` (optional): Step size of the deformation path. 
 - `tol::Real` (optional): Numerical tolerance for the approximation that is used for asserting the correctness of the approximation. Default value: `1e-8`.
 """
-function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=2)::DeformationPath
+function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Union{Tuple{Int,Int},Vector{Int}}, contraction_target::Real; slowdown_factor::Real=0.2, contraction_start::Union{Real,Nothing}=nothing, realization_start::Union{Nothing,Vector}=nothing, show_progress::Bool=true, step_size::Real=0.002, tol::Real=1e-11, time_penalty::Union{Real,Nothing}=4)::DeformationPath
     edge_for_contraction = [edge_for_contraction[1], edge_for_contraction[2]]
     length(edge_for_contraction)==2 && (edge_for_contraction in [[edge[1],edge[2]] for edge in F.edges] || [edge_for_contraction[2], edge_for_contraction[1]] in [[edge[1],edge[2]] for edge in F.edges]) || throw(error("The `edge_for_contraction` needs to be an edge of the polytope's 1-skeleton!"))
+    slowdown_factor>0 && slowdown_factor<=1 || throw(error("`slowdown_factor` needs to be between 0 and 1."))
     @var c
     edge_equation = sum( (F.G.xs[:,edge_for_contraction[1]]-F.G.xs[:,edge_for_contraction[2]]) .^2) - sum( (F.G.realization[:,edge_for_contraction[1]]-F.G.realization[:,edge_for_contraction[2]]) .^2)
     edge_variables = variables(edge_equation)
-    generic_point = randn(ComplexF64, size(F.G.xs)[1]*2)
+    generic_point = randn(ComplexF64, length(edge_variables))
     evaluated_edge_equation = evaluate(edge_equation, edge_variables=>generic_point)
-    corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), ComplexF64) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
+    Set(F.G.pinned_vertices)==Set(edge_for_contraction) && throw(error("You cannot choose the `pinned_vertices` to be equal to the `edge_for_contraction`, as this would imply that the edge cannot be deformed!"))
+    corresponding_equation_index = findfirst(eq->isa(evaluate(eq, edge_variables=>generic_point), Union{<:Real,<:Complex}) && isapprox(evaluate(eq, edge_variables=>generic_point), evaluated_edge_equation), F.G.equations)
     _G = deepcopy(F.G)
     _G.equations[corresponding_equation_index] = sum( (_G.xs[:,edge_for_contraction[1]]-_G.xs[:,edge_for_contraction[2]]) .^2) - c^2
     if !isnothing(contraction_start) && !isnothing(realization_start)
@@ -699,8 +803,8 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         show_progress && println("Trial $index")
         index = index+1
         try
-            cur_point = motion_samples[end] + 0.05*(rand(Float64,length(motion_samples[end]))-[0.5 for i in eachindex(motion_samples[end])])
-            local_equations = evaluate(_G.equations, c => start_c_value + local_step_size)
+            cur_point = vcat(motion_samples[end][1:length(F.x_variables)] + 0.05*(rand(Float64,length(F.x_variables))-[0.5 for i in eachindex(F.x_variables)]), motion_samples[end][length(F.x_variables)+1:end])
+            local_equations = evaluate(_G.equations, c => start_c_value + slowdown_factor*local_step_size)
             cur_point = newton_correct(local_equations, _G.variables, _G.jacobian, cur_point; tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
             push!(motion_samples, cur_point)
             break
@@ -710,19 +814,38 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
         end
     end
 
-    @showprogress enabled=show_progress for step in start_c_value+local_step_size:local_step_size:contraction_target
+    global failure_to_converge = 0
+    #INFO: Slows down the computation in the beginning and end.
+    step_array = vcat(start_c_value+slowdown_factor*local_step_size:slowdown_factor*local_step_size:start_c_value+local_step_size, start_c_value+2*local_step_size:local_step_size:contraction_target-local_step_size, contraction_target+(slowdown_factor-1)*local_step_size:slowdown_factor*local_step_size:contraction_target)
+    @showprogress enabled=show_progress for step in step_array
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
         try
-            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            cur_point = newton_correct(local_equations, _G.variables, local_jacobian, motion_samples[end]+0.25*(motion_samples[end]-motion_samples[end-1]); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+            starting_point = motion_samples[end]
+            _failure_to_converge=failure_to_converge
+            for t in 1:_failure_to_converge
+                local_equations = evaluate(_G.equations, c=>step-local_step_size*(failure_to_converge+1-t))
+                between_cur_points = newton_correct(local_equations, _G.variables, local_jacobian, starting_point+t/(failure_to_converge+1)*(cur_point-starting_point); tol=tol, time_penalty=time_penalty, armijo_linesearch=false)
+                push!(motion_samples, between_cur_points)
+                global failure_to_converge = failure_to_converge-1
+            end
             push!(motion_samples, cur_point)
+            global failure_to_converge = 0
         catch e
-            if norm(motion_samples[end]-motion_samples[end-1])>step_size*100
-                deleteat!(motion_samples, length(motion_samples))
+            cur_point = motion_samples[end]
+            global failure_to_converge += 1
+            #@warn "Failed to converge. `failure_to_converge=$(failure_to_converge)`."
+            if failure_to_converge>=4
                 show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                 break
             else
                 continue
+            end
+            if norm(motion_samples[end]-motion_samples[end-1])>step_size*10
+                deleteat!(motion_samples, length(motion_samples))
+            else
+                break
             end
             #Does this work?
             interpolating_points = motion_samples[end-2:end]

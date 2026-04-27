@@ -18,11 +18,17 @@ end
     F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'); pinned_vertices=[1,4])
     D = DeformationPath(F, [-1], 27; step_size=0.025)
     F2 = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], D.motion_matrices[end]) 
-    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
+    fig, ax = plot(F2; edge_color=:lightgrey, output_axis=true, flex_color=coral, show_pins=false, vertex_labels=false, padding=0.1, vertex_color=:lightgrey, vertex_size=7)
     plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=nothing)
     add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]
     scatter!(ax, points; color=:black, markersize=55)
+end
+
+
+@testset "generic_3Prism" begin
+    F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)])
+    @test is_inf_rigid(F)
 end
 
 
@@ -83,7 +89,7 @@ end
     F = Framework([[1,2],[2,3],[3,4],[1,4],[2,4],[1,3],[2,5]], Matrix([0. 0; 1 0; 1 1; 0 1; 2 0]'); pinned_vertices=[1,2])
     D = DeformationPath(F, [-1], 30; step_size=0.025)
     F2 = Framework([[1,2],[2,3],[3,4],[1,4],[2,4],[1,3],[2,5]], D.motion_matrices[end]; pinned_vertices=[1,2]) 
-    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, show_pins=false, vertex_labels=false, vertex_color=:lightgrey, vertex_size=7)
+    fig, ax = plot(F2; edge_color=:lightgrey, flex_color=coral, output_axis=true, show_pins=false, vertex_labels=false, vertex_color=:lightgrey, vertex_size=7)
     plot!(ax, F; edge_color=teal, flex_color=coral, plot_flexes=false, show_pins=false, vertex_labels=false, padding=0.15)
     add_shadow!(ax, F, D; flex_color=coral)
     points = [Point2f(D.motion_matrices[1][:,j]) for j in 1:size(D.motion_matrices[end])[2]]

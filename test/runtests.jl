@@ -33,7 +33,9 @@ import DeformationPaths:    Framework,
                             stich_deformation_paths,
                             add_shadow!, 
                             is_prestress_stable,
-                            FacetPolytope
+                            FacetPolytope,
+                            read_realizations,
+                            save_realizations
 using Test
 using HomotopyContinuation
 using LinearAlgebra
