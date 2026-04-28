@@ -148,10 +148,11 @@ function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::
         throw(error("The length of `start_points` and `end_points` both need to be 3."))
     end
     F = Framework(vcat(P.edges,[(i, cone_point) for i in P.G.vertices]), hcat(P.G.realization[:,1:length(P.G.vertices)],[0,0,0]))
-    @showprogress enabled=show_progress for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]
-        F.G.realization[:,end] .= [x,y,z]
+    discretization = [[x,y,z] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]]
+    @showprogress enabled=show_progress for pt in discretization
+        F.G.realization[:,end] .= pt
         if is_prestress_stable(F)
-            push!(rigid_points,[x,y,z])
+            push!(rigid_points,pt)
         end
     end
     return rigid_points
