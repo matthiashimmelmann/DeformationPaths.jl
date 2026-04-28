@@ -559,6 +559,49 @@ end
 
 
 """
+    is_in_interior(F,p)
+
+Checks whether the point `p` lies in the interior of the polytope `P`.
+"""
+function is_in_interior(F::Polytope, p::Vector{<:Real}; tol::Real=1e-8)
+    vrep = F.G.realization[:,1:length(F.G.vertices)]
+    barycentric_coords = vcat(vrep, [1 for _ in axes(vrep,2)]' ) \ vcat(p, 1)
+    if all(coord->coord>tol, barycentric_coords)
+        return true
+    end
+    #INFO: Check simplices for containment
+    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices), k in j+1:length(F.G.vertices), L in k+1:length(F.G.vertices)
+        barycentric_coords_simplex = vcat(vrep[:,[i,j,k,L]], [1 for _ in 1:4]' ) \ vcat(p, 1)
+        if all(coord->coord>tol, barycentric_coords_simplex)
+            return true
+        end 
+    end
+    #INFO: Check triangles next that do not belong to a face. They have overdetermined systems, so we have to check that too.
+    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices), k in j+1:length(F.G.vertices)
+        if any(face->i in face && j in face && k in face, F.facets)
+            continue
+        end
+        barycentric_coords_triangle = vcat(vrep[:,[i,j,k]], [1 for _ in 1:3]' ) \ vcat(p, 1)
+        if all(coord->coord>tol, barycentric_coords_line) && isapprox(norm(vcat(vrep[:,[i,j]], [1 for _ in 1:2]' )*barycentric_coords_triangle - vcat(p, 1)), 0; atol=tol)
+            return true
+        end 
+    end
+    #INFO: Finally check lines that do not belong to a face. They have overdetermined systems, so we have to check that too.
+    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices)
+        if any(face->i in face && j in face, F.facets)
+            continue
+        end
+        barycentric_coords_line = vcat(vrep[:,[i,j]], [1 for _ in 1:2]' ) \ vcat(p, 1)
+        if all(coord->coord>tol, barycentric_coords_line) && isapprox(norm(vcat(vrep[:,[i,j]], [1 for _ in 1:2]' )*barycentric_coords_line - vcat(p, 1)), 0; atol=tol)
+            return true
+        end 
+    end
+    #INFO: If none of the checks succeed, return false.
+    return false
+end
+
+
+"""
     fix_antipodals!(F)
 
 Entangles the antipodal points in a polytope `F` so that their position is constrained to antipodal points on a sphere. 

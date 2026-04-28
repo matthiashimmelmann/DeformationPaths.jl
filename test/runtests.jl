@@ -35,13 +35,17 @@ import DeformationPaths:    Framework,
                             is_prestress_stable,
                             FacetPolytope,
                             read_realizations,
-                            save_realizations
+                            save_realizations,
+                            coned_rigidity_phase_space,
+                            is_in_interior,
+                            save_to_Houdini
 using Test
 using HomotopyContinuation
 using LinearAlgebra
 using IterTools
 using Colors
 import GLMakie: save, scatter!, Point2f, MultiLightShading
+import ProgressMeter: @showprogress
 
 is_no_ci = !(get(ENV, "GITHUB_ACTIONS", "false") == "true")
 

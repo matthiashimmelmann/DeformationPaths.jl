@@ -61,9 +61,13 @@ minors
 ## Special Polytope Methods
 
 ```@docs
-fix_antipodals!(F::Polytope)
+coned_rigidity_phase_space
 
-tetrahedral_symmetry!(F::Polytope)
+is_in_interior
 
-triangle_shrinking(F::Polytope)
+fix_antipodals!
+
+tetrahedral_symmetry!
+
+triangle_shrinking
 ```

@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions
+import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions, coefficients
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
 import GLMakie: NoShading, axislegend, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
@@ -16,6 +16,7 @@ include("InfinitessimalFlexes.jl")
 include("PredictorCorrector.jl")
 include("Rigidity.jl")
 include("GCS_database.jl")
+include("AuxiliaryFunctions.jl")
 
 export  ConstraintSystem, 
         Framework,
@@ -54,7 +55,11 @@ export  ConstraintSystem,
         is_prestress_stable,
         FacetPolytope,
         read_realizations,
-        save_realizations
+        save_realizations,
+        save_to_Houdini,
+        coned_rigidity_phase_space,
+        is_in_interior
+
 
 """
     DeformationPath(G, motion_samples[; tol])
