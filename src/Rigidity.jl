@@ -93,6 +93,22 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
+    if size(flexes)[2]==1
+        if all(coef -> isapprox(coef,0,atol=tol), coefficients(parametrized_stress'*(evaluate.(F.G.jacobian, F.G.variables=>flexes[:,1])*flexes[:,1]), ω))
+            return false
+        else
+            return true
+        end
+    end
+    if size(stresses)[2]==1
+        Hessian = evaluate(differentiate(differentiate(stresses[:,1]'*evaluate.(F.G.jacobian, F.G.variables=>parametrized_flex)*parametrized_flex, λ), λ), λ=>[0 for _ in 1:length(λ)])
+        if all(ev->ev>tol, eigvals(Hessian)) || all(ev->ev<-tol, eigvals(Hessian))
+            return true
+        else
+            return false
+        end
+    end
+
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
     matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
@@ -116,4 +132,27 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
 
     #INFO Test needs work
     return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)
+end
+
+
+"""
+    coned_rigidity_phase_space(P, start_points, end_points[; discretization_size, show_progress])
+
+Compute the rigidity phase space of the coned 3-dimensional polytope `P` (or alternatively a bar-joint framework `P`).
+We check [`is_prestress_stable`](@ref) for all points contained in the cuboid given by the corner points `start_points` and `end_points`.
+"""
+function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::Vector{<:Real}, end_points::Vector{<:Real}; discretization_size::Real=0.1, show_progress::Bool=true)
+    cone_point = maximum(P.G.vertices)+1
+    rigid_points = []
+    if length(start_points)!=3 || length(end_points)!=3
+        throw(error("The length of `start_points` and `end_points` both need to be 3."))
+    end
+    F = Framework(vcat(P.edges,[(i, cone_point) for i in P.G.vertices]), hcat(P.G.realization[:,1:length(P.G.vertices)],[0,0,0]))
+    @showprogress enabled=show_progress for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]
+        F.G.realization[:,end] .= [x,y,z]
+        if is_prestress_stable(F)
+            push!(rigid_points,[x,y,z])
+        end
+    end
+    return rigid_points
 end

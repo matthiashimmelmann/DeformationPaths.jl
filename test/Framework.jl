@@ -6,6 +6,14 @@
 end
 
 
+@testset "coned_cube_rigidity_testrun" begin
+    cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -0.5 -0.5 1; 0.5 -0.5 1; 0.5 0.5 1; -0.5 0.5 1]'))
+    rigid_points = coned_rigidity_phase_space(cube,[-2,-2,-2],[2,2,2]; discretization_size=0.05)
+    save_to_Houdini(rigid_points, "cone_cube-frustum_phase_space")
+end
+
+
+
 @testset "3Prism" begin
     F = Framework([(1,2), (1,3), (2,3), (4,5), (5,6), (4,6), (1,4), (2,5), (3,6)], Matrix( [0 0; 0 1; sqrt(3)/2 0.5; 1.05 0; 1.05 1; 1.05+sqrt(3)/2 0.5]'))
     @test !is_prestress_stable(F)
