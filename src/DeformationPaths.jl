@@ -12,53 +12,14 @@ import Base: show
 import ProgressMeter: @showprogress
 
 include("GeometricConstraintSystem.jl")
+include("GCS_database.jl")
 include("InfinitessimalFlexes.jl")
 include("PredictorCorrector.jl")
-include("Rigidity.jl")
-include("GCS_database.jl")
-include("AuxiliaryFunctions.jl")
 
-export  ConstraintSystem, 
-        Framework,
-        AngularFramework,
-        DeformationPath,
-        VolumeHypergraph,
-        animate,
-        plot,
-        plot!,
-        project_deformation_random,
-        Polytope,
-        to_Matrix,
-        to_Array,
-        SpherePacking,
-        SphericalDiskPacking,
-        equations!,
-        add_equations!,
-        realization!,
-        newton_correct,
-        FrameworkOnSurface,
-        is_rigid,
-        is_inf_rigid,
-        is_second_order_rigid,
-        BodyHinge,
-        BodyBar,
-        compute_inf_flexes,
-        compute_equilibrium_stresses,
-        compute_nontrivial_inf_flexes,
-        fix_antipodals!,
-        tetrahedral_symmetry!,
-        compute_nonblocked_flex,
-        stich_deformation_paths,
-        Dodecahedron,
-        add_shadow!,
-        minors,
-        is_prestress_stable,
-        FacetPolytope,
-        read_realizations,
-        save_realizations,
-        save_to_Houdini,
-        coned_rigidity_phase_space,
-        is_in_interior
+export  DeformationPath,
+        stitch_deformation_paths,
+        DeformationPath_EdgeContraction,
+        resolve_singularity
 
 """
     DeformationPath(G, motion_samples[; tol])
@@ -500,72 +461,6 @@ end
 
 
 """
-    save_realizations(D, filename)
-
-Saves the `motion_matrices` from the `DeformationPath` `D` in a `.txt` file called `<filename>.txt`.
-"""
-function save_realizations(D::DeformationPath, filename::String)
-    open("$(filename).txt","w") do file
-        for mat in D.motion_matrices
-            write(file, "[")
-            for row in 1:size(mat)[1]
-                for val in mat[row,1:end-1]
-                    write(file, "$(val) ")
-                end
-                if row<size(mat)[1]
-                    write(file, "$(mat[row,end]); ")
-                else
-                    write(file, "$(mat[row,end])]\n")
-                end
-            end
-        end
-    end
-end
-
-
-"""
-    read_realizations(G, filename)
-
-Reads the `motion_matrices` for the `ConstraintSystem` `G` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
-"""
-function read_realizations(G::ConstraintSystem, filename::String; kwargs...)::DeformationPath
-    !isfile("$(filename).txt") && throw(error("A file with the name `$(filename).txt` does not exist."))
-    motion_matrices = Vector{Matrix{Float64}}([])
-    open("$(filename).txt","r") do file
-        while !eof(file)  
-            s = readline(file)[2:end-1]
-            rows = split(s, "; ")
-            row_array=[]
-            _realization = Base.copy(G.realization)
-            for row in rows
-                col = split(row, " ")
-                col_array = [parse(Float64, col[i]) for i in eachindex(col)]
-                push!(row_array, col_array)
-            end
-            if length(row_array)!=G.dimension || !all(row->length(row)==size(G.realization)[2] && length(row)==length(row_array[1]), row_array)
-                throw(error("The dimensions of the `row_array` do not match the given geometric constraint system!"))
-            end
-            for row in eachindex(row_array)
-                _realization[row,:] .= row_array[row]
-            end
-            push!(motion_matrices, _realization)
-        end
-    end
-    return DeformationPath(G, motion_matrices; kwargs...)
-end
-
-
-"""
-    read_realizations(F, filename)
-
-Reads the `motion_matrices` for the geometric constraint system `F` from a `.txt` file called `<filename>.txt` and returns a `DeformationPath`.
-"""
-function read_realizations(F::AllTypes, filename::String; kwargs...)::DeformationPath
-    read_realizations(F.G, filename; kwargs...)
-end
-
-
-"""
     resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size[; tol, time_penalty, symmetric_newton])
 
 Attempts to resolve a singularity at `motion_samples[end]`.
@@ -736,7 +631,7 @@ end
 
 
 """
-    stich_deformation_paths(D1, D2)
+    stitch_deformation_paths(D1, D2)
 
 Combine the `motion_samples` of the two deformation paths `D1` and `D2`.
 
@@ -751,7 +646,7 @@ the first deformation path needs to be the first realization of the second defor
 - `reversed::Bool` (optional): Determines whether the first deformation path is reversed or not. Default value: `true`.
 - `bypass_check::Bool` (optional): Lets us bypass the check for whether the two underlying geometric constraint systems are identical.
 """
-function stich_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true, bypass_check::Bool=false)::DeformationPath
+function stitch_deformation_paths(D1::DeformationPath, D2::DeformationPath; reversed::Bool=true, bypass_check::Bool=false)::DeformationPath
     bypass_check || D1.G == D2.G || throw(error("The deformation paths need to have the same underlying constraint system."))
     if reversed
         isapprox(norm(D1.motion_samples[1]-D2.motion_samples[1]), 0, atol=1e-4) || throw(error("The motion samples are not compatible."))
@@ -894,5 +789,7 @@ function Base.show(io::IO, D::DeformationPath)
 end
 
 include("Visualization.jl")
+include("AuxiliaryFunctions.jl")
+include("Rigidity.jl")
 
 end 

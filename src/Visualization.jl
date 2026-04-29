@@ -1,3 +1,9 @@
+export  animate,
+        plot,
+        plot!,
+        project_deformation_random,
+        add_shadow!,
+        plot_flexes!
 
 """
     plot(F[, filename])

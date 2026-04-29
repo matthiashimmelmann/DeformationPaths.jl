@@ -1,3 +1,8 @@
+export  is_rigid,
+        is_inf_rigid,
+        is_second_order_rigid,
+        is_prestress_stable,
+        coned_rigidity_phase_space
 
 """
     is_rigid(F[; tol, tol, tested_random_flexes, symmetric_newton])
@@ -143,7 +148,7 @@ We check [`is_prestress_stable`](@ref) for all points contained in the cuboid gi
 """
 function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::Vector{<:Real}, end_points::Vector{<:Real}; discretization_size::Real=0.1, show_progress::Bool=true)
     cone_point = maximum(P.G.vertices)+1
-    rigid_points = []
+    rigid_points = Vector{Vector{Float64}}([])
     if length(start_points)!=3 || length(end_points)!=3
         throw(error("The length of `start_points` and `end_points` both need to be 3."))
     end

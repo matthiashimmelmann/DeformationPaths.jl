@@ -8,7 +8,7 @@ end
 
 @testset "coned_cube_rigidity_testrun" begin
     cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -0.5 -0.5 1; 0.5 -0.5 1; 0.5 0.5 1; -0.5 0.5 1]'))
-    rigid_points = coned_rigidity_phase_space(cube,[-2,-2,-2],[2,2,2]; discretization_size=0.05)
+    rigid_points = coned_rigidity_phase_space(cube,[-1.25,-1.25,-1.25],[1.25,1.25,2.5]; discretization_size=0.05)
     save_to_Houdini(rigid_points, "cone_cube-frustum_phase_space")
 end
 

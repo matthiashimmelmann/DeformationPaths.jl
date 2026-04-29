@@ -1,3 +1,8 @@
+export  compute_inf_flexes,
+        compute_equilibrium_stresses,
+        compute_nontrivial_inf_flexes,
+        compute_nonblocked_flex
+
 """
     compute_inf_flexes(G, point[; tol])
 
@@ -80,22 +85,4 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     end
     sols = real_solutions(solve(Vector{Expression}(ED_stress_system)))    
     return isempty(sols) ? [] : sols[1]
-end
-
-
-"""
-    minors(A, k)
-
-Compute the (k+1)x(k+1) minors of the matrix `A`
-"""
-function minors(A, k)::Vector
-    n, m = size(A)
-    rowsets = collect(combinations(1:n, k))
-    colsets = collect(combinations(1:m, k))
-
-    result = Dict()
-    for r in rowsets, c in colsets
-        result[(r, c)] = det(A[r, c])
-    end
-    return collect(values(result))
 end

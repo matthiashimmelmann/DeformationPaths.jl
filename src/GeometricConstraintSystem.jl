@@ -1,3 +1,23 @@
+export  ConstraintSystem, 
+        Framework,
+        AngularFramework,
+        VolumeHypergraph,
+        FrameworkOnSurface,
+        BodyHinge,
+        BodyBar,
+        Polytope,
+        FacetPolytope,
+        SpherePacking,
+        SphericalDiskPacking,
+        equations!,
+        add_equations!,
+        realization!,
+        to_Matrix,
+        to_Array,
+        is_in_interior,
+        fix_antipodals!,
+        tetrahedral_symmetry!
+
 """
 Class for Constructing a general constraint system.
 
@@ -66,6 +86,7 @@ function Base.show(io::IO, G::ConstraintSystem)::Nothing
         else
             print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\t$(G.realization[2,i])\t$(G.realization[3,i]) ...\n")
         end
+        print(io, "\t\t\t\t\t...\n")
     end
     if !(isempty(G.pinned_vertices))
         print(io, "\tPinned Vertices: $(G.pinned_vertices) (pinned to hyperplane: $(G.pinned_GCS))")

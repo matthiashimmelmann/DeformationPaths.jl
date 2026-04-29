@@ -14,6 +14,8 @@ is_inf_rigid(F::AllTypes)
 is_prestress_stable(F::AllTypes)
 
 is_second_order_rigid(F::AllTypes)
+
+coned_rigidity_phase_space
 ```
 
 ## Predictor-Corrector Methods
@@ -70,4 +72,14 @@ fix_antipodals!
 tetrahedral_symmetry!
 
 triangle_shrinking
+```
+
+## I/O methods
+
+```@docs
+save_realizations
+
+read_realizations
+
+save_to_Houdini
 ```
