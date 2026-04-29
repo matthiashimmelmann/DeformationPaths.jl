@@ -9,7 +9,7 @@ export  read_realizations,
 Save the `points` to a `.poly` file with the name `filename` which can later be opened in SideFX Houdini. 
 """
 function save_to_Houdini(points::Vector, filename::String)
-    all(pt->pt isa <:Vector{<:Real} && length(pt)==3, points) || throw(error("All points need to be vectors of length 3."))
+    all(pt->pt isa Vector{<:Real} && length(pt)==3, points) || throw(error("All points need to be vectors of length 3."))
     open("$(filename).poly","w") do file
         write(file, "POINTS\n")
         for i in 1:length(points)

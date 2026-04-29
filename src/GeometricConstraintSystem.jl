@@ -86,8 +86,8 @@ function Base.show(io::IO, G::ConstraintSystem)::Nothing
         else
             print(io, (i==1 ? "" : "\t\t\t\t")*"$(G.realization[1,i])\t$(G.realization[2,i])\t$(G.realization[3,i]) ...\n")
         end
-        print(io, "\t\t\t\t\t...\n")
     end
+    print(io, "\t\t\t\t\t...\n")
     if !(isempty(G.pinned_vertices))
         print(io, "\tPinned Vertices: $(G.pinned_vertices) (pinned to hyperplane: $(G.pinned_GCS))")
     end
@@ -407,7 +407,7 @@ end
 
 
 """
-    Polytope([vertices,] facets, realization[; pinned_GCS, pinned_vertices])
+    Polytope([vertices,] facets, realization[; center_realization, pinned_GCS, pinned_vertices])
 
 Class for 3-dimensional polytopes with edge-length and facet planarity constraints.
 
@@ -420,14 +420,14 @@ mutable struct Polytope
     x_variables::Vector{Variable}
     n_variables::Vector{Variable}
 
-    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; skip_check::Bool=false, pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
+    function Polytope(vertices::Vector{Int}, facets::Union{Vector{Vector{Int}}, Vector{<:Tuple{Int, Int, Int, Vararg{Int}}}}, realization::Matrix{<:Real}; center_realization::Bool=true, skip_check::Bool=false, pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))
         realization = Float64.(realization)
         dimension = size(realization)[1]
         dimension==3 || throw("The dimension needs to be 3, but is $(dimension)")
         all(facet->all(v->v in vertices, facet), facets) && all(facet->length(facet)>=3, facets) || throw("The facets don't have the correct format. They need to contain at least 3 vertices each.")
         facets = [[f for f in facet] for facet in facets]
         all(v->v in vertices, pinned_vertices) || throw("`pinned_vertices` does not have the correct format.")
-        centered_realization = hcat([realization[:,j] - sum(realization[:,i] for i in eachindex(vertices)) ./ length(vertices)  for j in eachindex(vertices)]...)
+        centered_realization = center_realization ? hcat([realization[:,j] - sum(realization[:,i] for i in eachindex(vertices)) ./ length(vertices)  for j in eachindex(vertices)]...) : realization[:,eachindex(vertices)]
         if size(centered_realization)[1]==dimension && size(centered_realization)[2]==length(vertices)
             normal_realization, bars = Array{Float64,2}(undef, 3, length(facets)), []
             for j in eachindex(facets)
