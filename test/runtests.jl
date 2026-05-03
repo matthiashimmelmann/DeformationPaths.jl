@@ -30,7 +30,7 @@ import DeformationPaths:    Framework,
                             compute_nontrivial_inf_flexes,
                             ConstraintSystem,
                             compute_nonblocked_flex,
-                            stich_deformation_paths,
+                            stitch_deformation_paths,
                             add_shadow!, 
                             is_prestress_stable,
                             FacetPolytope,
@@ -39,7 +39,7 @@ import DeformationPaths:    Framework,
                             coned_rigidity_phase_space,
                             is_in_interior,
                             save_to_Houdini
-
+using Test
 using HomotopyContinuation
 using LinearAlgebra
 using IterTools

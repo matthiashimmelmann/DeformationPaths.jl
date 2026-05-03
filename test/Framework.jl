@@ -2,7 +2,7 @@
     F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
     plot(F,"coned_cube"; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,1], show_pins=false, flex_scale=0.2, vertex_labels=false)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
-    animate(D,F; filetype="mp4")
+    animate(D,F,"coned_cube"; azimuth = π / 5, elevation=pi/10, filetype="gif")
 end
 
 

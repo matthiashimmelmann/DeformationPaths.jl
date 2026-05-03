@@ -156,7 +156,7 @@ function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::
     discretization = [[x,y,z] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]]
     @showprogress enabled=show_progress for pt in discretization
         F.G.realization[:,end] .= pt
-        if is_prestress_stable(F)
+        if is_second_order_rigid(F)
             push!(rigid_points,pt)
         end
     end
