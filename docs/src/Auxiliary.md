@@ -63,8 +63,6 @@ minors
 ## Special Polytope Methods
 
 ```@docs
-coned_rigidity_phase_space
-
 is_in_interior
 
 fix_antipodals!
