@@ -23,7 +23,7 @@ jobs:
         with:
           version: "1.11"
 
-      - uses: julia-actions/cache@v1
+      - uses: julia-actions/cache@v3
 
       - name: Install python
         uses: actions/setup-python@v6
