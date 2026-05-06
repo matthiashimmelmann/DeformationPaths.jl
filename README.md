@@ -114,13 +114,13 @@ animate(D,F,"spherepacking_motion"; filetype="mp4")
 Body-hinge frameworks are composed of rigid bodies -- think of polygonal faces that are not allowed to shift shapes -- that are joined along edges. Therefore, bodies are allowed to rotate around edges, comparable to a hinge. Such an object can be created using the `BodyHinge` constructor. The following example creates two rigid squares that share an edge. 
 
 ```julia
-F = BodyHinge([[1,2,3,4],[3,4,5,6]], Matrix([0 0 0; 1 0 0; 1 1 0; 0 1 0; 0 1 1; 1 1 1]'))
+    F = BodyHinge([[1,2,3],[1,3,4],[1,4,5],[1,5,6],[1,6,2]], Matrix([0 0 1; cos(2*pi/5) sin(2*pi/5) 0; cos(4*pi/5) sin(4*pi/5) 0; cos(6*pi/5) sin(6*pi/5) 0; cos(8*pi/5) sin(8*pi/5) 0; cos(10*pi/5) sin(10*pi/5) 0;]'))
 D = DeformationPath(F, [], 200; step_size=0.025)
 animate(D,F,"bodyhinge_motion"; filetype="mp4")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/e8ec59cd-c6ef-4be4-a04e-58c0a7f25793" controls="controls" style="max-width: 850px;">
+<video src="https://github.com/user-attachments/assets/6a8488f7-33b1-4de7-8113-e1fdb210e0e7" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Polytopes with Coplanarity Constraints
@@ -134,7 +134,7 @@ animate(D,F,"cuboctahedron_motion"; filetype="mp4")
 ```
 
 <div align="center">
-<video src="https://github.com/user-attachments/assets/35e62ea7-3487-45ce-8ec1-30c285f15082" controls="controls" style="max-width: 850px;">
+<video src="https://github.com/user-attachments/assets/ab58760d-61bc-458c-bc2a-218586e1955c" controls="controls" style="max-width: 850px;">
 </video></div>
 
 ### Volume Hypergraphs
