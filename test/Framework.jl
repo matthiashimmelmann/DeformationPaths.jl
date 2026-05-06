@@ -2,14 +2,18 @@
     F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1; 0 0 1.65]'))
     plot(F,"coned_cube"; edge_color=teal, flex_color=coral, padding=0.5, plot_flexes=true, flex_Real=[1,1], show_pins=false, flex_scale=0.2, vertex_labels=false)
     D = DeformationPath(F, [0.5,0.5], 500; step_size=0.02, show_progress=false)
-    animate(D,F,"coned_cube"; azimuth = π / 5, elevation=pi/10, filetype="gif")
+    F = Framework(vcat([[1,2],[2,3],[3,4],[1,4],[1,5],[2,6],[3,7],[4,8],[5,6],[6,7],[7,8],[5,8]],[[i,9] for i in 1:8]), hcat(D.motion_matrices[100][:,1:8],[0.,0,0]))
+    animate(D,F,"coned_cube"; azimuth = π / 6, elevation=pi/10, filetype="gif")
 end
 
 
-@testset "coned_cube_rigidity_testrun" begin
-    cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -2 -3; 1 -2 -3; 1 2 -3; -1 2 -3; -1 -2 3; 1 -2 3; 1 2 3; -1 2 3]'); center_realization=false)
-    #cube.G.realization[:,8] .=  [-0.4, 0.4, 0.9]
-    rigid_points = coned_rigidity_phase_space(cube,[-1.5,-2.5,-3.5],[1.5,2.5,3.5]; discretization_size=0.1)
+@testset "coned_cube_rigidity_testrun2" begin
+    #cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1/2 -1/3 1; 1/4 -1/3 1; 1/4 3/4 1; -1/2 3/4 1]'); center_realization=false)
+    cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'); center_realization=false)
+    cube.G.realization[:,7] .=  [0.75, 0.75, 0.75]
+    cube.G.realization[:,5] .=  [-0.75, -0.75, 0.75]
+    plot(cube)
+    rigid_points = coned_rigidity_phase_space(cube,[-2,-2,-2],[2,2,2]; discretization_size=0.2)
     save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
 
