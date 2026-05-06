@@ -11,9 +11,9 @@ end
     #cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1/2 -1/3 1; 1/4 -1/3 1; 1/4 3/4 1; -1/2 3/4 1]'); center_realization=false)
     cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'); center_realization=false)
     cube.G.realization[:,7] .=  [0.75, 0.75, 0.75]
-    cube.G.realization[:,5] .=  [-0.75, -0.75, 0.75]
+    cube.G.realization[:,1] .=  [-0.75, -0.75, -0.75]
     plot(cube)
-    rigid_points = coned_rigidity_phase_space(cube,[-2,-2,-2],[2,2,2]; discretization_size=0.2)
+    rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; discretization_size=0.1)
     save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
 
