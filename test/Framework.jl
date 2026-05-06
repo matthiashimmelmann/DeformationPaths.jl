@@ -14,7 +14,7 @@ end
     cube.G.realization[:,1] .=  [-0.75, -0.75, -0.75]
     plot(cube)
     rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; discretization_size=0.2)
-    save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
+    #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
 
 
