@@ -836,9 +836,9 @@ mutable struct BodyBar
                 xs[:,v] .= realization[:,v]
             end
         end
-        edges = [(i,j) for facet in facets for i in facet for j in facet if i<j]
-        edges = collect(Set(edges))
-        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,edges)]
+        facet_edges = [(i,j) for facet in facets for i in facet for j in facet if i<j]
+        facet_edges = collect(Set(facet_edges))
+        bar_equations = [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in vcat(edges,facet_edges)]
         equations = filter(eq->eq!=0, bar_equations)
         G = ConstraintSystem(vertices, variables, equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
         new(G, facets, edges)
