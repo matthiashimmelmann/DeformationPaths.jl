@@ -12,8 +12,7 @@ end
     cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'); center_realization=false)
     cube.G.realization[:,7] .=  [0.75, 0.75, 0.75]
     cube.G.realization[:,1] .=  [-0.75, -0.75, -0.75]
-    plot(cube)
-    rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; check=:SOR, discretization_size=0.5)
+    rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; check=:SOR, discretization_size=1)
     #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
 
