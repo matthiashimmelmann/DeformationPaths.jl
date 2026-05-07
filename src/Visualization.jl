@@ -153,7 +153,13 @@ end
 
 Plot a bar-joint or angular framework.
 """
-function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Union{Vector{Int},Tuple{Int,Int}}) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
+    end
+    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the framework's underlying graph!"))
+
     matrix_coords = Base.copy(F.G.realization)
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -194,8 +200,13 @@ function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramew
     if plot_flexes
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width, arrowsize)
     end
-
-    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.edges)
+    if isnothing(special_edges)
+        foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), F.edges)
+    else
+        edges_here = filter(edge->!(any(special_edge->[special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]], special_edges)), F.edges)
+        foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), edges_here)
+        foreach(special_edge->linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color), special_edges)
+    end
     show_pins && foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
