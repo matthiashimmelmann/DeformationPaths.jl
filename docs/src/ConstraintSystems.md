@@ -38,3 +38,15 @@ realization!(G::ConstraintSystem, realization::Matrix{<:Real})
 realization!(F::AllTypesWithoutPolytope, realization::Matrix{<:Real})
 realization!(F::Polytope, realization::Matrix{<:Real})
 ```
+
+## Database of Geometric Constraint Systems
+
+```@docs
+Dodecahedron
+TruncatedIcosahedron
+TruncatedDodecahedron
+Tetrahedron
+Octahedron
+Icosahedron
+Cube
+```

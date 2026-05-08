@@ -14,6 +14,8 @@ is_inf_rigid(F::AllTypes)
 is_prestress_stable(F::AllTypes)
 
 is_second_order_rigid(F::AllTypes)
+
+coned_rigidity_phase_space
 ```
 
 ## Predictor-Corrector Methods
@@ -61,9 +63,21 @@ minors
 ## Special Polytope Methods
 
 ```@docs
-fix_antipodals!(F::Polytope)
+is_in_interior
 
-tetrahedral_symmetry!(F::Polytope)
+fix_antipodals!
 
-triangle_shrinking(F::Polytope)
+tetrahedral_symmetry!
+
+triangle_shrinking
+```
+
+## I/O methods
+
+```@docs
+save_realizations
+
+read_realizations
+
+save_to_Houdini
 ```

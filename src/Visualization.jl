@@ -1,3 +1,9 @@
+export  animate,
+        plot,
+        plot!,
+        project_deformation_random,
+        add_shadow!,
+        plot_flexes!
 
 """
     plot(F[, filename])
@@ -147,7 +153,13 @@ end
 
 Plot a bar-joint or angular framework.
 """
-function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+    if !isnothing(special_edges)
+        special_edges = !(special_edges[1] isa Union{Vector{Int},Tuple{Int,Int}}) ? [special_edges] : special_edges
+        special_edges = [[edge[1],edge[2]] for edge in special_edges]
+    end
+    isnothing(special_edges) || all(special_edge->(special_edge in [[edge[1],edge[2]] for edge in F.edges] || [special_edge[2], special_edge[1]] in [[edge[1],edge[2]] for edge in F.edges]), special_edges) || throw(error("The `special_edge` needs to be an edge of the framework's underlying graph!"))
+
     matrix_coords = Base.copy(F.G.realization)
     if !isnothing(padding)
         xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -170,7 +182,7 @@ function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramew
 
     allVertices = F.G.dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
     if typeof(F)==AngularFramework
-        L = angle_size*maximum([minimum([norm(matrix_coords[:,bar[1]]-matrix_coords[:,bar[2]]) for bar in F.bars]),0])
+        L = angle_size*maximum([minimum([norm(matrix_coords[:,bar[1]]-matrix_coords[:,bar[2]]) for bar in F.edges]),0])
         for angle in F.angles
             poly_points=[F.G.dimension==2 ? Point2f(matrix_coords[:,angle[2]]) : Point3f(matrix_coords[:,angle[2]])]
             if norm(matrix_coords[:,angle[2]]-matrix_coords[:,angle[1]])==0 || norm(matrix_coords[:,angle[2]]-matrix_coords[:,angle[3]])==0
@@ -188,8 +200,13 @@ function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramew
     if plot_flexes
         plot_flexes!(ax, F, flex_Real, flex_color, flex_scale, line_width, arrowsize)
     end
-
-    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
+    if isnothing(special_edges)
+        foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), F.edges)
+    else
+        edges_here = filter(edge->!(any(special_edge->[special_edge[1],special_edge[2]]==[edge[1],edge[2]] || [special_edge[1],special_edge[2]]==[edge[2],edge[1]], special_edges)), F.edges)
+        foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth=line_width, color=edge_color), edges_here)
+        foreach(special_edge->linesegments!(ax, [(allVertices)[Int64(special_edge[1])], (allVertices)[Int64(special_edge[2])]]; linewidth=line_width+2.5, color=special_edge_color), special_edges)
+    end
     show_pins && foreach(v->scatter!(ax, [F.G.dimension==2 ? Point2f((allVertices)[v]-[pin_point_offset,0]) : Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -235,7 +252,7 @@ function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; 
     end
 
     allVertices = [Point3f(matrix_coords[:,j]) for j in 1:size(matrix_coords)[2]]
-    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.bars)
+    foreach(edge->linesegments!(ax, [(allVertices)[Int64(edge[1])], (allVertices)[Int64(edge[2])]]; linewidth = line_width, color=edge_color), F.edges)
     foreach(v->scatter!(ax, [Point3f((allVertices)[v]-[pin_point_offset,0,0])]; markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, [(allVertices)[i]]; markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, [(allVertices)[i]], text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -568,7 +585,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     if typeof(F)==AngularFramework
-        L = angle_size*maximum([minimum([norm(matrix_coords[1][:,bar[1]]-matrix_coords[1][:,bar[2]]) for bar in F.bars]),0])
+        L = angle_size*maximum([minimum([norm(matrix_coords[1][:,bar[1]]-matrix_coords[1][:,bar[2]]) for bar in F.edges]),0])
         angle_points=@lift begin
             output=[]
             for angle in F.angles
@@ -592,7 +609,7 @@ function animate2D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
         foreach(i->lines!(ax,@lift(($angle_points)[i][2:end]), color=angle_color, linewidth=line_width/2), 1:length(F.angles))    
     end
 
-    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
+    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.edges)
     show_pins && foreach(v->scatter!(ax, @lift([Point2f(($allVertices)[v]-[pin_point_offset,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(F.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -702,7 +719,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
     end
 
     if typeof(F)==AngularFramework
-        L = angle_size*maximum([minimum([norm(matrix_coords[1][:,bar[1]]-matrix_coords[1][:,bar[2]]) for bar in F.bars]),0])
+        L = angle_size*maximum([minimum([norm(matrix_coords[1][:,bar[1]]-matrix_coords[1][:,bar[2]]) for bar in F.edges]),0])
         angle_points=@lift begin
             output=[]
             for angle in F.angles
@@ -726,7 +743,7 @@ function animate3D_framework(D::DeformationPath, F::Union{Framework,AngularFrame
         foreach(i->lines!(ax,@lift(($angle_points)[i][2:end]), color=angle_color, linewidth=line_width/2), 1:length(F.angles))    
     end
 
-    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.bars)
+    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=:steelblue), F.edges)
     foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=:black), 1:length(D.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))
@@ -807,7 +824,7 @@ function animate3D_frameworkonsurface(D::DeformationPath, F::FrameworkOnSurface,
         pointys = matrix_coords[$time]
         [Point3f(pointys[:,j]) for j in 1:size(pointys)[2]]
     end
-    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.bars)
+    foreach(edge->linesegments!(ax, @lift([($allVertices)[Int64(edge[1])], ($allVertices)[Int64(edge[2])]]); linewidth = line_width, color=edge_color), F.edges)
     foreach(v->scatter!(ax, @lift([Point3f(($allVertices)[v]-[pin_point_offset,0,0])]); markersize=vertex_size, color=(pin_markercolor, 0.4), marker=:rtriangle), F.G.pinned_vertices)
     foreach(i->scatter!(ax, @lift([($allVertices)[i]]); markersize = vertex_size, color=vertex_color), 1:length(D.G.vertices))
     vertex_labels && foreach(i->text!(ax, @lift([($allVertices)[i]]), text=["$(F.G.vertices[i])"], fontsize=fontsize, font=:bold, align = (:center, :center), color=[font_color]), 1:length(F.G.vertices))

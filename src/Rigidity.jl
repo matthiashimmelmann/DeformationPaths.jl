@@ -1,3 +1,8 @@
+export  is_rigid,
+        is_inf_rigid,
+        is_second_order_rigid,
+        is_prestress_stable,
+        coned_rigidity_phase_space
 
 """
     is_rigid(F[; tol, tol, tested_random_flexes, symmetric_newton])
@@ -93,6 +98,22 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
     @var λ[1:size(flexes)[2]] ω[1:size(stresses)[2]] μ[1:size(flexes)[2]]
     parametrized_flex = flexes*λ
     parametrized_stress = stresses*ω
+    if size(flexes)[2]==1
+        if all(coef -> isapprox(coef,0,atol=tol), coefficients(parametrized_stress'*(evaluate.(F.G.jacobian, F.G.variables=>flexes[:,1])*flexes[:,1]), ω))
+            return false
+        else
+            return true
+        end
+    end
+    if size(stresses)[2]==1
+        Hessian = evaluate(differentiate(differentiate(stresses[:,1]'*evaluate.(F.G.jacobian, F.G.variables=>parametrized_flex)*parametrized_flex, λ), λ), λ=>[0 for _ in 1:length(λ)])
+        if all(ev->ev>tol, eigvals(Hessian)) || all(ev->ev<-tol, eigvals(Hessian))
+            return true
+        else
+            return false
+        end
+    end
+
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_flex
     Hessian = differentiate(differentiate(stress_energy, λ), λ)
     matrices = [[evaluate(differentiate(Hessian[j,k], [ω[i]])[1], [ω[i]]=>[0.]) for j in axes(Hessian,1), k in axes(Hessian,2)] for i in eachindex(ω)]
@@ -116,4 +137,38 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
 
     #INFO Test needs work
     return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)
+end
+
+
+"""
+    coned_rigidity_phase_space(P, start_points, end_points[; check, discretization_size, show_progress])
+
+Compute the rigidity phase space of the coned 3-dimensional polytope `P` (or alternatively a bar-joint framework `P`).
+Depending on the `check`` keyword, we check the rigidity for all points contained in the cuboid given by the corner points `start_points` and `end_points`.
+The `check` keyword is a Symbol that can take the values of 
+- `:FOR`, in which case the method [`is_inf_rigid`](@ref) is called,
+- `:PSS`, in which case the method [`is_prestress_stable`](@ref) is called,
+- `:SOR`, in which case [`is_second_order_rigid`](@ref) is called and
+- `:RIG`, in which case [`is_rigid`](@ref) is called.
+The keyword's default value is `:PSS`.
+"""
+function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::Vector{<:Real}, end_points::Vector{<:Real}; check::Symbol=:PSS, discretization_size::Real=0.1, show_progress::Bool=true)
+    cone_point = maximum(P.G.vertices)+1
+    rigid_points = Vector{Vector{Float64}}([])
+    if length(start_points)!=3 || length(end_points)!=3
+        throw(error("The length of `start_points` and `end_points` both need to be 3."))
+    end
+    if !(check in [:FOR, :PSS, :SOR, :RIG])
+        throw(error("The `check` keyword needs to be either `:FOR` for infinitesimal rigidity, `:PSS` for prestress stability, `:SOR` for second-order rigidity or `:RIG` for (continuous) rigidity."))
+    end
+
+    F = Framework(vcat(P.edges,[(i, cone_point) for i in P.G.vertices]), hcat(P.G.realization[:,1:length(P.G.vertices)],[0,0,0]))
+    discretization = [[x,y,z] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]]
+    @showprogress enabled=show_progress for pt in discretization
+        F.G.realization[:,end] .= pt
+        if (check==:FOR && is_inf_rigid(F)) || (check==:PSS && is_prestress_stable(F)) || (check==:SOR && is_second_order_rigid(F)) || (check==:RIG && is_rigid(F))
+            push!(rigid_points, pt)
+        end
+    end
+    return rigid_points
 end

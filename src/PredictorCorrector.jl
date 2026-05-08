@@ -1,3 +1,7 @@
+export  newton_correct,
+        symmetric_newton_correct,
+        euler_step
+
 """
     euler_step(G, step_size, prev_flex, point, K_n)
 
