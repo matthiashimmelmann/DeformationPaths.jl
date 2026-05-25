@@ -18,7 +18,7 @@ if is_no_ci
 
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.63; step_size=0.005, time_penalty=0.1)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.6; step_size=0.005, time_penalty=0.1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 @test is_inf_rigid(_F)
                 animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,15), recompute_motion_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
@@ -41,7 +41,7 @@ if is_no_ci
             animate(_D,_F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_motion_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
             for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 2; step_size=0.005, time_penalty=0.1)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.5; step_size=0.005, time_penalty=0.1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 @test is_inf_rigid(_F)
                 animate(_D,F; fixed_vertices=(9,10,15), special_edges=[9, 10], recompute_motion_samples=true, renderEntirePolytope=true, padding=0.01)

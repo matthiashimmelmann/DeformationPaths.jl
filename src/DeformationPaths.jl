@@ -722,7 +722,7 @@ function DeformationPath_EdgeContraction(F::Polytope, edge_for_contraction::Unio
 
     global failure_to_converge = 0
     #INFO: Slows down the computation in the beginning and end.
-    step_array = vcat(start_c_value+slowdown_factor*local_step_size:slowdown_factor*local_step_size:start_c_value+local_step_size, start_c_value+2*local_step_size:local_step_size:contraction_target-local_step_size, contraction_target+(slowdown_factor-1)*local_step_size:slowdown_factor*local_step_size:contraction_target)
+    step_array = vcat(start_c_value+slowdown_factor*local_step_size:slowdown_factor*local_step_size:start_c_value+local_step_size, start_c_value+2*local_step_size:local_step_size:contraction_target-10*local_step_size, contraction_target+10*local_step_size+slowdown_factor*local_step_size:slowdown_factor*local_step_size:contraction_target)
     @showprogress enabled=show_progress for step in step_array
         local_equations = evaluate(_G.equations, c=>step)
         local_jacobian = _G.jacobian
