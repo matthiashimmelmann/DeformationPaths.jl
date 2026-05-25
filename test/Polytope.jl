@@ -13,13 +13,14 @@ if is_no_ci
                 push!(Defs, read_realizations(F, "dodecahedron_deformation_realizations$(i)"; skip_check=true))
             end
             for i in 1:15
-                project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
+                existing_realization>0 && project_deformation_random(Defs, F, 2, "Dodec_projection$i"; padding=nothing, vertex_size=60, line_width=11)
             end
 
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.63; step_size=0.005, time_penalty=3)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.63; step_size=0.005, time_penalty=0.1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
+                @test is_inf_rigid(_F)
                 animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,15), recompute_motion_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
                 #_F = Polytope(F.facets, _D.motion_matrices[end])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)
@@ -35,13 +36,14 @@ if is_no_ci
             mini, index = findmin(Defo->norm((Defo[1].motion_samples[1][1:60]-Defo[1].motion_samples[2][1:60]) - (Defo[2].motion_samples[2][1:60]-Defo[2].motion_samples[1][1:60])), collect(Iterators.product(Defs,Defs)))
             #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
             DPaths = collect(Iterators.product(Defs,Defs))
-            _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
+            _D = stitch_deformation_paths(DPaths[index][1], DPaths[index][2])
             project_deformation_random([_D], _F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,_F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_motion_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
             for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 2; step_size=0.005, time_penalty=3)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 2; step_size=0.005, time_penalty=0.1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
+                @test is_inf_rigid(_F)
                 animate(_D,F; fixed_vertices=(9,10,15), special_edges=[9, 10], recompute_motion_samples=true, renderEntirePolytope=true, padding=0.01)
                 #_F = Polytope(F.facets, _D.motion_matrices[end])
                 plot(_F, "Dodec$(i)"; azimuth = 2pi * 125 / 190 - pi/3.16, elevation=-pi/4.25, special_edges=[9, 10], renderEntirePolytope=true, padding=0.01)

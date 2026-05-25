@@ -50,6 +50,7 @@ function is_inf_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
         throw("Type of F is not yet supported. It is $(typeof(F)).")
     end
     inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol_rank_drop)
+    display(svd(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))).S[end-7:end])
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol_rank_drop)
     #println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
     return length(inf_flexes) == length(trivial_inf_flexes)
