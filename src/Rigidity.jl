@@ -51,6 +51,9 @@ function is_inf_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
     end
     inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol_rank_drop)
     trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol_rank_drop)
+    display(svd(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization))).S[end-7:end])
+    display(size(inf_flexes))
+    display(size(trivial_inf_flexes))
     #println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
     return length(inf_flexes) == length(trivial_inf_flexes)
 end
@@ -107,7 +110,7 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
     end
     if size(stresses)[2]==1
         Hessian = evaluate(differentiate(differentiate(stresses[:,1]'*evaluate.(F.G.jacobian, F.G.variables=>parametrized_flex)*parametrized_flex, λ), λ), λ=>[0 for _ in 1:length(λ)])
-        if all(ev->ev>tol, eigvals(Hessian)) || all(ev->ev<-tol, eigvals(Hessian))
+        if all(ev->ev>tol, real.(eigvals(Hessian))) || all(ev->ev<-tol, real.(eigvals(Hessian)))
             return true
         else
             return false
@@ -136,7 +139,7 @@ function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e
     end=#
 
     #INFO Test needs work
-    return any(matrix->all(ev->ev>tol, eigvals(matrix)), matrices) || any(matrix->all(ev->ev<-tol, eigvals(matrix)), matrices)
+    return any(matrix->all(ev->ev>tol, real.(eigvals(matrix))), matrices) || any(matrix->all(ev->ev<-tol, real.(eigvals(matrix))), matrices)
 end
 
 
@@ -155,15 +158,15 @@ The keyword's default value is `:PSS`.
 function coned_rigidity_phase_space(P::Union{Polytope,Framework}, start_points::Vector{<:Real}, end_points::Vector{<:Real}; check::Symbol=:PSS, discretization_size::Real=0.1, show_progress::Bool=true)
     cone_point = maximum(P.G.vertices)+1
     rigid_points = Vector{Vector{Float64}}([])
-    if length(start_points)!=3 || length(end_points)!=3
-        throw(error("The length of `start_points` and `end_points` both need to be 3."))
+    if length(start_points)!=P.G.dimension || length(end_points)!=P.G.dimension || length(start_points)!=length(end_points) || !(P.G.dimension in [2,3])
+        throw(error("The length of `start_points` and `end_points` both need to be equal to 2 or 3."))
     end
     if !(check in [:FOR, :PSS, :SOR, :RIG])
         throw(error("The `check` keyword needs to be either `:FOR` for infinitesimal rigidity, `:PSS` for prestress stability, `:SOR` for second-order rigidity or `:RIG` for (continuous) rigidity."))
     end
 
-    F = Framework(vcat(P.edges,[(i, cone_point) for i in P.G.vertices]), hcat(P.G.realization[:,1:length(P.G.vertices)],[0,0,0]))
-    discretization = [[x,y,z] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]]
+    F = Framework(vcat(P.edges,[(i, cone_point) for i in P.G.vertices]), hcat(P.G.realization[:,1:length(P.G.vertices)], P.G.dimension==2 ? [0,0] : [0,0,0]))
+    discretization = P.G.dimension==2 ? [[x,y] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2]] : [[x,y,z] for x in start_points[1]:discretization_size:end_points[1], y in start_points[2]:discretization_size:end_points[2], z in start_points[3]:discretization_size:end_points[3]]
     @showprogress enabled=show_progress for pt in discretization
         F.G.realization[:,end] .= pt
         if (check==:FOR && is_inf_rigid(F)) || (check==:PSS && is_prestress_stable(F)) || (check==:SOR && is_second_order_rigid(F)) || (check==:RIG && is_rigid(F))

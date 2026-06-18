@@ -6,6 +6,12 @@
     animate(D,F,"coned_cube"; azimuth = π / 6, elevation=pi/10, filetype="gif")
 end
 
+@testset "coned_square_rigidity" begin
+    cube = Framework([(1,2),(2,3),(3,4)], Matrix([0 0; 1 0; 1 1; 0 1]'))
+    rigid_points = coned_rigidity_phase_space(cube,[-1,-1],[2,2]; check=:PSS, discretization_size=0.1)
+    #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
+end
+
 
 @testset "coned_cube_rigidity_testrun2" begin
     #cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1/2 -1/3 1; 1/4 -1/3 1; 1/4 3/4 1; -1/2 3/4 1]'); center_realization=false)
@@ -15,6 +21,15 @@ end
     rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; check=:SOR, discretization_size=1)
     #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
+
+@testset "coned_torus_rigidity_testrun2" begin
+    faces = [[0,  1, 11, 16,  8,  2], [0,  2,  4, 10, 12,  6], [0,  6, 15,  9,  3,  1], [5,  3,  9, 17, 10,  4], [5,  4,  2,  8, 14,  7], [5,  7, 13, 11,  1,  3], [18, 16, 11, 13, 21, 19], [18, 19, 15,  6, 12, 20], [18, 20, 22, 14,  8, 16], [23, 17,  9, 15, 19, 21], [23, 21, 13,  7, 14, 22], [23, 22, 20, 12, 10, 17]]
+    faces = [face .+ 1 for face in faces]
+    torus = Polytope(faces, Matrix([3  3  3; 3  3 -3; -3  3  3; 3 -3 -3; -3 -3  3; -3 -3 -3; 3  1  3; -3 -1 -3; -3  3  1; 3 -3 -1; -1 -3  3;  1  3 -3; -1  1  3; 1 -1 -3; -3 -1  1; 3  1 -1; 1  3  1; -1 -3 -1; 1  1  1; 1  1 -1; -1  1  1; 1 -1 -1; -1 -1  1; -1 -1 -1]'); skip_check=true)
+    rigid_points = coned_rigidity_phase_space(torus,[-4,-4,-4],[4,4,4]; check=:PSS, discretization_size=0.5)
+    save_to_Houdini(rigid_points, "cone_torus_phase_space")
+end
+
 
 
 @testset "3Prism" begin
