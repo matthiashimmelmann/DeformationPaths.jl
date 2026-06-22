@@ -4,7 +4,7 @@ if is_no_ci
         println("dodecahedron_EdgeContraction")
         F = Polytope([[15,10,9,14,1],[2,6,12,11,5],[5,11,7,3,19],[11,12,8,16,7],[12,6,20,4,8],[6,2,13,18,20],[2,5,19,17,13],[4,20,18,10,15],[18,13,17,9,10],[17,19,3,14,9],[3,7,16,1,14],[16,8,4,15,1]], Matrix([-1.376381920471174 0 0.2628655560595668; 1.376381920471174 0 -0.2628655560595668; -0.4253254041760200 -1.309016994374947 0.2628655560595668; -0.4253254041760200 1.309016994374947 0.2628655560595668; 1.113516364411607 -0.8090169943749474 0.2628655560595668; 1.113516364411607 0.8090169943749474 0.2628655560595668; -0.2628655560595668 -0.8090169943749474 1.113516364411607; -0.2628655560595668 0.8090169943749474 1.113516364411607; -0.6881909602355868 -0.5000000000000000 -1.113516364411607; -0.6881909602355868 0.5000000000000000 -1.113516364411607; 0.6881909602355868 -0.5000000000000000 1.113516364411607; 0.6881909602355868 0.5000000000000000 1.113516364411607; 0.8506508083520399 0 -1.113516364411607; -1.113516364411607 -0.8090169943749474 -0.2628655560595668; -1.113516364411607 0.8090169943749474 -0.2628655560595668; -0.8506508083520399 0 1.113516364411607; 0.2628655560595668 -0.8090169943749474 -1.113516364411607; 0.2628655560595668 0.8090169943749474 -1.113516364411607; 0.4253254041760200 -1.309016994374947 -0.2628655560595668; 0.4253254041760200 1.309016994374947 -0.2628655560595668]'); pinned_vertices=[10,15])
         if is_no_ci
-            number_of_realizations=15
+            number_of_realizations=30
             Defs = Vector{DeformationPath}([])
             existing_realization = findlast(i->isfile("dodecahedron_deformation_realizations$(i).txt"), 1:100)
             existing_realization = isnothing(existing_realization) ? 0 : minimum([number_of_realizations, existing_realization])
@@ -18,7 +18,7 @@ if is_no_ci
 
             for i in existing_realization+1:number_of_realizations
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.6; step_size=0.005, time_penalty=0.1)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 0.62; step_size=0.005, time_penalty=1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 @test is_inf_rigid(_F)
                 animate(_D,_F; scaling_factor=0.98, fixed_vertices=(9,10,15), recompute_motion_samples=true, special_edges=(9,10), renderEntirePolytope=true, padding=0.01)
@@ -41,7 +41,7 @@ if is_no_ci
             animate(_D,_F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_motion_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
             for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
-                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.5; step_size=0.005, time_penalty=0.1)
+                _D = DeformationPath_EdgeContraction(F, [9, 10], 1.5; step_size=0.01, time_penalty=1)
                 _F = Polytope(F.facets, _D.motion_matrices[end]; pinned_vertices=[10,15])
                 @test is_inf_rigid(_F)
                 animate(_D,F; fixed_vertices=(9,10,15), special_edges=[9, 10], recompute_motion_samples=true, renderEntirePolytope=true, padding=0.01)
