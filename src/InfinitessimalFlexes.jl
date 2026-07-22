@@ -22,28 +22,34 @@ Compute all trivial infinitesimal flexes of a geometric constraint system `G` in
 """
 function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
     dim = G.dimension
-    translations = [
-        vcat(vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in G.vertices]...), [0 for _ in dim*length(G.vertices)+1:dim*size(G.realization)[2]]) for j in 1:dim
-    ]
-    basis_skew_symmetric = []
-    for i in 2:dim
-        for j in 1:i-1
-            A = zeros(dim, dim)
-            A[i, j] = 1
-            A[j, i] = -1
-            push!(basis_skew_symmetric, A)
+    if length(G.vertices)<size(G.realization)[2]
+        K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
+        jacobian = evaluate.(K_n.jacobian, K_n.variables=>to_Array(K_n, K_n.realization))
+        basis = nullspace(jacobian; atol=tol)
+    else
+        translations = [
+            vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in axes(G.realization,2)]...) for j in 1:dim
+        ]
+        basis_skew_symmetric = []
+        for i in 2:dim
+            for j in 1:i-1
+                A = zeros(dim, dim)
+                A[i, j] = 1
+                A[j, i] = -1
+                push!(basis_skew_symmetric, A)
+            end
         end
+        inf_rot = [
+            vcat([A * G.realization[:,v] for v in axes(G.realization,2)]...)
+            for A in basis_skew_symmetric
+        ]
+        matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
+        F = qr(matrix_inf_flexes, ColumnNorm())
+        r = rank(matrix_inf_flexes; atol=tol)
+        # Basis for the column space
+        basis = Matrix(F.Q)[:, 1:r]
     end
-    inf_rot = [
-        vcat([A * G.realization[:,v] for v in axes(G.realization,2)]...)
-        for A in basis_skew_symmetric
-    ]
-    matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
-    F = qr(matrix_inf_flexes, ColumnNorm())
-    r = rank(matrix_inf_flexes; atol=tol)
-    # Basis for the column space
-    column_basis = Matrix(F.Q)[:, 1:r]
-    return column_basis
+    return basis
 end
 
 
