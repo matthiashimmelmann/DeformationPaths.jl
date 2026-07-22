@@ -21,11 +21,9 @@ coned_rigidity_phase_space
 ## Predictor-Corrector Methods
 
 ```@docs
-euler_step(G::DeformationPaths.ConstraintSystem, step_size::Real, prev_flex::Vector{<:Real}, point::Vector{<:Real}, K_n::DeformationPaths.ConstraintSystem)
+euler_step
 
-newton_correct(G::DeformationPaths.ConstraintSystem, point::Vector{<:Real})
-
-newton_correct(equations::Vector{Expression}, variables::Vector{Variable}, jac::Matrix{Expression}, point::Vector{<:Real})
+newton_correct
 
 symmetric_newton_correct(G::ConstraintSystem, point::Vector{<:Real})
 
@@ -39,7 +37,7 @@ compute_inf_flexes
 
 compute_equilibrium_stresses
 
-compute_nontrivial_inf_flexes
+compute_trivial_inf_flexes
 
 compute_nontrivial_inf_flexes
 
