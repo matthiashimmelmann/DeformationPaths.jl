@@ -707,8 +707,7 @@ end
 Evenly shrink the triangular facets of a given polytope and compute the nontrivial infinitesimal flexes in each step.
 """
 function triangle_shrinking(F::Polytope)
-    K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
-    initial_flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
+    initial_flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization))
     triangles = filter(facet->length(facet)==3, F.facets)
     triangle_centers = [sum(F.G.realization[:,k] for k in triang) ./ 3 for triang in triangles]
     
@@ -721,8 +720,7 @@ function triangle_shrinking(F::Polytope)
         end
         #println([_realization[:,k] for k in triangles[1]])
         P = Polytope(F.facets, _realization)
-        K_n = ConstraintSystem(P.G.vertices, P.G.variables, vcat(P.G.equations, [sum( (P.G.xs[:,bar[1]]-P.G.xs[:,bar[2]]) .^2) - sum( (P.G.realization[:,bar[1]]-P.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(P.G.vertices) for j in eachindex(P.G.vertices) if i<j]]), P.G.realization, P.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=P.G.pinned_vertices)
-        final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization), K_n)
+        final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization))
         plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
     end
 end

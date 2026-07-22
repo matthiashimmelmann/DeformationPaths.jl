@@ -31,26 +31,8 @@ end
 Checks if a geometric constraint system `F` is infinitesimally rigid.
 """
 function is_inf_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
-    if typeof(F)==Framework
-        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif typeof(F)==AngularFramework
-        K_n = AngularFramework([[i,j,k] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) for k in eachindex(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif typeof(F)==FrameworkOnSurface
-        K_n = deepcopy(G)
-        add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
-    elseif typeof(F)==VolumeHypergraph
-        K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization).G
-    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
-    elseif typeof(F)==SphericalDiskPacking
-        minkowski_scalar_product(e1,e2) = e1'*e2-1
-        inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
-    else
-        throw("Type of F is not yet supported. It is $(typeof(F)).")
-    end
-    inf_flexes = nullspace(evaluate(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)); atol=tol_rank_drop)
-    trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>to_Array(F, F.G.realization)[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol_rank_drop)
+    inf_flexes = compute_trivial_inf_flexes(F.G, to_Array(F.G, F.G.realization); tol=tol_rank_drop)
+    trivial_inf_flexes = compute_inf_flexes(F.G, to_Array(F.G, F.G.realization); tol=tol_rank_drop)
     #println("flexes: $(size(inf_flexes)[2]), nontrivial: $(size(inf_flexes)[2]-size(trivial_inf_flexes)[2])")
     return length(inf_flexes) == length(trivial_inf_flexes)
 end
@@ -79,14 +61,7 @@ end
 Checks if a geometric constraint system `F` is prestress stable.
 """
 function is_prestress_stable(F::AllTypes; tol_rank_drop::Real=1e-6, tol::Real=1e-10)::Bool
-    if typeof(F)==Framework
-        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
-    else
-        throw("Type of F is not yet supported. It is $(typeof(F)).")
-    end
-    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol_rank_drop)
+    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization); tol=tol_rank_drop)
     if size(flexes)[2]==0
         return true
     end

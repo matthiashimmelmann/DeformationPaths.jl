@@ -23,7 +23,7 @@ Compute all trivial infinitesimal flexes of a geometric constraint system `G` in
 function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
     dim = G.dimension
     translations = [
-        vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in G.vertices]...) for j in 1:dim
+        vcat(vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in G.vertices]...), [0 for _ in dim*length(G.vertices)+1:dim*size(G.realization)[2]]) for j in 1:dim
     ]
     basis_skew_symmetric = []
     for i in 2:dim
@@ -35,12 +35,12 @@ function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; 
         end
     end
     inf_rot = [
-        vcat([A * G.realization[:,v] for v in G.vertices]...)
+        vcat([A * G.realization[:,v] for v in axes(G.realization,2)]...)
         for A in basis_skew_symmetric
     ]
     matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
     F = qr(matrix_inf_flexes, ColumnNorm())
-    r = rank(matrix_inf_flexes)
+    r = rank(matrix_inf_flexes; atol=tol)
     # Basis for the column space
     column_basis = Matrix(F.Q)[:, 1:r]
     return column_basis

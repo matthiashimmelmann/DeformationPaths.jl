@@ -39,7 +39,9 @@ compute_inf_flexes
 
 compute_equilibrium_stresses
 
-compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}, K_n::ConstraintSystem)
+compute_nontrivial_inf_flexes
+
+compute_nontrivial_inf_flexes
 
 compute_nonblocked_flex(F::AllTypes)
 ```
