@@ -86,10 +86,16 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     try
         sols = real_solutions(solve(Vector{Expression}(ED_stress_system)))
         return isempty(sols) ? [] : sols[1]
-    catch e
-        if e isa FiniteException
-            println(e)
-            return([1 for _ in eachindex(λ)])
+    catch err
+        if err isa FiniteException
+            A = LinearSubspace(randn(Float64, err.:dim, length(λ)), randn(Float64, err.:dim))
+            W = witness_set(System(Vector{Expression}(ED_stress_system)), A)
+            sols = real_solutions(W.:R)
+            if isempty(sols)
+                return []
+            else
+                return sols[1]
+            end
         else 
             rethrow()
         end
