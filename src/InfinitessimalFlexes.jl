@@ -1,4 +1,5 @@
 export  compute_inf_flexes,
+        compute_trivial_inf_flexes,
         compute_equilibrium_stresses,
         compute_nontrivial_inf_flexes,
         compute_nonblocked_flex
@@ -15,6 +16,38 @@ end
 
 
 """
+    compute_trivial_inf_flexes(G, point[; tol])
+
+Compute all trivial infinitesimal flexes of a geometric constraint system `G` in `point`
+"""
+function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
+    dim = G.dimension
+    translations = [
+        vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in G.vertices]...) for j in 1:dim
+    ]
+    basis_skew_symmetric = []
+    for i in 2:dim
+        for j in 1:i-1
+            A = zeros(dim, dim)
+            A[i, j] = 1
+            A[j, i] = -1
+            push!(basis_skew_symmetric, A)
+        end
+    end
+    inf_rot = [
+        vcat([A * G.realization[:,v] for v in G.vertices]...)
+        for A in basis_skew_symmetric
+    ]
+    matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
+    F = qr(matrix_inf_flexes, ColumnNorm())
+    r = rank(matrix_inf_flexes)
+    # Basis for the column space
+    column_basis = Matrix(F.Q)[:, 1:r]
+    return column_basis
+end
+
+
+"""
     compute_equilibrium_stresses(G, point[; tol])
 
 Compute all equilibrium stresses of a geometric constraint system `G` in `point`.
@@ -25,13 +58,13 @@ function compute_equilibrium_stresses(G::ConstraintSystem, point::Vector{<:Real}
 end
 
 """
-    compute_nontrivial_inf_flexes(G, point, K_n[; tol])
+    compute_nontrivial_inf_flexes(G, point[; tol])
 
 Compute the nontrivial infinitesimal flexes of a geometric constraint system `G` in `point`.
 """
-function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}, K_n::ConstraintSystem; tol::Real=1e-8)::Matrix{<:Real}
-    inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
-    trivial_inf_flexes = nullspace(evaluate(typeof(K_n)==ConstraintSystem ? K_n.jacobian : K_n.G.jacobian, (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables)=>point[1:length( (typeof(K_n)==ConstraintSystem ? K_n.variables : K_n.G.variables))]); atol=tol)
+function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
+    inf_flexes = compute_inf_flexes(G, point; tol)
+    trivial_inf_flexes = compute_trivial_inf_flexes(G, point; tol)
     s = size(trivial_inf_flexes)[2]+1
     extend_basis_matrix = trivial_inf_flexes
     for inf_flex in [inf_flexes[:,i] for i in 1:size(inf_flexes)[2]]
@@ -52,14 +85,7 @@ end
 Compute an infinitesimal flex of `F` that is not blocked by an equilibrium stress.
 """
 function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_drop::Real=1e-6, tol::Real=1e-12)::Vector
-    if typeof(F)==Framework
-        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif typeof(F)==Polytope || typeof(F)==SpherePacking || typeof(F)==BodyHinge || typeof(F)==FacetPolytope
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
-    else
-        throw("Type of F is not yet supported. It is $(typeof(F)).")
-    end
-    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n; tol=tol_rank_drop)
+    flexes = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization); tol=tol_rank_drop)
     if size(flexes)[2]==0
         return []
     end
