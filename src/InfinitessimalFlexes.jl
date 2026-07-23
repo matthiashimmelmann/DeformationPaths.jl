@@ -28,7 +28,7 @@ function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; 
         basis = nullspace(jacobian; atol=tol)
     else
         translations = [
-            vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in axes(G.realization,2)]...) for j in 1:dim
+            vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in 1:length(G.vertices)-length(G.pinned_vertices)]...) for j in 1:dim
         ]
         basis_skew_symmetric = []
         for i in 2:dim
@@ -40,7 +40,7 @@ function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; 
             end
         end
         inf_rot = [
-            vcat([A * G.realization[:,v] for v in axes(G.realization,2)]...)
+            vcat([A * G.realization[:,v] for v in 1:length(G.vertices)-length(G.pinned_vertices)]...)
             for A in basis_skew_symmetric
         ]
         matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
