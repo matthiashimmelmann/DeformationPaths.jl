@@ -459,7 +459,7 @@ mutable struct Polytope
             throw("The realization does not have the correct format. The size of the realization is $(size(realization)), while the vertices suggest a size of $((dimension,length(vertices)))!")
         end
         edges = collect(Set(edges))
-        length(vertices)-length(edges)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(edges)+length(facets))")
+        skip_check || length(vertices)-length(edges)+length(facets)==2 || throw("The Euler characteristic of the Polytope needs to be 2, but is $(length(vertices)-length(edges)+length(facets))")
                 
         @var x[1:dimension, 1:length(vertices)] n[1:dimension, 1:length(facets)]
         if pinned_GCS

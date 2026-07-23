@@ -68,10 +68,13 @@ end
 
 Add infinitesimal flexes to a plot of a geometric constraint system
 """
-function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,Vector{<:Number}}, flex_color, flex_scale, linewidth, arrowsize)
+function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}, flex_color, flex_scale, linewidth, arrowsize)
     (flex_Real isa Int || flex_Real isa Vector) || throw(error("`flex_Real` does not have the correct type. It needs to be an `Int` or a `Vector`, but is a $(typeof(flex_Real))."))
     if flex_Real isa Int
         flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization))[:,flex_Real]; flexes=true)
+    elseif flex_Real isa Vector{<:Vector}
+        (isapprox(norm(evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)) * flex_Real[1]), 0; atol=1e-6)) || throw("In this format, 'flex_Real' must be an infinitesimal flex.")
+        flex = to_Matrix(F, flex_Real[1]; flexes=true)
     else
         flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization))
         length(flex_Real)==size(flex_matrix)[2] || throw(error("The length of `flex_Real` ($(length(flex_Real))) does not match the length of the computed infinitesimal flexes, which is $(size(flex_matrix)[2])."))
@@ -134,7 +137,7 @@ end
 
 Plot a bar-joint or angular framework.
 """
-function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_framework!(ax::Union{Axis,Axis3}, F::Union{Framework,AngularFramework}; padding::Union{Real,Nothing}=0.15, vertex_size=55, vertex_labels=true, fontsize=28, line_width=12, edge_color=:steelblue, special_edges::Union{Nothing, Vector, Tuple{Int,Int}}=nothing, special_edge_color=:red3, angle_color=:lightgrey, font_color=:lightgrey, angle_size=0.3, pin_markercolor=:red3, show_pins=true, pin_point_offset=0.1, vertex_color=:black, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     if !isnothing(special_edges)
         special_edges = !(special_edges[1] isa Union{Vector{Int},Tuple{Int,Int}}) ? [special_edges] : special_edges
         special_edges = [[edge[1],edge[2]] for edge in special_edges]
@@ -199,7 +202,7 @@ end
 
 Plot a bar-joint framework constrained to a surface.
 """
-function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; padding::Union{Real,Nothing}=0.15, alpha=0.45, fontsize=28, vertex_size=55, line_width=10, edge_color=:steelblue, pin_markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_frameworkonsurface!(ax::Union{Axis,Axis3}, F::FrameworkOnSurface; padding::Union{Real,Nothing}=0.15, alpha=0.45, fontsize=28, vertex_size=55, line_width=10, edge_color=:steelblue, pin_markercolor=:red3, pin_point_offset=0.2, vertex_color=:black, vertex_labels=true, font_color=:lightgrey, surface_color=:grey80, surface_samples=150, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization
 
     xlims = [minimum(vcat(matrix_coords[1,:])), maximum(matrix_coords[1,:])]
@@ -245,7 +248,7 @@ end
 
 Plot a sphere packing.
 """
-function plot_spherepacking!(ax::Union{Axis,Axis3}, F::SpherePacking; padding::Union{Real,Nothing}=0.15, fontsize=28, alpha=0.1, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, pin_markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
+function plot_spherepacking!(ax::Union{Axis,Axis3}, F::SpherePacking; padding::Union{Real,Nothing}=0.15, fontsize=28, alpha=0.1, disk_strokewidth=8.5, vertex_labels::Bool=true, font_color=:black, sphere_color=:steelblue, D2_markersize=75, D3_markersize=55, pin_markercolor=:red3, line_width=7, D2_dualgraph_color=:grey80, D3_dualgraph_color=:grey50, n_circle_segments::Int=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40, kwargs...)
     matrix_coords = Base.copy(F.G.realization)
 
     allVertices = F.G. dimension==2 ? [Point2f(matrix_coords[:,j]) for j in axes(matrix_coords,2)] : [Point3f(matrix_coords[:,j]) for j in axes(matrix_coords,2)]
@@ -301,7 +304,7 @@ end
 
 Plot a spherical disk packing.
 """
-function plot_sphericaldiskpacking!(ax::Union{Axis,Axis3}, F::SphericalDiskPacking; fontsize=32, padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_sphericaldiskpacking!(ax::Union{Axis,Axis3}, F::SphericalDiskPacking; fontsize=32, padding::Union{Real,Nothing}=0.015, alpha=0.15, sphere_color=:lightgrey, font_color=:black, vertex_size=60, disk_strokewidth=9, line_width=6, disk_color=:steelblue, dualgraph_color=(:red3,0.45), vertex_color=:black, vertex_labels::Bool=true, n_circle_segments=50, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = F.G.realization    
     if !isnothing(padding)
         xlims!(ax,-1.5-padding, 1.5+padding)
@@ -351,7 +354,7 @@ end
 
 Plot a volume-constrained hypergraph.
 """
-function plot_hypergraph!(ax::Union{Axis,Axis3}, F::VolumeHypergraph; padding::Union{Real,Nothing}=0.15, alpha=0.25, fontsize=28, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_hypergraph!(ax::Union{Axis,Axis3}, F::VolumeHypergraph; padding::Union{Real,Nothing}=0.15, alpha=0.25, fontsize=28, vertex_size=60, line_width=8, facet_colors=nothing, vertex_color=:black, font_color=:lightgrey, vertex_labels::Bool=true, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     matrix_coords = Base.copy(F.G.realization)
 
     if isnothing(facet_colors)
@@ -394,7 +397,7 @@ end
 
 Plot a polytope.
 """
-function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing,Tuple{Int,Int}}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
+function plot_polytope!(ax::Union{Axis,Axis3}, F::Union{Polytope,BodyHinge,BodyBar}; vertex_size::Real=12, special_edges::Union{Vector,Nothing,Tuple{Int,Int}}=nothing, fontsize=28, shading=NoShading, special_edge_color=:red3, renderEntirePolytope::Bool=true, scaling_factor::Real=0.975, padding::Union{Real,Nothing}=0.1, vertex_color=:steelblue, vertex_labels::Bool=false, alpha=0.6, line_width=12, edge_color=:steelblue, facet_color=:grey98, font_color=:lightgrey, plot_flexes=false, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}=1, flex_color=:green3, flex_scale=0.35, arrowsize=40)
     if !isnothing(special_edges)
         special_edges = !(special_edges[1] isa Union{Vector{Int},Tuple{Int,Int}}) ? [special_edges] : special_edges
         special_edges = [[edge[1],edge[2]] for edge in special_edges]
