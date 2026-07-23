@@ -76,7 +76,7 @@ end
 
 @testset "square" begin
     F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
-    plot(F; show_pins=false, edge_color=teal, flex_color=coral, flex_Real=[[0,1,0,1]], plot_flexes=true, vertex_labels=true)
+    plot(F; show_pins=false, edge_color=teal, flex_color=coral, plot_flexes=true, vertex_labels=true)
     @test !is_rigid(F)
     D = DeformationPath(F, [1], 350; step_size=0.025)
     @test !is_prestress_stable(F)
