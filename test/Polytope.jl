@@ -36,7 +36,7 @@ if is_no_ci
             #println("$mini, $index, $(collect(Iterators.product(1:6,1:6))), $(collect(Iterators.product(1:6,1:6))[index])")
             DPaths = collect(Iterators.product(Defs,Defs))
             _D = stich_deformation_paths(DPaths[index][1], DPaths[index][2])
-            project_deformation_random([_D], _F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
+            #project_deformation_random([_D], _F, 2, "Dodec_projection_only_contraction"; padding=nothing, vertex_size=85, line_width=11, edge_colors=[:gray35])
             animate(_D,_F,"Dodec_deformation_stitched"; scaling_factor=0.98, recompute_motion_samples=false, filetype="mp4", special_edges=[9, 10],  renderEntirePolytope=true, padding=0.01)
             for i in number_of_realizations+1:number_of_realizations+5
                 GC.gc()
@@ -51,7 +51,8 @@ if is_no_ci
                 end
                 #save_realizations(_D, "dodecahedron_deformation_realizations$(i)")
             end
-            project_deformation_random(Defs, F, 3; padding=nothing, vertex_size=60, line_width=11)
+           
+            #project_deformation_random(Defs, F, 3; padding=nothing, vertex_size=60, line_width=11)
         end
     end
 end
