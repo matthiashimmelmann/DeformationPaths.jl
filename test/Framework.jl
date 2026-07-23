@@ -75,12 +75,8 @@ end
 
 
 @testset "square" begin
-    teal = RGB(0/255, 128/255, 128/255)
-    soft_teal = RGB(160/255,218/255,218/255)
-    coral=RGB(255/255, 127/255, 80/255)
-
-    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; sqrt(2) 0; 1+sqrt(2) 0; 1 0]'); pinned_vertices=[1,2])
-    plot(F, "rectangle"; show_pins=false, edge_color=teal, flex_color=coral, flex_Real=[[0,1,0,1]], plot_flexes=true, vertex_labels=true)
+    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
+    plot(F; show_pins=false, edge_color=teal, flex_color=coral, flex_Real=[[0,1,0,1]], plot_flexes=true, vertex_labels=true)
     @test !is_rigid(F)
     D = DeformationPath(F, [1], 350; step_size=0.025)
     @test !is_prestress_stable(F)
