@@ -13,6 +13,12 @@ function compute_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Rea
     inf_flexes = nullspace(evaluate(G.jacobian, G.variables=>point); atol=tol)
     return inf_flexes
 end
+function compute_inf_flexes(G::ConstraintSystem; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_inf_flexes(G, to_Array(G, G.realization); tol=tol)
+end
+function compute_inf_flexes(F::AllTypes; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_inf_flexes(F.G; tol=tol)
+end
 
 
 """
@@ -28,7 +34,7 @@ function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; 
         basis = nullspace(jacobian; atol=tol)
     else
         translations = [
-            vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in 1:length(G.vertices)-length(G.pinned_vertices)]...) for j in 1:dim
+            vcat([[i!=j ? 0 : 1 for i in 1:dim] for _ in 1:length(G.vertices)]...) for j in 1:dim
         ]
         basis_skew_symmetric = []
         for i in 2:dim
@@ -40,16 +46,26 @@ function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; 
             end
         end
         inf_rot = [
-            vcat([A * G.realization[:,v] for v in 1:length(G.vertices)-length(G.pinned_vertices)]...)
+            vcat([A * G.realization[:,v] for v in 1:length(G.vertices)]...)
             for A in basis_skew_symmetric
         ]
         matrix_inf_flexes = hcat(vcat(translations, inf_rot)...)
-        F = qr(matrix_inf_flexes, ColumnNorm())
-        r = rank(matrix_inf_flexes; atol=tol)
-        # Basis for the column space
-        basis = Matrix(F.Q)[:, 1:r]
+        projector = Matrix(I, length(G.vertices)*dim, length(G.vertices)*dim)
+        projector = projector[:, vcat([[dim*(i-1)+j for j in 1:dim] for i in G.vertices if !(i in G.pinned_vertices)]...)]
+        M = hcat(matrix_inf_flexes, -projector)
+        Zerospace = nullspace(M; atol=tol)
+        r = size(matrix_inf_flexes,2)
+        X = Zerospace[1:r, :]
+        basis = matrix_inf_flexes*X
+        basis = basis[vcat([[dim*(i-1)+j for j in 1:dim] for i in G.vertices if !(i in G.pinned_vertices)]...),:]
     end
     return basis
+end
+function compute_trivial_inf_flexes(G::ConstraintSystem; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_trivial_inf_flexes(G, to_Array(G, G.realization); tol=tol)
+end
+function compute_trivial_inf_flexes(F::AllTypes; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_trivial_inf_flexes(F.G; tol=tol)
 end
 
 
@@ -62,6 +78,13 @@ function compute_equilibrium_stresses(G::ConstraintSystem, point::Vector{<:Real}
     stresses = nullspace(evaluate(G.jacobian, G.variables=>point)'; atol=tol)
     return stresses
 end
+function compute_equilibrium_stresses(G::ConstraintSystem; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_equilibrium_stresses(G, to_Array(G, G.realization); tol=tol)
+end
+function compute_equilibrium_stresses(F::AllTypes; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_equilibrium_stresses(F.G; tol=tol)
+end
+
 
 """
     compute_nontrivial_inf_flexes(G, point[; tol])
@@ -82,6 +105,12 @@ function compute_nontrivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real
     Q, R = qr(extend_basis_matrix)
     Q = Q[:, s:rank(R, atol=tol)]
     return Q
+end
+function compute_nontrivial_inf_flexes(G::ConstraintSystem; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_nontrivial_inf_flexes(G, to_Array(G, G.realization); tol=tol)
+end
+function compute_nontrivial_inf_flexes(F::AllTypes; tol::Real=1e-8)::Matrix{<:Real}
+    return compute_nontrivial_inf_flexes(F.G; tol=tol)
 end
 
 
