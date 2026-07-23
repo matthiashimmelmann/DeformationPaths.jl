@@ -112,6 +112,7 @@ end
 
     @test !is_inf_rigid(F)
     @test !is_prestress_stable(F)
+    GC.gc()
     @test is_second_order_rigid(F)
     @test is_rigid(F)
 end
