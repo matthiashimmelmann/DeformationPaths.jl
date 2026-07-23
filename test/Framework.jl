@@ -6,14 +6,45 @@
     animate(D,F,"coned_cube"; azimuth = π / 6, elevation=pi/10, filetype="gif")
 end
 
+@testset "coned_square_rigidity" begin
+    cube = Framework([(1,2),(2,3),(3,4)], Matrix([0 0; 1 0; 1 1; 0 1]'))
+    rigid_points = coned_rigidity_phase_space(cube,[-1,-1],[2,2]; check=:PSS, discretization_size=0.1)
+    #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
+end
+
 
 @testset "coned_cube_rigidity_testrun2" begin
     #cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1/2 -1/3 1; 1/4 -1/3 1; 1/4 3/4 1; -1/2 3/4 1]'); center_realization=false)
     cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'); center_realization=false)
-    cube.G.realization[:,7] .=  [0.75, 0.75, 0.75]
-    cube.G.realization[:,1] .=  [-0.75, -0.75, -0.75]
     rigid_points = coned_rigidity_phase_space(cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; check=:SOR, discretization_size=1)
     #save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
+end
+
+
+if is_no_ci
+    @testset "coned_torus_rigidity_testrun" begin
+        faces = [[0,  1, 11, 16,  8,  2], [0,  2,  4, 10, 12,  6], [0,  6, 15,  9,  3,  1], [5,  3,  9, 17, 10,  4], [5,  4,  2,  8, 14,  7], [5,  7, 13, 11,  1,  3], [18, 16, 11, 13, 21, 19], [18, 19, 15,  6, 12, 20], [18, 20, 22, 14,  8, 16], [23, 17,  9, 15, 19, 21], [23, 21, 13,  7, 14, 22], [23, 22, 20, 12, 10, 17]]
+        faces = [face .+ 1 for face in faces]
+        torus = Polytope(faces, Matrix([3  3  3; 3  3 -3; -3  3  3; 3 -3 -3; -3 -3  3; -3 -3 -3; 3  1  3; -3 -1 -3; -3  3  1; 3 -3 -1; -1 -3  3;  1  3 -3; -1  1  3; 1 -1 -3; -3 -1  1; 3  1 -1; 1  3  1; -1 -3 -1; 1  1  1; 1  1 -1; -1  1  1; 1 -1 -1; -1 -1  1; -1 -1 -1]'); skip_check=true)
+        rigid_points = coned_rigidity_phase_space(torus,[-3,-3,-3],[3,3,3]; check=:SOR, discretization_size=0.25)
+        #save_to_Houdini(rigid_points, "cone_torus_phase_space")
+    end
+
+
+    @testset "coned_truncoct_rigidity_testrun" begin
+        F = Polytope([[17,11,9,15],[14,8,10,16],[22,24,21,18],[12,5,2,6],[13,19,23,20],[4,1,3,7],[19,13,7,3,8,14],[15,9,4,7,13,20],[16,10,5,12,18,21],[22,18,12,6,11,17],[20,23,24,22,17,15],[14,16,21,24,23,19],[9,11,6,2,1,4],[3,1,2,5,10,8]], Matrix([-1.5000000000000 -0.50000000000000 0; -1.5000000000000 0.50000000000000 0; -1.0000000000000 -1.0000000000000 -0.70710678118655; -1.0000000000000 -1.0000000000000 0.70710678118655; -1.0000000000000 1.0000000000000 -0.70710678118655; -1.0000000000000 1.0000000000000 0.70710678118655; -0.50000000000000 -1.5000000000000 0; -0.50000000000000 -0.50000000000000 -1.4142135623731; -0.50000000000000 -0.50000000000000 1.4142135623731; -0.50000000000000 0.50000000000000 -1.4142135623731; -0.50000000000000 0.50000000000000 1.4142135623731; -0.50000000000000 1.5000000000000 0; 0.50000000000000 -1.5000000000000 0; 0.50000000000000 -0.50000000000000 -1.4142135623731; 0.50000000000000 -0.50000000000000 1.4142135623731; 0.50000000000000 0.50000000000000 -1.4142135623731; 0.50000000000000 0.50000000000000 1.4142135623731; 0.50000000000000 1.5000000000000 0; 1.0000000000000 -1.0000000000000 -0.70710678118655; 1.0000000000000 -1.0000000000000 0.70710678118655; 1.0000000000000 1.0000000000000 -0.70710678118655; 1.000000000000 1.0000000000000 0.70710678118655; 1.5000000000000 -0.50000000000000 0; 1.5000000000000 0.50000000000000 0]'))    
+        rigid_points = coned_rigidity_phase_space(F,[-2,-1.5,-1.5],[-1,1.5,1.5]; check=:PSS, discretization_size=0.1)
+        save_to_Houdini(rigid_points, "cone_truncoct_phase_space")
+    end
+
+
+    @testset "coned_cuboctahedron_rigidity_testrun" begin
+        F = Polytope([[1,5,9],[1,5,3,7],[1,7,11],[1,9,2,11],[2,9,6],[2,11,8],[3,5,10],[3,7,12],[3,10,4,12],[4,10,6],[4,12,8],[6,4,8,2],[5,9,6,10],[7,11,8,12]], Matrix([1 1 0; -1 1 0; 1 -1 0; -1 -1 0; 1 0 1; -1 0 1; 1 0 -1; -1 0 -1; 0 1 1; 0 -1 1; 0 1 -1; 0 -1 -1;]'))
+        #plot(F; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0.125*pi, elevation=0.05*pi, alpha=0.65)
+
+        rigid_points = coned_rigidity_phase_space(F,[-2,-2,-2],[2,2,2]; check=:SOR, discretization_size=0.5, show_progress=false)
+        save_to_Houdini(rigid_points, "cone_cuboctahedron_phase_space")
+    end
 end
 
 
@@ -44,8 +75,8 @@ end
 
 
 @testset "square" begin
-    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'))
-    plot(F)
+    F = Framework([[1,2],[2,3],[3,4],[1,4]], Matrix([0. 0; 1 0; 1 1; 0 1]'); pinned_vertices=[1,2])
+    plot(F; show_pins=false, edge_color=teal, flex_color=coral, plot_flexes=true, vertex_labels=true)
     @test !is_rigid(F)
     D = DeformationPath(F, [1], 350; step_size=0.025)
     @test !is_prestress_stable(F)

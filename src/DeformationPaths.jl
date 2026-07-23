@@ -1,6 +1,6 @@
 module DeformationPaths
 
-import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions, coefficients
+import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions, coefficients, FiniteException, witness_set, LinearSubspace
 import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
 import GLMakie: NoShading, axislegend, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
@@ -270,12 +270,19 @@ mutable struct DeformationPath
             else
                 flex_mult = [1/size(flex_space)[2] for _ in axes(flex_space,2)]
             end
+            prev_flex = length(flex_mult)==0 ? [0 for _ in axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
+            prev_flex = prev_flex ./ norm(prev_flex)
+        elseif flex_mult isa Vector{<:Vector}
+            prev_flex = flex_mult[1]
+            flex_mult = Float64.(prev_flex)
+            (isapprox(norm(evaluate.(G.jacobian, G.variables=>start_point) * prev_flex), 0; atol=1e-6)) || throw("In this format, 'flex_mult' must be an infinitesimal flex.")
         else
             flex_mult = Float64.(flex_mult)
+            size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
+            
+            prev_flex = length(flex_mult)==0 ? [0 for _ in axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
+            prev_flex = prev_flex ./ norm(prev_flex)
         end
-        size(flex_space)[2]==length(flex_mult) || throw("The length of 'flex_mult' match the size of the nontrivial infinitesimal flexes, which is $(size(flex_space)[2]).")
-        prev_flex = length(flex_mult)==0 ? [0 for _ in axes(flex_space,1)] : sum(flex_mult[i] .* flex_space[:,i] for i in eachindex(flex_mult))
-        prev_flex = prev_flex ./ norm(prev_flex)
         
         motion_samples = [Float64.(start_point)]
         @showprogress enabled=show_progress for i in 1:num_steps
@@ -293,8 +300,8 @@ mutable struct DeformationPath
                 push!(motion_samples, q)
             catch e
                 prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
-                if !success || e == "The space of nontrivial infinitesimal motions is empty."
-                    show_progress && @warn "The approximation of a deformation path ended prematurely."
+                if !success# || e == "The space of nontrivial infinitesimal motions is empty."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
                 end
             end
@@ -343,8 +350,8 @@ mutable struct DeformationPath
                 push!(motion_samples, q)
             catch e
                 prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
-                if !success || e == "The space of nontrivial infinitesimal motions is empty."
-                    show_progress && @warn "The approximation of a deformation path ended prematurely."
+                if !success# || e == "The space of nontrivial infinitesimal motions is empty."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
                 end
             end
@@ -447,8 +454,8 @@ mutable struct DeformationPath
                 # If Newton's method only diverges once and we are in a singularity,
                 # we first try to reverse the previous flex before exiting the routine.
                 prev_flex, success = resolve_singularity(F.G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
-                if !success || e == "The space of nontrivial infinitesimal motions is empty."
-                    show_progress && @warn "The approximation of a deformation path ended prematurely."
+                if !success# || e == "The space of nontrivial infinitesimal motions is empty."
+                    show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
                 end
             end
