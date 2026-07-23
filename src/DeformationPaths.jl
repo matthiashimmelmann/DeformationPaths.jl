@@ -262,7 +262,7 @@ mutable struct DeformationPath
         motion_samples = [Float64.(start_point)]
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end]_n; tol=1e-5)
+                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end]; tol=1e-5)
                 prev_flex = _prev_flex
                 if symmetric_newton
                     q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
