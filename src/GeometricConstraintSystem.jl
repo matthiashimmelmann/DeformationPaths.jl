@@ -56,7 +56,9 @@ function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, eq
     dimension = size(realization)[1]
     size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || (pinned_GCS && size(realization)[2]==length(variables)//dimension+dimension*(dimension+1)//2) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
     size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
-    K_n = ConstraintSystem(vertices, variables, vcat(equations, [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(vertices) for j in eachindex(vertices) if i<j]]), realization, xs, pinned_GCS, pinned_vertices, nothing)
+    K_n_equations = vcat(equations, [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(vertices) for j in eachindex(vertices) if i<j]])
+    K_n_jacobian = hcat([differentiate(eq, variables) for eq in K_n_equations]...)'
+    K_n = ConstraintSystem(vertices, variables, K_n_equations, realization, K_n_jacobian, dimension, xs, pinned_GCS, pinned_vertices, nothing)
     ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, pinned_GCS, pinned_vertices, K_n)
 end
 
