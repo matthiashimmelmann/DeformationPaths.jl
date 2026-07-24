@@ -28,7 +28,7 @@ Compute all trivial infinitesimal flexes of a geometric constraint system `G` in
 """
 function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
     dim = G.dimension
-    if length(G.vertices)<size(G.realization)[2]
+    if length(G.vertices)<size(G.realization)[2] || !isnothing(G.K_n)
         jacobian = evaluate.(G.K_n.jacobian, G.variables=>to_Array(G, G.realization))
         basis = nullspace(jacobian; atol=tol)
     else

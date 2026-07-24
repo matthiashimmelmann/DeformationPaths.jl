@@ -51,14 +51,11 @@ end
 
 Constructor of a `ConstraintSystem` object.
 """
-function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]))::ConstraintSystem
+function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs; pinned_GCS::Bool=false, pinned_vertices::Vector{Int}=Vector{Int}([]), K_n::Union{ConstraintSystem, Nothing}=nothing)::ConstraintSystem
     jacobian = hcat([differentiate(eq, variables) for eq in equations]...)'
     dimension = size(realization)[1]
     size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || (pinned_GCS && size(realization)[2]==length(variables)//dimension+dimension*(dimension+1)//2) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
     size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
-    K_n_equations = vcat(equations, [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(vertices) for j in eachindex(vertices) if i<j]])
-    K_n_jacobian = hcat([differentiate(eq, variables) for eq in K_n_equations]...)'
-    K_n = ConstraintSystem(vertices, variables, K_n_equations, realization, K_n_jacobian, dimension, xs, pinned_GCS, pinned_vertices, nothing)
     ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, pinned_GCS, pinned_vertices, K_n)
 end
 
@@ -398,7 +395,13 @@ mutable struct VolumeHypergraph
         end
         facet_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([xs[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in volumes]
         facet_equations = filter(eq->eq!=0, facet_equations)
-        G = ConstraintSystem(vertices, variables, facet_equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
+
+        K_n_equations = [det(vcat([1. for _ in 1:dimension+1]', hcat([xs[:,v] for v in facet]...))) - det(vcat([1. for _ in 1:dimension+1]', hcat([realization[:,v] for v in facet]...))) for facet in collect(combinations(vertices, 3))]
+        K_n_equations = filter(eq->eq!=0, K_n_equations)
+        K_n_jacobian = hcat([differentiate(eq, variables) for eq in K_n_equations]...)'
+        K_n = ConstraintSystem(vertices, variables, K_n_equations, realization, K_n_jacobian, dimension, xs, pinned_GCS, pinned_vertices, nothing)
+        
+        G = ConstraintSystem(vertices, variables, facet_equations, realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices), K_n=K_n)
         new(G, volumes)
     end
 
@@ -494,7 +497,9 @@ mutable struct Polytope
         else
             skip_check || all(eq->isapprox(evaluate(eq, vcat(variables, normal_variables)=>vcat([_realization[i,j] for (i,j) in collect(Iterators.product(1:size(_realization)[1], 1:size(_realization)[2])) if !(j in pinned_vertices)]...)), 0; atol=1e-4), equations) || throw(error("The given realization does not satisfy the constraints."))
         end
-        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices))
+        K_n = ConstraintSystem(vertices, vcat(variables, normal_variables), vcat(equations, [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (_realization[:,bar[1]]-_realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(vertices) for j in eachindex(vertices) if i<j]]), _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=pinned_vertices)
+        
+        G = ConstraintSystem(vertices, vcat(variables, normal_variables), equations, _realization, xs; pinned_GCS=pinned_GCS, pinned_vertices=Vector{Int64}(pinned_vertices), K_n=K_n)
         new(G, facets, edges, variables, normal_variables)
     end
 
