@@ -41,10 +41,9 @@ mutable struct ConstraintSystem
     jacobian::Matrix{Expression}
     dimension::Int
     xs::Union{Matrix{Variable},Matrix{Expression}}
-    system::System
     pinned_GCS::Bool
     pinned_vertices::Vector{Int}
-    K_n::ConstraintSystem
+    K_n::Union{ConstraintSystem, Nothing}
 end 
 
 """
@@ -57,8 +56,8 @@ function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, eq
     dimension = size(realization)[1]
     size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || (pinned_GCS && size(realization)[2]==length(variables)//dimension+dimension*(dimension+1)//2) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
     size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
-    K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
-    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_GCS, pinned_vertices, K_n)
+    K_n = ConstraintSystem(vertices, variables, vcat(equations, [sum( (xs[:,bar[1]]-xs[:,bar[2]]) .^2) - sum( (realization[:,bar[1]]-realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(vertices) for j in eachindex(vertices) if i<j]]), realization, xs, pinned_GCS, pinned_vertices, nothing)
+    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, pinned_GCS, pinned_vertices, K_n)
 end
 
 
@@ -909,7 +908,7 @@ function equations!(G::ConstraintSystem, equations::Vector{Expression})::Nothing
     Set(System(equations).variables)==Set(G.variables) && length(System(equations).variables)==length(G.variables) || throw("The variables in `equations` do not match the original variables.")
     G.equations = equations
     G.jacobian = hcat([differentiate(eq, G.variables) for eq in equations]...)'
-    G.system = System(equations; variables=G.variables)
+    #G.system = System(equations; variables=G.variables)
     return nothing
 end
 
@@ -934,7 +933,7 @@ function equations!(F::AllTypes, equations::Vector{Expression})
     Set(System(equations).variables)==Set(F.G.variables) && length(System(equations).variables)==length(F.G.variables) || throw("The variables in `equations` do not match the original variables.")
     F.G.equations = equations
     F.G.jacobian = hcat([differentiate(eq, F.G.variables) for eq in equations]...)'
-    F.G.system = System(equations; variables=F.G.variables)
+    #F.G.system = System(equations; variables=F.G.variables)
     return nothing
 end
 
