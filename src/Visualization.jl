@@ -70,32 +70,13 @@ Add infinitesimal flexes to a plot of a geometric constraint system
 """
 function plot_flexes!(ax::Union{Axis,Axis3}, F::AllTypes, flex_Real::Union{Int,Vector{<:Number},Vector{<:Vector}}, flex_color, flex_scale, linewidth, arrowsize)
     (flex_Real isa Int || flex_Real isa Vector) || throw(error("`flex_Real` does not have the correct type. It needs to be an `Int` or a `Vector`, but is a $(typeof(flex_Real))."))
-    if F isa Framework
-        K_n = Framework([[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif F isa AngularFramework
-        K_n = AngularFramework([[i,j,k] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) for k in eachindex(F.G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], F.G.realization; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices).G
-    elseif F isa FrameworkOnSurface
-        K_n = deepcopy(G)
-        add_equations!(K_n, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(F.G.vertices) if i<j]])
-    elseif F isa VolumeHypergraph
-        K_n = VolumeHypergraph(collect(powerset(F.G.vertices, F.G.dimension+1, F.G.dimension+1)), F.G.realization).G
-    elseif F isa Polytope || F isa SpherePacking || F isa BodyHinge || F isa BodyBar || F isa FacetPolytope
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
-    elseif  F isa SphericalDiskPacking
-        minkowski_scalar_product(e1,e2) = e1'*e2-1
-        inversive_distances = [minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(F.G.realization[:,contact[1]], F.G.realization[:,contact[1]]) * minkowski_scalar_product(F.G.realization[:,contact[2]], F.G.realization[:,contact[2]])) for contact in powerset(F.G.vertices, 2, 2)]
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, [minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(F.G.xs[:,contact[1]], F.G.xs[:,contact[1]]) * minkowski_scalar_product(F.G.xs[:,contact[2]], F.G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(F.G.vertices, 2, 2))], F.G.realization, F.G.xs)
-    else
-        throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge', 'bodybar', or 'polytope', but is '$(type)'.")
-    end
-
     if flex_Real isa Int
-        flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)[:,flex_Real]; flexes=true)
+        flex = to_Matrix(F,compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization))[:,flex_Real]; flexes=true)
     elseif flex_Real isa Vector{<:Vector}
         (isapprox(norm(evaluate.(F.G.jacobian, F.G.variables=>to_Array(F, F.G.realization)) * flex_Real[1]), 0; atol=1e-6)) || throw("In this format, 'flex_Real' must be an infinitesimal flex.")
         flex = to_Matrix(F, flex_Real[1]; flexes=true)
     else
-        flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization), K_n)
+        flex_matrix = compute_nontrivial_inf_flexes(F.G, to_Array(F, F.G.realization))
         length(flex_Real)==size(flex_matrix)[2] || throw(error("The length of `flex_Real` ($(length(flex_Real))) does not match the length of the computed infinitesimal flexes, which is $(size(flex_matrix)[2])."))
         flex_vector = flex_matrix*flex_Real
         flex = to_Matrix(F, [v for v in flex_vector]; flexes=true)

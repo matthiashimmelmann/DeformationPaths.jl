@@ -3,7 +3,7 @@ export  newton_correct,
         euler_step
 
 """
-    euler_step(G, step_size, prev_flex, point, K_n)
+    euler_step(G, step_size, prev_flex, point)
 
 Euler step predicting the next point along the approximate motion.
 
@@ -11,8 +11,8 @@ Euler step predicting the next point along the approximate motion.
 - `predicted_point::Vector{<:Real}`: The next point predicted by Euler's method.
 - `predicted_inf_flex::Vector{<:Real}`: The tangent vector predicted by Euler's method.
 """
-function euler_step(G::ConstraintSystem, step_size::Real, prev_flex::Vector{<:Real}, point::Vector{<:Real}, K_n::ConstraintSystem; tol=1e-5)::Tuple{Vector{<:Real}, Vector{<:Real}}
-    flex_space = compute_nontrivial_inf_flexes(G, point, K_n; tol=tol)
+function euler_step(G::ConstraintSystem, step_size::Real, prev_flex::Vector{<:Real}, point::Vector{<:Real}; tol=1e-5)::Tuple{Vector{<:Real}, Vector{<:Real}}
+    flex_space = compute_nontrivial_inf_flexes(G, point; tol=tol)
     if size(flex_space)[2]==0
         throw("The space of nontrivial infinitesimal motions is empty.")
     end

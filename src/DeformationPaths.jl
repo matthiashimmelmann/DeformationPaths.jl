@@ -1,7 +1,7 @@
 module DeformationPaths
 
-import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions, coefficients, FiniteException, witness_set, LinearSubspace
-import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals
+import HomotopyContinuation: solve, evaluate, differentiate, newton, Expression, Variable, @var, real_solutions, System, solve, variables, solutions, coefficients, FiniteException, witness_set, LinearSubspace, degree
+import LinearAlgebra: norm, pinv, nullspace, rank, qr, zeros, inv, cross, det, svd, I, zeros, eigvals, ColumnNorm
 import GLMakie: NoShading, axislegend, MultiLightShading, FastShading, GeometryBasics, Vec3f, Vec2f, meshscatter!, surface!, Sphere, mesh!, @lift, poly!, text!, Figure, record, hidespines!, hidedecorations!, lines!, linesegments!, scatter!, Axis, Axis3, xlims!, ylims!, zlims!, Observable, Point3f, Point2f, connect, faces, Mesh, mesh, save, arrows!
 import Combinatorics: powerset, combinations
 import Colors: distinguishable_colors, red, green, blue, colormap, RGB
@@ -244,25 +244,7 @@ mutable struct DeformationPath
             norm(evaluate(G.equations, G.variables=>start_point), Inf) < sqrt(tol) || throw(error("The `start_point` does not satisfy the underlying constraints in the constraint system `G`!"))
         end
 
-        if type==Framework
-            K_n = Framework([[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G    
-        elseif type==AngularFramework
-            K_n = AngularFramework([[i,j,k] for i in eachindex(G.vertices) for j in eachindex(G.vertices) for k in eachindex(G.vertices) if (i<j && j<k) || (i<k && k<j) || (j<i && i<k)], G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
-        elseif type==FrameworkOnSurface
-            K_n = deepcopy(G)
-            add_equations!(K_n, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]])
-        elseif type==VolumeHypergraph
-            K_n = VolumeHypergraph(collect(powerset(G.vertices, G.dimension+1, G.dimension+1)), G.realization; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices).G
-        elseif type==Polytope || type==SpherePacking || type==BodyHinge || type==BodyBar
-            K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
-        elseif  type==SphericalDiskPacking
-            minkowski_scalar_product(e1,e2) = e1'*e2-1
-            inversive_distances = [minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[2]])/sqrt(minkowski_scalar_product(G.realization[:,contact[1]], G.realization[:,contact[1]]) * minkowski_scalar_product(G.realization[:,contact[2]], G.realization[:,contact[2]])) for contact in powerset(G.vertices, 2, 2)]
-            K_n = ConstraintSystem(G.vertices, G.variables, [minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[2]])^2 - inversive_distances[i]^2 * minkowski_scalar_product(G.xs[:,contact[1]], G.xs[:,contact[1]]) * minkowski_scalar_product(G.xs[:,contact[2]], G.xs[:,contact[2]]) for (i,contact) in enumerate(powerset(G.vertices, 2, 2))], G.realization, G.xs)
-        else
-            throw("The type must either be 'framework', 'frameworkonsurface', 'diskpacking', 'sphericaldiskpacking', 'hypergraph', 'bodyhinge', 'bodybar' or 'polytope', but is '$(type)'.")
-        end
-        flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
+        flex_space = compute_nontrivial_inf_flexes(G, start_point)
         if flex_mult==[]
             if random_flex
                 flex_mult = randn(Float64, size(flex_space)[2])
@@ -287,7 +269,7 @@ mutable struct DeformationPath
         motion_samples = [Float64.(start_point)]
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end]; tol=1e-5)
                 prev_flex = _prev_flex
                 if symmetric_newton
                     q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
@@ -299,7 +281,7 @@ mutable struct DeformationPath
                 end
                 push!(motion_samples, q)
             catch e
-                prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                prev_flex, success = resolve_singularity(G, motion_samples, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                 if !success# || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
@@ -311,7 +293,7 @@ mutable struct DeformationPath
     end
 
 
-    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int, K_n::ConstraintSystem; show_progress::Bool=true, step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing, time_penalty::Union{Real,Nothing}=2)::DeformationPath
+    function DeformationPath(G::ConstraintSystem, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, step_size::Real=1e-2, tol::Real=1e-13, random_flex::Bool=false, symmetric_newton::Bool=false, start_point::Union{Nothing, Vector{<:Real}}=nothing, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         num_steps>=0 && step_size>=0 && tol>0 || throw(error("The `num_steps`, the `step_size` and `tol` needs to be a nonnegative, but are  $((num_steps, step_size, tol))."))
         if isnothing(start_point)
             start_point = to_Array(G, G.realization)
@@ -319,7 +301,7 @@ mutable struct DeformationPath
             norm(evaluate(G.equations, G.variables=>start_point), Inf) < sqrt(tol) || throw(error("The `start_point` does not satisfy the underlying constraints in the constraint system `G`!"))
         end
 
-        flex_space = compute_nontrivial_inf_flexes(G, start_point, K_n)
+        flex_space = compute_nontrivial_inf_flexes(G, start_point)
         if flex_mult==[]
             if random_flex
                 flex_mult = randn(Float64, size(flex_space)[2])
@@ -337,7 +319,7 @@ mutable struct DeformationPath
         motion_samples = [Float64.(start_point)]
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                q, _prev_flex = euler_step(G, step_size, prev_flex, motion_samples[end]; tol=1e-5)
                 prev_flex = _prev_flex
                 if symmetric_newton
                     q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
@@ -349,7 +331,7 @@ mutable struct DeformationPath
                 end
                 push!(motion_samples, q)
             catch e
-                prev_flex, success = resolve_singularity(G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                prev_flex, success = resolve_singularity(G, motion_samples, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                 if !success# || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
@@ -407,9 +389,8 @@ mutable struct DeformationPath
     """
     function DeformationPath(F::SpherePacking, flex_mult::Vector, num_steps::Int; show_progress::Bool=true, symmetric_newton::Bool=false, motion_samples::Vector=[], _contacts::Vector=[], step_size::Real=1e-2, prev_flex::Union{Nothing, Vector}=nothing, tol::Real=1e-13, random_flex::Bool=false, time_penalty::Union{Real,Nothing}=2)::DeformationPath
         start_point = to_Array(F, F.G.realization)
-        K_n = ConstraintSystem(F.G.vertices, F.G.variables, vcat(F.G.equations, [sum( (F.G.xs[:,bar[1]]-F.G.xs[:,bar[2]]) .^2) - sum( (F.G.realization[:,bar[1]]-F.G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(F.G.vertices) for j in eachindex(F.G.vertices) if i<j]]), F.G.realization, F.G.xs; pinned_GCS=F.G.pinned_GCS, pinned_vertices=F.G.pinned_vertices)
         if isnothing(prev_flex)
-            flex_space = compute_nontrivial_inf_flexes(F.G, start_point, K_n)
+            flex_space = compute_nontrivial_inf_flexes(F.G, start_point)
             if flex_mult==[]
                 if random_flex
                     flex_mult = randn(Float64, size(flex_space)[2])
@@ -430,7 +411,7 @@ mutable struct DeformationPath
 
         @showprogress enabled=show_progress for i in 1:num_steps
             try
-                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end], K_n; tol=1e-5)
+                q, prev_flex = euler_step(F.G, step_size, prev_flex, motion_samples[end]; tol=1e-5)
                 if symmetric_newton
                     q = symmetric_newton_correct(F.G, q; tol=tol, time_penalty=time_penalty)
                 else
@@ -453,7 +434,7 @@ mutable struct DeformationPath
             catch e
                 # If Newton's method only diverges once and we are in a singularity,
                 # we first try to reverse the previous flex before exiting the routine.
-                prev_flex, success = resolve_singularity(F.G, motion_samples, K_n, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
+                prev_flex, success = resolve_singularity(F.G, motion_samples, prev_flex, step_size; show_progress=show_progress, tol=tol, time_penalty=time_penalty, symmetric_newton=symmetric_newton)
                 if !success# || e == "The space of nontrivial infinitesimal motions is empty."
                     show_progress && @warn "The approximation of a deformation path ended prematurely. $e"
                     break
@@ -468,11 +449,11 @@ end
 
 
 """
-    resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, K_n, prev_flex, step_size[; tol, time_penalty, symmetric_newton])
+    resolve_singularity(G, motion_samples, failure_to_converge, motion_matrices, prev_flex, step_size[; tol, time_penalty, symmetric_newton])
 
 Attempts to resolve a singularity at `motion_samples[end]`.
 """
-function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, K_n::ConstraintSystem, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
+function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, prev_flex::Vector, step_size::Real; show_progress::Bool=true, tol::Real=1e-10, time_penalty::Real=3, symmetric_newton::Bool=false)
     global failure_to_converge = 0
     global success = false
     _prev_flex = copy(prev_flex)
@@ -483,7 +464,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, K_n::C
             helper_samples = [motion_samples[end]]
             try
                 for _ in 1:5
-                    q, _prev_flex = euler_step(G, step_size/5, _prev_flex, helper_samples[end], K_n; tol=1e-5)
+                    q, _prev_flex = euler_step(G, step_size/5, _prev_flex, helper_samples[end]; tol=1e-5)
                     if symmetric_newton
                         q = symmetric_newton_correct(G, q; tol=tol, time_penalty=time_penalty)
                     else
@@ -580,7 +561,7 @@ function resolve_singularity(G::ConstraintSystem, motion_samples::Vector, K_n::C
             end=#
         else
             show_progress && @info "Acceleration-based cusp method is being used."
-            flexes = compute_nontrivial_inf_flexes(G, motion_samples[end], K_n; tol=1e-3)
+            flexes = compute_nontrivial_inf_flexes(G, motion_samples[end]; tol=1e-3)
             if size(flexes)[2]==0
                 break
             end
