@@ -44,7 +44,8 @@ mutable struct ConstraintSystem
     system::System
     pinned_GCS::Bool
     pinned_vertices::Vector{Int}
-end
+    K_n::ConstraintSystem
+end 
 
 """
     ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, equations::Vector{Expression}, realization::Matrix{<:Real}, xs[; pinned_GCS, pinned_vertices])
@@ -56,7 +57,8 @@ function ConstraintSystem(vertices::Vector{Int}, variables::Vector{Variable}, eq
     dimension = size(realization)[1]
     size(realization)[1]==dimension && (size(realization)[2]==length(vertices) || size(realization)[2]==length(variables)//dimension+length(pinned_vertices)) || (pinned_GCS && size(realization)[2]==length(variables)//dimension+dimension*(dimension+1)//2) || size(realization)[2]==size(xs)[2] || throw("The realization does not have the correct format.")
     size(xs)[1]==size(realization)[1] && size(xs)[2]==size(realization)[2] || throw("The matrix 'xs' does not have the correct format.")
-    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_GCS, pinned_vertices)
+    K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
+    ConstraintSystem(vertices, variables, equations, realization, jacobian, dimension, xs, System(equations; variables=variables), pinned_GCS, pinned_vertices, K_n)
 end
 
 

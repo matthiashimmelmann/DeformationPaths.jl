@@ -29,8 +29,7 @@ Compute all trivial infinitesimal flexes of a geometric constraint system `G` in
 function compute_trivial_inf_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Matrix{<:Real}
     dim = G.dimension
     if length(G.vertices)<size(G.realization)[2]
-        K_n = ConstraintSystem(G.vertices, G.variables, vcat(G.equations, [sum( (G.xs[:,bar[1]]-G.xs[:,bar[2]]) .^2) - sum( (G.realization[:,bar[1]]-G.realization[:,bar[2]]) .^2) for bar in [[i,j] for i in eachindex(G.vertices) for j in eachindex(G.vertices) if i<j]]), G.realization, G.xs; pinned_GCS=G.pinned_GCS, pinned_vertices=G.pinned_vertices)
-        jacobian = evaluate.(K_n.jacobian, K_n.variables=>to_Array(K_n, K_n.realization))
+        jacobian = evaluate.(G.K_n.jacobian, G.variables=>to_Array(G, G.realization))
         basis = nullspace(jacobian; atol=tol)
     else
         translations = [
