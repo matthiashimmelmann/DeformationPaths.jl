@@ -2,7 +2,8 @@ export  compute_inf_flexes,
         compute_trivial_inf_flexes,
         compute_equilibrium_stresses,
         compute_nontrivial_inf_flexes,
-        compute_nonblocked_flex
+        compute_nonblocked_flex,
+        compute_second_order_flexes
 
 """
     compute_inf_flexes(G, point[; tol])
@@ -145,19 +146,40 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     end
     try
         sols = real_solutions(solve(Vector{Expression}(ED_stress_system)))
+        display(sols)
         return isempty(sols) ? [] : sols[1]
     catch err
+        display(err)
         if err isa FiniteException
             A = LinearSubspace(randn(Float64, err.:dim, length(λ)), randn(Float64, err.:dim))
             W = witness_set(System(Vector{Expression}(ED_stress_system)), A)
             sols = real_solutions(W.:R)
-            if isempty(sols)
-                return []
-            else
-                return sols[1]
-            end
+            return isempty(sols) ? [] : sols[1]
         else 
             rethrow()
         end
     end
+end
+
+
+"""
+    compute_second_order_flexes(G, point; tol)
+"""
+function compute_second_order_flexes(G::ConstraintSystem, point::Vector{<:Real}; tol::Real=1e-8)::Dict
+    inf_flexes = compute_nontrivial_inf_flexes(G, point; tol=tol)
+    rig_matrix = evaluate.(G.jacobian, G.variables=>point)
+    second_order_flexes = Dict()
+    for i in axes(inf_flexes,2), j in axes(inf_flexes,2)
+        s_flex = rig_matrix \ (-evaluate(G.jacobian, G.variables=>inf_flexes[:,i])*inf_flexes[:,j])
+        second_order_flexes[(i,j)] = s_flex
+    end
+    return second_order_flexes
+end
+
+
+"""
+    compute_second_order_flexes(F; tol)
+"""
+function compute_second_order_flexes(F::AllTypes; tol::Real=1e-8)::Dict
+    return compute_second_order_flexes(F.G, to_Array(F, F.G.realization); tol=tol)
 end
