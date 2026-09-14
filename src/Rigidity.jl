@@ -64,11 +64,8 @@ See also [`compute_second_order_flexes`](@ref).
 """
 function is_third_order_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
     inf_flexes = compute_nontrivial_inf_flexes(F; tol=tol_rank_drop)
-    display(inf_flexes)
     stresses = compute_equilibrium_stresses(F; tol=tol_rank_drop)
-    display(stresses)
     so_flex_dict = compute_second_order_flexes(F; tol=tol_rank_drop)
-    display(so_flex_dict)
     @var λ[1:size(inf_flexes)[2]] ω[1:size(stresses)[2]]
     parametrized_second_order_flex = sum(λ[i]*λ[j]*so_flex_dict[(i,j)] for i in eachindex(λ), j in eachindex(λ))
     parametrized_stress = stresses*ω
