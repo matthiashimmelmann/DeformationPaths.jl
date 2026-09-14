@@ -38,7 +38,9 @@ import DeformationPaths:    Framework,
                             save_realizations,
                             coned_rigidity_phase_space,
                             is_in_interior,
-                            save_to_Houdini
+                            save_to_Houdini,
+                            compute_second_order_flexes,
+                            is_third_order_rigid
 using Test
 using HomotopyContinuation
 using LinearAlgebra
