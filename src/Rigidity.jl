@@ -72,24 +72,25 @@ function is_third_order_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
     @var λ[1:size(inf_flexes)[2]] ω[1:size(stresses)[2]]
     parametrized_second_order_flex = sum(λ[i]*λ[j]*so_flex_dict[(i,j)] for i in eachindex(λ), j in eachindex(λ))
     parametrized_stress = stresses*ω
-    parametrized_flex = flexes*λ
+    parametrized_flex = inf_flexes*λ
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_second_order_flex
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
     codim = rank(evaluate.(differentiate(projective_stress_system, λ), λ=>randn(ComplexF64, length(λ))); atol=1e-10)
     if codim == length(λ)
-        display(true)
         ED_stress_system = projective_stress_system
     else
-        display(false)
         rand_pt = randn(Float64, length(λ))
         ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ - rand_pt)
         ED_stress_system = vcat(projective_stress_system, minors(ED_matrix, codim+1))
     end
     try
-        sols = real_solutions(solve(Vector{Expression}(ED_stress_system)))
+        result = solve(Vector{Expression}(ED_stress_system))
+        display(result)
+        sols = real_solutions(result)
         return isempty(sols)
     catch err
+        display(err)
         if err isa FiniteException
             A = LinearSubspace(randn(Float64, err.:dim, length(λ)), randn(Float64, err.:dim))
             W = witness_set(System(Vector{Expression}(ED_stress_system)), A)
