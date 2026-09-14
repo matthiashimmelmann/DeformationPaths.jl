@@ -146,6 +146,7 @@ function compute_nonblocked_flex(F::AllTypes; fast_search::Bool=false, tol_rank_
     end
     try
         sols = real_solutions(solve(Vector{Expression}(ED_stress_system)))
+        display(sols)
         return isempty(sols) ? [] : sols[1]
     catch err
         display(err)

@@ -76,16 +76,22 @@ function is_third_order_rigid(F::AllTypes; tol_rank_drop::Real=1e-8)::Bool
     stress_energy = parametrized_stress'*evaluate.(F.G.jacobian, F.G.variables=>Vector{Expression}(parametrized_flex))*parametrized_second_order_flex
     stress_poly_system = differentiate(stress_energy, ω)
     projective_stress_system = vcat(stress_poly_system, sum(λ .^ 2) - 1)
-    rand_pt = randn(Float64, length(λ))
-    ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ - rand_pt)
-    ED_stress_system = vcat(projective_stress_system, minors(ED_matrix, codim+1))
+    codim = rank(evaluate.(differentiate(projective_stress_system, λ), λ=>randn(ComplexF64, length(λ))); atol=1e-10)
+    if codim == length(λ)
+        ED_stress_system = projective_stress_system
+        #display(numerical_irreducible_decomposition(System(Vector{Expression}(ED_stress_system))))
+    else
+        rand_pt = randn(Float64, length(λ))
+        ED_matrix = hcat(length(stress_poly_system)==1 ? differentiate(stress_poly_system, λ)' : differentiate(stress_poly_system, λ), λ - rand_pt)
+        ED_stress_system = vcat(projective_stress_system, minors(ED_matrix, codim+1))
+    end
     try
         result = solve(Vector{Expression}(ED_stress_system))
-        display(result)
+        #display(result)
         sols = real_solutions(result)
         return isempty(sols)
     catch err
-        display(err)
+        #display(err)
         if err isa FiniteException
             A = LinearSubspace(randn(Float64, err.:dim, length(λ)), randn(Float64, err.:dim))
             W = witness_set(System(Vector{Expression}(ED_stress_system)), A)
