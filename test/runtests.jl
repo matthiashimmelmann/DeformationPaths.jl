@@ -38,7 +38,8 @@ import DeformationPaths:    Framework,
                             save_realizations,
                             coned_rigidity_phase_space,
                             is_in_interior,
-                            save_to_Houdini
+                            save_to_Houdini,
+                            truncate_at_vertex
 using Test
 using HomotopyContinuation
 using LinearAlgebra

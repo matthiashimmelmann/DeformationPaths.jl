@@ -70,6 +70,8 @@ fix_antipodals!
 tetrahedral_symmetry!
 
 triangle_shrinking
+
+truncate_at_vertex
 ```
 
 ## I/O methods

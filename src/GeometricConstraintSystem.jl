@@ -16,7 +16,8 @@ export  ConstraintSystem,
         to_Array,
         is_in_interior,
         fix_antipodals!,
-        tetrahedral_symmetry!
+        tetrahedral_symmetry!,
+        truncate_at_vertex
 
 """
 Class for Constructing a general constraint system.
@@ -682,6 +683,7 @@ function tetrahedral_symmetry!(F::Polytope)
         for w in _vertex_list
             try
                 if isapprox(norm(F.G.realization[:,w]-R1*F.G.realization[:,v]), 0; atol=1e-4)
+   
                     push!(helper,w)
                     index = findfirst(t->w==t, vertex_list)
                     deleteat!(vertex_list, index)
@@ -731,6 +733,299 @@ function triangle_shrinking(F::Polytope)
         final_flexes = compute_nontrivial_inf_flexes(P.G, to_Array(P, P.G.realization))
         plot(P, "truncatedDodecahedron$(t)"; vertex_labels=false, vertex_size=16, vertex_color=:steelblue, padding=0.01, azimuth=0., elevation=0.035*pi, alpha=0.65)
     end
+end
+
+
+"""
+    truncate_at_vertex(F, v, ratio)
+
+Truncated the polytope at vertex number `v` at ratio `depth` along the adjacent edges.
+"""
+function truncate_at_vertex(F::Polytope, v::Int; depth::Real=0.2, atol=1e-8)
+    v in F.G.vertices || throw(ArgumentError("Vertex $v is not contained in `F`'s vertices"))
+    0 < depth < 1 || throw(ArgumentError("depth must satisfy 0 < depth < 1"))
+
+    realization = F.G.realization[:,1:length(F.G.vertices)]
+    coordinates = Matrix{Float64}(realization)
+
+    d, n = size(realization)
+    d >= 2 || throw(ArgumentError("This implementation assumes d >= 2"))
+
+    facets = F.facets
+    facet_lists = [collect(Int, facet) for facet in facets]
+    incident = findall(F -> v in F, facet_lists)
+    isempty(incident) && error("Vertex $v does not occur in any facet.")
+
+    incident_sets = [Set(facet_lists[index]) for index in incident]
+
+    neighbors = Int[]
+
+    for w in 1:n
+        w == v && continue
+
+        common_facets = [
+            facet_set
+            for facet_set in incident_sets
+            if w in facet_set
+        ]
+
+        isempty(common_facets) && continue
+
+        face_vertices = reduce(intersect, common_facets)
+
+        if length(face_vertices) == 2 &&
+           v in face_vertices &&
+           w in face_vertices
+            push!(neighbors, w)
+        end
+    end
+
+    sort!(neighbors)
+
+    isempty(neighbors) &&
+        error("Could not determine any edges incident to vertex $v.")
+
+    # ------------------------------------------------------------
+    # Compute an outward normal of a facet.
+    # ------------------------------------------------------------
+
+    function facet_normal(facet::Vector{Int})
+
+        length(facet) >= d ||
+            error(
+                "Facet $facet does not contain enough vertices " *
+                "for dimension $d."
+            )
+
+        basepoint = coordinates[:, facet[1]]
+
+        # Columns are direction vectors spanning the facet.
+        direction_matrix =
+            coordinates[:, facet] .-
+            reshape(basepoint, d, 1)
+
+        decomposition = svd(direction_matrix')
+
+        largest_singular_value =
+            isempty(decomposition.S) ?
+            0.0 :
+            maximum(decomposition.S)
+
+        rank_tolerance =
+            atol * max(1.0, largest_singular_value)
+
+        affine_rank =
+            count(
+                singular_value ->
+                    singular_value > rank_tolerance,
+                decomposition.S,
+            )
+
+        affine_rank == d - 1 ||
+            error(
+                "Facet $facet has affine rank $affine_rank; " *
+                "expected $(d - 1)."
+            )
+
+        # Null vector of the facet direction space.
+        normal = decomposition.V[:, end]
+        normal ./= norm(normal)
+
+        offset = dot(normal, basepoint)
+
+        signed_values =
+            vec(normal' * coordinates) .- offset
+
+        scale =
+            max(
+                1.0,
+                maximum(abs, vec(normal' * coordinates)),
+                abs(offset),
+            )
+
+        side_tolerance = atol * scale
+
+        if maximum(signed_values) <= side_tolerance
+            # Normal already points outward.
+
+        elseif minimum(signed_values) >= -side_tolerance
+            normal .*= -1
+            offset *= -1
+
+        else
+            error(
+                "Facet $facet is not supporting the supplied realization."
+            )
+        end
+
+        return normal, offset
+    end
+
+    # ------------------------------------------------------------
+    # Construct an exposing direction for v.
+    # ------------------------------------------------------------
+
+    cut_normal = zeros(Float64, d)
+
+    for index in incident
+        normal, _ = facet_normal(facet_lists[index])
+        cut_normal .+= normal
+    end
+
+    norm(cut_normal) > atol ||
+        error(
+            "Failed to construct an exposing direction at vertex $v."
+        )
+
+    cut_normal ./= norm(cut_normal)
+
+    scores = vec(cut_normal' * coordinates)
+
+    vertex_score = scores[v]
+
+    second_score =
+        maximum(
+            scores[index]
+            for index in 1:n
+            if index != v
+        )
+
+    score_tolerance =
+        atol *
+        max(
+            1.0,
+            abs(vertex_score),
+            abs(second_score),
+        )
+
+    vertex_score > second_score + score_tolerance ||
+        error(
+            "The constructed direction does not expose vertex $v uniquely."
+        )
+
+    # ------------------------------------------------------------
+    # Choose the truncating hyperplane.
+    # ------------------------------------------------------------
+
+    cut_offset =
+        vertex_score -
+        depth * (vertex_score - second_score)
+
+    # ------------------------------------------------------------
+    # Retain all original vertices except v.
+    # ------------------------------------------------------------
+
+    kept_vertices = [
+        index
+        for index in 1:n
+        if index != v
+    ]
+
+    number_of_vertices =
+        n - 1 + length(neighbors)
+
+    truncated_realization =
+        Matrix{Float64}(
+            undef,
+            d,
+            number_of_vertices,
+        )
+
+    old_to_new = zeros(Int, n)
+
+    for (new_index, old_index) in enumerate(kept_vertices)
+
+        truncated_realization[:, new_index] .=
+            coordinates[:, old_index]
+
+        old_to_new[old_index] = new_index
+    end
+
+    # ------------------------------------------------------------
+    # Intersect each incident edge [v,w] with the cut hyperplane.
+    # ------------------------------------------------------------
+
+    new_vertex_on_edge = Dict{Int, Int}()
+
+    new_vertex_offset = length(kept_vertices)
+
+    for (j, w) in enumerate(neighbors)
+
+        neighbor_score = scores[w]
+
+        interpolation_parameter =
+            (vertex_score - cut_offset) /
+            (vertex_score - neighbor_score)
+
+        if !(0 < interpolation_parameter < 1)
+            error(
+                "Intersection parameter on edge ($v,$w) is " *
+                "$interpolation_parameter; expected a value " *
+                "strictly between 0 and 1."
+            )
+        end
+
+        new_coordinates =
+            (1 - interpolation_parameter) .*
+            coordinates[:, v] +
+            interpolation_parameter .*
+            coordinates[:, w]
+
+        new_index = new_vertex_offset + j
+
+        truncated_realization[:, new_index] .=
+            new_coordinates
+
+        new_vertex_on_edge[w] = new_index
+    end
+
+    # ------------------------------------------------------------
+    # Update the old facets.
+    # ------------------------------------------------------------
+
+    truncated_facets = Vector{Vector{Int}}()
+
+    neighbor_set = Set(neighbors)
+
+    for facet in facet_lists
+
+        new_facet = Int[]
+
+        # Surviving original vertices
+        for vertex in facet
+            vertex == v && continue
+            push!(new_facet, old_to_new[vertex])
+        end
+
+        # New truncation vertices in this facet
+        if v in facet
+            for w in facet
+                if w in neighbor_set
+                    push!(
+                        new_facet,
+                        new_vertex_on_edge[w],
+                    )
+                end
+            end
+        end
+
+        sort!(unique!(new_facet))
+        push!(truncated_facets, new_facet)
+    end
+
+    # ------------------------------------------------------------
+    # Add the new truncation facet.
+    # ------------------------------------------------------------
+
+    truncation_facet =
+        sort([
+            new_vertex_on_edge[w]
+            for w in neighbors
+        ])
+
+    push!(truncated_facets, truncation_facet)
+
+    return Polytope(truncated_facets, truncated_realization)
 end
 
 
