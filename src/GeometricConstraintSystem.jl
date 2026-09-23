@@ -593,41 +593,83 @@ end
 
 Checks whether the point `p` lies in the interior of the polytope `P`.
 """
-function is_in_interior(F::Polytope, p::Vector{<:Real}; tol::Real=1e-8)
-    vrep = F.G.realization[:,1:length(F.G.vertices)]
-    barycentric_coords = vcat(vrep, [1 for _ in axes(vrep,2)]' ) \ vcat(p, 1)
-    if all(coord->coord>tol, barycentric_coords)
-        return true
-    end
-    #INFO: Check simplices for containment
-    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices), k in j+1:length(F.G.vertices), L in k+1:length(F.G.vertices)
-        barycentric_coords_simplex = vcat(vrep[:,[i,j,k,L]], [1 for _ in 1:4]' ) \ vcat(p, 1)
-        if all(coord->coord>tol, barycentric_coords_simplex)
-            return true
-        end 
-    end
-    #INFO: Check triangles next that do not belong to a face. They have overdetermined systems, so we have to check that too.
-    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices), k in j+1:length(F.G.vertices)
-        if any(face->i in face && j in face && k in face, F.facets)
-            continue
+function is_in_interior(F::Polytope, pt::Vector{<:Real}; tol::Real=1e-8)
+    realization = F.G.realization[:,1:length(F.G.vertices)]
+    facets = F.facets
+    d, n = size(realization)
+
+    length(pt) == d ||
+        throw(DimensionMismatch("pt must have length $d"))
+
+    all_vertices = Set(1:n)
+
+    for facet in facets
+        facet = collect(facet)
+
+        isempty(facet) &&
+            throw(ArgumentError("Facets cannot be empty."))
+
+        # Vertices of this facet, stored as columns.
+        V = realization[:, facet]
+
+        v0 = V[:, 1]
+
+        A = (V[:, 2:end] .- v0)'
+
+        F = svd(A; full=true)
+
+        # Last right singular vector spans the nullspace
+        # when the facet has codimension 1.
+        normal = F.V[:, end]
+
+        normal_norm = norm(normal)
+
+        normal_norm > tol ||
+            throw(ArgumentError(
+                "Could not determine a supporting hyperplane for facet $facet"
+            ))
+
+        normal ./= normal_norm
+        offset = dot(normal, v0)
+
+        # Vertices not lying on the facet.
+        nonfacet = collect(setdiff(all_vertices, Set(facet)))
+
+        isempty(nonfacet) &&
+            throw(ArgumentError(
+                "A facet cannot contain every vertex."
+            ))
+
+        # Signed distances, up to scaling, from the supporting hyperplane.
+        values = [
+            dot(normal, realization[:, j]) - offset
+            for j in nonfacet
+        ]
+
+        # Orient the normal so that the polytope satisfies
+        #
+        #     normal ⋅ x ≤ offset.
+        if all(x -> x >= -tol, values)
+            normal = -normal
+            offset = -offset
+            values = -values
         end
-        barycentric_coords_triangle = vcat(vrep[:,[i,j,k]], [1 for _ in 1:3]' ) \ vcat(p, 1)
-        if all(coord->coord>tol, barycentric_coords_line) && isapprox(norm(vcat(vrep[:,[i,j]], [1 for _ in 1:2]' )*barycentric_coords_triangle - vcat(p, 1)), 0; atol=tol)
-            return true
-        end 
-    end
-    #INFO: Finally check lines that do not belong to a face. They have overdetermined systems, so we have to check that too.
-    for i in 1:length(F.G.vertices), j in i+1:length(F.G.vertices)
-        if any(face->i in face && j in face, F.facets)
-            continue
+
+        # All non-facet vertices must lie on the same side.
+        if any(x -> x > tol, values)
+            throw(ArgumentError(
+                "Facet $facet is not a supporting facet of the realization."
+            ))
         end
-        barycentric_coords_line = vcat(vrep[:,[i,j]], [1 for _ in 1:2]' ) \ vcat(p, 1)
-        if all(coord->coord>tol, barycentric_coords_line) && isapprox(norm(vcat(vrep[:,[i,j]], [1 for _ in 1:2]' )*barycentric_coords_line - vcat(p, 1)), 0; atol=tol)
-            return true
-        end 
+
+        # Strict interior requires strict satisfaction of every
+        # facet inequality.
+        if dot(normal, pt) >= offset - tol
+            return false
+        end
     end
-    #INFO: If none of the checks succeed, return false.
-    return false
+
+    return true
 end
 
 

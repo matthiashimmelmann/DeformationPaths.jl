@@ -34,7 +34,7 @@ end
     cube = Polytope([[1,2,3,4],[5,6,7,8],[1,2,5,6],[2,3,6,7],[3,4,7,8],[1,4,5,8]], Matrix([-1 -1 -1; 1 -1 -1; 1 1 -1; -1 1 -1; -1 -1 1; 1 -1 1; 1 1 1; -1 1 1]'); center_realization=false)
     trunc_cube = truncate_at_vertex(cube, 1; depth=0.5)
     plot(trunc_cube, "trunc_cube")
-    rigid_points = coned_rigidity_phase_space(trunc_cube,[-1.5,-1.5,-1.5],[1.5,1.5,1.5]; check=:PSS, discretization_size=0.1)
+    rigid_points = coned_rigidity_phase_space(trunc_cube,[-2,-2,-2],[2,2,2]; check=:PSS, discretization_size=0.05)
     save_to_Houdini(rigid_points, "cone_cuboid_phase_space")
 end
 
